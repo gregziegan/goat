@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Collage exposing (collage, defaultLine, filled, move, rotate, toForm)
 import Color
@@ -126,6 +126,7 @@ type Msg
     | Undo
     | Redo
     | Reset
+    | Export
 
 
 update : Msg -> TimeTravel -> ( TimeTravel, List (Cmd Msg) )
@@ -238,6 +239,10 @@ update msg ({ present } as timeTravel) =
                 UndoList.reset timeTravel
                     => []
 
+            Export ->
+                timeTravel
+                    => [ exportToImage "annotation-app" ]
+
 
 {-| Add this model change to app history
 -}
@@ -286,9 +291,10 @@ viewPresent model =
                 _ ->
                     []
     in
-        div []
+        div [ id "annotation-app" ]
             ([ viewCanvas model
              , viewControls model
+             , button [ Html.Events.onClick Export ] [ text "Export" ]
              , p [] [ text <| toString <| model ]
              ]
                 ++ offscreenInput
@@ -383,7 +389,7 @@ viewCanvas model =
             |> collage 300 200
             |> toHtml
             |> List.singleton
-            |> div attrs
+            |> div (attrs ++ [ id "canvas" ])
 
 
 viewDrawing drawing mouse =
@@ -479,7 +485,7 @@ viewTextBox ({ start, end, text } as textBox) =
 
 viewImage : Element.Element
 viewImage =
-    image 300 200 "https://upload.wikimedia.org/wikipedia/commons/f/ff/Domestic_goat_kid_in_capeweed.jpg"
+    image 300 200 "photo.jpg"
 
 
 
@@ -575,6 +581,13 @@ drawingToEditMode drawing =
 
         Selection ->
             Select
+
+
+
+-- PORTS
+
+
+port exportToImage : String -> Cmd msg
 
 
 
