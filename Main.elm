@@ -14,6 +14,7 @@ import Rocket exposing ((=>))
 import Task exposing (succeed)
 import Text
 import UndoList exposing (UndoList)
+import Keyboard.Extra
 
 
 -- MODEL
@@ -83,6 +84,7 @@ type alias EditState =
 type alias Model =
     { edits : UndoList EditState
     , mouse : Mouse.Position
+    , keyboardState : Keyboard.Extra.State
     }
 
 
@@ -112,6 +114,7 @@ init : ( Model, List (Cmd Msg) )
 init =
     { edits = UndoList.fresh initialEditState
     , mouse = Mouse.Position 0 0
+    , keyboardState = Keyboard.Extra.initialState
     }
         => []
 
@@ -130,6 +133,7 @@ type Msg
     | TextBoxInput TextMode String
     | AddTextBox TextMode
     | SetMouse Mouse.Position
+    | KeyboardMsg Keyboard.Extra.Msg
     | ChangeDrawing Drawing
     | SelectColor Color
     | Undo
@@ -233,6 +237,13 @@ update msg ({ edits, mouse } as model) =
                 { model | mouse = pos }
                     => []
 
+            KeyboardMsg keyMsg ->
+                { model
+                    | keyboardState =
+                        Keyboard.Extra.update keyMsg model.keyboardState
+                }
+                    => []
+
             ChangeDrawing drawing ->
                 { editState | drawing = drawing }
                     |> skipChange model
@@ -281,7 +292,7 @@ updateMouse pos model =
 
 
 view : Model -> Html Msg
-view ({ edits, mouse } as model) =
+view ({ edits, mouse, keyboardState } as model) =
     let
         editState =
             edits.present
@@ -310,7 +321,7 @@ view ({ edits, mouse } as model) =
                     []
     in
         div [ id "annotation-app" ]
-            ([ viewCanvas editState mouse
+            ([ viewCanvas editState mouse keyboardState
              , viewControls editState
              , viewColorSelection editState
              , button [ Html.Events.onClick Export ] [ text "Export" ]
@@ -378,8 +389,8 @@ viewEditOption editState editMode =
             [ text <| modeToString editMode ]
 
 
-viewCanvas : EditState -> Mouse.Position -> Html Msg
-viewCanvas editState curMouse =
+viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Html Msg
+viewCanvas editState curMouse keyboardState =
     let
         attrs =
             case editState.drawing of
@@ -414,7 +425,7 @@ viewCanvas editState curMouse =
                     []
 
         currentDrawing =
-            viewDrawing editState curMouse
+            viewDrawing editState curMouse keyboardState
 
         arrows =
             List.map viewArrow editState.arrows
@@ -442,7 +453,8 @@ viewCanvas editState curMouse =
             |> div (attrs ++ [ id "canvas" ])
 
 
-viewDrawing { drawing, fill } mouse =
+viewDrawing : EditState -> Mouse.Position -> Keyboard.Extra.State -> Collage.Form
+viewDrawing { drawing, fill } mouse keyboardState =
     case drawing of
         DrawArrow arrowDrawing ->
             case arrowDrawing of
@@ -450,7 +462,7 @@ viewDrawing { drawing, fill } mouse =
                     toForm Element.empty
 
                 DrawingArrow pos ->
-                    Arrow pos mouse fill
+                    Arrow pos (normalizeMouse pos mouse keyboardState) fill
                         |> viewArrow
 
         DrawOval ovalDrawing ->
@@ -667,6 +679,23 @@ trackMouse editState =
             False
 
 
+shiftPressed keyboardState =
+    Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
+
+
+altPressed keyboardState =
+    Keyboard.Extra.isPressed Keyboard.Extra.Alt keyboardState
+
+
+normalizeMouse startPos curPos keyboardState =
+    if shiftPressed keyboardState then
+        { curPos | y = startPos.y }
+    else if altPressed keyboardState then
+        { curPos | x = startPos.x }
+    else
+        curPos
+
+
 
 -- PORTS
 
@@ -684,6 +713,7 @@ subscriptions model =
             Mouse.moves SetMouse
           else
             Sub.none
+        , Sub.map KeyboardMsg Keyboard.Extra.subscriptions
         ]
 
 
