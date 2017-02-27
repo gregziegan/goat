@@ -67,17 +67,18 @@ type alias TextBox =
     }
 
 
-type alias Model =
+type alias EditState =
     { arrows : List Arrow
     , ovals : List Oval
     , textBoxes : List TextBox
     , drawing : Drawing
-    , mouse : Mouse.Position
     }
 
 
-type alias TimeTravel =
-    UndoList Model
+type alias Model =
+    { edits : UndoList EditState
+    , mouse : Mouse.Position
+    }
 
 
 {-|
@@ -92,19 +93,20 @@ editModes =
     ]
 
 
-initialModel : Model
-initialModel =
+initialEditState : EditState
+initialEditState =
     { arrows = []
     , ovals = []
     , textBoxes = []
     , drawing = Selection
-    , mouse = Mouse.Position 0 0
     }
 
 
-init : ( TimeTravel, List (Cmd Msg) )
+init : ( Model, List (Cmd Msg) )
 init =
-    UndoList.fresh initialModel
+    { edits = UndoList.fresh initialEditState
+    , mouse = Mouse.Position 0 0
+    }
         => []
 
 
@@ -129,42 +131,45 @@ type Msg
     | Export
 
 
-update : Msg -> TimeTravel -> ( TimeTravel, List (Cmd Msg) )
-update msg ({ present } as timeTravel) =
+update : Msg -> Model -> ( Model, List (Cmd Msg) )
+update msg ({ edits, mouse } as model) =
     let
-        model =
-            present
+        editState =
+            edits.present
     in
         case msg of
             StartArrow pos ->
-                { model | drawing = DrawArrow (DrawingArrow pos) }
-                    |> logChange timeTravel
+                { editState | drawing = DrawArrow (DrawingArrow pos) }
+                    |> logChange model
+                    |> updateMouse pos
                     => []
 
             AddArrow startPos endPos ->
-                { model
-                    | arrows = Arrow startPos endPos :: model.arrows
+                { editState
+                    | arrows = Arrow startPos endPos :: editState.arrows
                     , drawing = DrawArrow NoArrow
                 }
-                    |> skipChange timeTravel
+                    |> skipChange model
                     => []
 
             StartOval pos ->
-                { model | drawing = DrawOval (DrawingOval pos) }
-                    |> logChange timeTravel
+                { editState | drawing = DrawOval (DrawingOval pos) }
+                    |> logChange model
+                    |> updateMouse pos
                     => []
 
             AddOval startPos endPos ->
-                { model
-                    | ovals = Oval startPos endPos :: model.ovals
+                { editState
+                    | ovals = Oval startPos endPos :: editState.ovals
                     , drawing = DrawOval NoOval
                 }
-                    |> skipChange timeTravel
+                    |> skipChange model
                     => []
 
             StartTextBox pos ->
-                { model | drawing = DrawTextBox (DrawingTextBox pos) }
-                    |> logChange timeTravel
+                { editState | drawing = DrawTextBox (DrawingTextBox pos) }
+                    |> logChange model
+                    |> updateMouse pos
                     => []
 
             PlaceTextBox startPos endPos ->
@@ -180,99 +185,100 @@ update msg ({ present } as timeTravel) =
                             Err _ ->
                                 Undo
                 in
-                    { model | drawing = DrawTextBox initialEdit }
-                        |> skipChange timeTravel
+                    { editState | drawing = DrawTextBox initialEdit }
+                        |> skipChange model
                         => [ Dom.focus "text-box-edit"
                                 |> Task.attempt tryToEdit
                            ]
 
             TextBoxInput textMode inputString ->
                 let
-                    newModel =
+                    newEditState =
                         case textMode of
                             EditingTextMode startPos endPos text ->
-                                { model | drawing = DrawTextBox (EditingTextMode startPos endPos inputString) }
+                                { editState | drawing = DrawTextBox (EditingTextMode startPos endPos inputString) }
 
                             _ ->
-                                model
+                                editState
                 in
-                    newModel
-                        |> skipChange timeTravel
+                    newEditState
+                        |> skipChange model
                         => []
 
             AddTextBox textMode ->
                 let
-                    newModel =
+                    newEditState =
                         case textMode of
                             EditingTextMode startPos endPos text ->
-                                { model
-                                    | textBoxes = TextBox startPos endPos text :: model.textBoxes
+                                { editState
+                                    | textBoxes = TextBox startPos endPos text :: editState.textBoxes
                                     , drawing = DrawTextBox NoText
                                 }
 
                             _ ->
-                                model
+                                editState
                 in
-                    newModel
-                        |> skipChange timeTravel
+                    newEditState
+                        |> skipChange model
                         => []
 
             SetMouse pos ->
                 { model | mouse = pos }
-                    |> skipChange timeTravel
                     => []
 
             ChangeDrawing drawing ->
-                { model | drawing = drawing }
-                    |> skipChange timeTravel
+                { editState | drawing = drawing }
+                    |> skipChange model
                     => []
 
             Undo ->
-                UndoList.undo timeTravel
+                { model | edits = UndoList.undo model.edits }
                     => []
 
             Redo ->
-                UndoList.redo timeTravel
+                { model | edits = UndoList.redo model.edits }
                     => []
 
             Reset ->
-                UndoList.reset timeTravel
+                { model | edits = UndoList.reset model.edits }
                     => []
 
             Export ->
-                timeTravel
+                model
                     => [ exportToImage "annotation-app" ]
 
 
-{-| Add this model change to app history
+{-| Add this editState change to app history
 -}
-logChange timeTravel model =
-    UndoList.new model timeTravel
+logChange model editState =
+    { model | edits = UndoList.new editState model.edits }
 
 
-{-| Do not add this model change to app history
+{-| Do not add this editState change to app history
 -}
-skipChange timeTravel model =
-    { timeTravel | present = model }
+skipChange model editState =
+    { model | edits = UndoList.mapPresent (\_ -> editState) model.edits }
+
+
+updateMouse pos model =
+    { model | mouse = pos }
 
 
 
 -- VIEW
 
 
-view : TimeTravel -> Html Msg
-view { present } =
-    viewPresent present
-
-
-viewPresent : Model -> Html Msg
-viewPresent model =
+view : Model -> Html Msg
+view ({ edits, mouse } as model) =
     let
+        editState =
+            edits.present
+
         options =
             { preventDefault = True, stopPropagation = False }
 
         offscreenInput =
-            case model.drawing of
+            case editState.drawing of
                 DrawTextBox textBoxDrawing ->
                     case textBoxDrawing of
                         EditingTextMode startPos endPos text ->
@@ -292,8 +298,8 @@ viewPresent model =
                     []
     in
         div [ id "annotation-app" ]
-            ([ viewCanvas model
-             , viewControls model
+            ([ viewCanvas editState mouse
+             , viewControls editState
              , button [ Html.Events.onClick Export ] [ text "Export" ]
              , p [] [ text <| toString <| model ]
              ]
@@ -301,20 +307,20 @@ viewPresent model =
             )
 
 
-viewControls model =
+viewControls editState =
     div []
         (button [ Html.Events.onClick Reset ] [ text "Reset" ]
             :: button [ Html.Events.onClick Undo ] [ text "Undo" ]
             :: button [ Html.Events.onClick Redo ] [ text "Redo" ]
-            :: List.map (viewEditOption model) editModes
+            :: List.map (viewEditOption editState) editModes
         )
 
 
-viewEditOption model editMode =
+viewEditOption editState editMode =
     let
         buttonStyle =
             style <|
-                if drawingToEditMode model.drawing == editMode then
+                if drawingToEditMode editState.drawing == editMode then
                     [ ( "background-color", "cyan" )
                     , ( "color", "white" )
                     ]
@@ -328,11 +334,11 @@ viewEditOption model editMode =
             [ text <| modeToString editMode ]
 
 
-viewCanvas : Model -> Html Msg
-viewCanvas model =
+viewCanvas : EditState -> Mouse.Position -> Html Msg
+viewCanvas editState curMouse =
     let
         attrs =
-            case model.drawing of
+            case editState.drawing of
                 DrawArrow arrowDrawing ->
                     case arrowDrawing of
                         NoArrow ->
@@ -364,16 +370,16 @@ viewCanvas model =
                     []
 
         currentDrawing =
-            viewDrawing model.drawing model.mouse
+            viewDrawing editState.drawing curMouse
 
         arrows =
-            List.map viewArrow model.arrows
+            List.map viewArrow editState.arrows
 
         ovals =
-            List.map viewOval model.ovals
+            List.map viewOval editState.ovals
 
         textBoxes =
-            List.map viewTextBox model.textBoxes
+            List.map viewTextBox editState.textBoxes
 
         forms =
             List.concat
@@ -583,6 +589,37 @@ drawingToEditMode drawing =
             Select
 
 
+trackMouse : EditState -> Bool
+trackMouse editState =
+    case editState.drawing of
+        DrawArrow arrowMode ->
+            case arrowMode of
+                DrawingArrow _ ->
+                    True
+
+                _ ->
+                    False
+
+        DrawOval ovalMode ->
+            case ovalMode of
+                DrawingOval _ ->
+                    True
+
+                _ ->
+                    False
+
+        DrawTextBox textMode ->
+            case textMode of
+                DrawingTextBox _ ->
+                    True
+
+                _ ->
+                    False
+
+        Selection ->
+            False
+
+
 
 -- PORTS
 
@@ -591,14 +628,27 @@ port exportToImage : String -> Cmd msg
 
 
 
+-- SUBSCRIPTIONS
+
+
+subscriptions model =
+    Sub.batch
+        [ if trackMouse model.edits.present then
+            Mouse.moves SetMouse
+          else
+            Sub.none
+        ]
+
+
+
 -- MAIN
 
 
-main : Program Never TimeTravel Msg
+main : Program Never Model Msg
 main =
     Html.program
         { init = Rocket.batchInit init
         , update = update >> Rocket.batchUpdate
         , view = view
-        , subscriptions = \model -> Mouse.moves SetMouse
+        , subscriptions = subscriptions
         }
