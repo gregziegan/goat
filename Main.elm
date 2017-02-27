@@ -1,7 +1,8 @@
 port module Main exposing (main)
 
 import Collage exposing (collage, defaultLine, filled, move, rotate, toForm)
-import Color
+import Color exposing (Color)
+import Color.Convert
 import Dom
 import Element exposing (image, toHtml)
 import Html exposing (Html, button, div, p, text)
@@ -51,12 +52,14 @@ type EditMode
 type alias Arrow =
     { start : Mouse.Position
     , end : Mouse.Position
+    , fill : Color
     }
 
 
 type alias Oval =
     { start : Mouse.Position
     , end : Mouse.Position
+    , fill : Color
     }
 
 
@@ -64,6 +67,7 @@ type alias TextBox =
     { start : Mouse.Position
     , end : Mouse.Position
     , text : String
+    , fill : Color
     }
 
 
@@ -72,6 +76,7 @@ type alias EditState =
     , ovals : List Oval
     , textBoxes : List TextBox
     , drawing : Drawing
+    , fill : Color
     }
 
 
@@ -99,6 +104,7 @@ initialEditState =
     , ovals = []
     , textBoxes = []
     , drawing = Selection
+    , fill = Color.red
     }
 
 
@@ -125,6 +131,7 @@ type Msg
     | AddTextBox TextMode
     | SetMouse Mouse.Position
     | ChangeDrawing Drawing
+    | SelectColor Color
     | Undo
     | Redo
     | Reset
@@ -146,7 +153,7 @@ update msg ({ edits, mouse } as model) =
 
             AddArrow startPos endPos ->
                 { editState
-                    | arrows = Arrow startPos endPos :: editState.arrows
+                    | arrows = Arrow startPos endPos editState.fill :: editState.arrows
                     , drawing = DrawArrow NoArrow
                 }
                     |> skipChange model
@@ -160,7 +167,7 @@ update msg ({ edits, mouse } as model) =
 
             AddOval startPos endPos ->
                 { editState
-                    | ovals = Oval startPos endPos :: editState.ovals
+                    | ovals = Oval startPos endPos editState.fill :: editState.ovals
                     , drawing = DrawOval NoOval
                 }
                     |> skipChange model
@@ -211,7 +218,7 @@ update msg ({ edits, mouse } as model) =
                         case textMode of
                             EditingTextMode startPos endPos text ->
                                 { editState
-                                    | textBoxes = TextBox startPos endPos text :: editState.textBoxes
+                                    | textBoxes = TextBox startPos endPos text editState.fill :: editState.textBoxes
                                     , drawing = DrawTextBox NoText
                                 }
 
@@ -229,6 +236,11 @@ update msg ({ edits, mouse } as model) =
             ChangeDrawing drawing ->
                 { editState | drawing = drawing }
                     |> skipChange model
+                    => []
+
+            SelectColor color ->
+                { editState | fill = color }
+                    |> logChange model
                     => []
 
             Undo ->
@@ -300,6 +312,7 @@ view ({ edits, mouse } as model) =
         div [ id "annotation-app" ]
             ([ viewCanvas editState mouse
              , viewControls editState
+             , viewColorSelection editState
              , button [ Html.Events.onClick Export ] [ text "Export" ]
              , p [] [ text <| toString <| model ]
              ]
@@ -314,6 +327,37 @@ viewControls editState =
             :: button [ Html.Events.onClick Redo ] [ text "Redo" ]
             :: List.map (viewEditOption editState) editModes
         )
+
+
+viewColorSelection editState =
+    [ Color.red
+    , Color.orange
+    , Color.yellow
+    , Color.green
+    , Color.blue
+    , Color.purple
+    , Color.brown
+    ]
+        |> List.map (viewColorOption editState.fill)
+        |> div []
+
+
+viewColorOption selectedColor color =
+    button
+        [ style
+            ([ "width" => "20px"
+             , "height" => "20px"
+             , "background-color" => Color.Convert.colorToHex color
+             ]
+                ++ (if selectedColor == color then
+                        [ "border" => "1px solid black" ]
+                    else
+                        []
+                   )
+            )
+        , Html.Events.onClick (SelectColor color)
+        ]
+        []
 
 
 viewEditOption editState editMode =
@@ -370,7 +414,7 @@ viewCanvas editState curMouse =
                     []
 
         currentDrawing =
-            viewDrawing editState.drawing curMouse
+            viewDrawing editState curMouse
 
         arrows =
             List.map viewArrow editState.arrows
@@ -398,7 +442,7 @@ viewCanvas editState curMouse =
             |> div (attrs ++ [ id "canvas" ])
 
 
-viewDrawing drawing mouse =
+viewDrawing { drawing, fill } mouse =
     case drawing of
         DrawArrow arrowDrawing ->
             case arrowDrawing of
@@ -406,7 +450,7 @@ viewDrawing drawing mouse =
                     toForm Element.empty
 
                 DrawingArrow pos ->
-                    Arrow pos mouse
+                    Arrow pos mouse fill
                         |> viewArrow
 
         DrawOval ovalDrawing ->
@@ -415,7 +459,7 @@ viewDrawing drawing mouse =
                     toForm Element.empty
 
                 DrawingOval pos ->
-                    Oval pos mouse
+                    Oval pos mouse fill
                         |> viewOval
 
         DrawTextBox textBoxDrawing ->
@@ -424,11 +468,11 @@ viewDrawing drawing mouse =
                     toForm Element.empty
 
                 DrawingTextBox pos ->
-                    TextBox pos mouse ""
+                    TextBox pos mouse "" fill
                         |> viewTextBox
 
                 EditingTextMode startPos endPos text ->
-                    TextBox startPos endPos text
+                    TextBox startPos endPos text fill
                         |> viewTextBox
 
         Selection ->
@@ -436,25 +480,28 @@ viewDrawing drawing mouse =
 
 
 viewArrow : Arrow -> Collage.Form
-viewArrow ({ start, end } as arrow) =
+viewArrow ({ start, end, fill } as arrow) =
     let
         lineStyle =
-            Collage.defaultLine
+            { defaultLine | width = 10, color = fill }
     in
         Collage.group
             [ Collage.ngon 3 15
-                |> filled Color.black
+                |> filled fill
                 |> rotate (arrowAngle arrow)
                 |> rotate (degrees 90)
                 |> move (mouseOffset start)
             , Collage.segment (mouseOffset start) (mouseOffset end)
-                |> Collage.traced { lineStyle | width = 10 }
+                |> Collage.traced lineStyle
             ]
 
 
 viewOval : Oval -> Collage.Form
-viewOval ({ start, end } as oval) =
+viewOval ({ start, end, fill } as oval) =
     let
+        lineStyle =
+            { defaultLine | color = fill }
+
         delta =
             end.x
                 - start.x
@@ -464,13 +511,13 @@ viewOval ({ start, end } as oval) =
             mouseOffset start
     in
         Collage.oval (toFloat (end.x - start.x)) (toFloat (end.y - start.y))
-            |> Collage.outlined Collage.defaultLine
+            |> Collage.outlined lineStyle
             |> Collage.move ( offsetX, offsetY )
             |> Collage.moveX (delta / 2)
 
 
 viewTextBox : TextBox -> Collage.Form
-viewTextBox ({ start, end, text } as textBox) =
+viewTextBox ({ start, end, text, fill } as textBox) =
     let
         delta =
             end.x
@@ -482,7 +529,7 @@ viewTextBox ({ start, end, text } as textBox) =
     in
         Collage.group
             [ Collage.rect (toFloat (end.x - start.x)) (toFloat (end.y - start.y))
-                |> Collage.outlined (Collage.dotted Color.black)
+                |> Collage.outlined (Collage.dotted fill)
             , Collage.text <| Text.fromString text
             ]
             |> Collage.move ( offsetX, offsetY )
