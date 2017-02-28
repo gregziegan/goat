@@ -16,6 +16,8 @@ import Rocket exposing ((=>))
 import Task exposing (succeed)
 import Text
 import UndoList exposing (UndoList)
+import Svg
+import Svg.Attributes
 
 
 -- MODEL
@@ -62,6 +64,7 @@ type alias Arrow =
     { start : Mouse.Position
     , end : Mouse.Position
     , fill : Color
+    , stroke : LineStroke
     }
 
 
@@ -69,6 +72,7 @@ type alias Oval =
     { start : Mouse.Position
     , end : Mouse.Position
     , fill : Color
+    , stroke : LineStroke
     }
 
 
@@ -77,6 +81,7 @@ type alias TextBox =
     , end : Mouse.Position
     , text : String
     , fill : Color
+    , stroke : LineStroke
     }
 
 
@@ -103,6 +108,8 @@ type alias EditState =
     , lines : List Line
     , drawing : Drawing
     , fill : Color
+    , stroke : LineStroke
+    , showLineStrokeOptions : Bool
     }
 
 
@@ -111,6 +118,30 @@ type alias Model =
     , mouse : Mouse.Position
     , keyboardState : Keyboard.Extra.State
     }
+
+
+colorOptions : List Color
+colorOptions =
+    [ Color.red
+    , Color.orange
+    , Color.yellow
+    , Color.green
+    , Color.blue
+    , Color.purple
+    , Color.brown
+    , Color.black
+    , Color.white
+    ]
+
+
+lineStrokeOptions : List LineStroke
+lineStrokeOptions =
+    [ VeryThin
+    , Thin
+    , Medium
+    , Thick
+    , VeryThick
+    ]
 
 
 {-|
@@ -134,6 +165,8 @@ initialEditState =
     , lines = []
     , drawing = Selection
     , fill = Color.red
+    , stroke = Medium
+    , showLineStrokeOptions = False
     }
 
 
@@ -165,6 +198,8 @@ type Msg
     | KeyboardMsg Keyboard.Extra.Msg
     | ChangeDrawing Drawing
     | SelectColor Color
+    | SelectLineStroke LineStroke
+    | ToggleLineStrokeDropdown
     | Undo
     | Redo
     | Reset
@@ -186,7 +221,7 @@ update msg ({ edits, mouse } as model) =
 
             AddArrow startPos endPos ->
                 { editState
-                    | arrows = Arrow startPos endPos editState.fill :: editState.arrows
+                    | arrows = Arrow startPos endPos editState.fill editState.stroke :: editState.arrows
                     , drawing = DrawArrow NoArrow
                 }
                     |> skipChange model
@@ -200,7 +235,7 @@ update msg ({ edits, mouse } as model) =
 
             AddOval startPos endPos ->
                 { editState
-                    | ovals = Oval startPos endPos editState.fill :: editState.ovals
+                    | ovals = Oval startPos endPos editState.fill editState.stroke :: editState.ovals
                     , drawing = DrawOval NoOval
                 }
                     |> skipChange model
@@ -251,7 +286,7 @@ update msg ({ edits, mouse } as model) =
                         case textMode of
                             EditingTextMode startPos endPos text ->
                                 { editState
-                                    | textBoxes = TextBox startPos endPos text editState.fill :: editState.textBoxes
+                                    | textBoxes = TextBox startPos endPos text editState.fill editState.stroke :: editState.textBoxes
                                     , drawing = DrawTextBox NoText
                                 }
 
@@ -270,7 +305,7 @@ update msg ({ edits, mouse } as model) =
 
             AddLine startPos endPos ->
                 { editState
-                    | lines = Line startPos endPos editState.fill Medium :: editState.lines
+                    | lines = Line startPos endPos editState.fill editState.stroke :: editState.lines
                     , drawing = DrawLine NoLine
                 }
                     |> skipChange model
@@ -295,6 +330,16 @@ update msg ({ edits, mouse } as model) =
             SelectColor color ->
                 { editState | fill = color }
                     |> logChange model
+                    => []
+
+            SelectLineStroke lineStroke ->
+                { editState | stroke = lineStroke }
+                    |> logChange model
+                    => []
+
+            ToggleLineStrokeDropdown ->
+                { editState | showLineStrokeOptions = not editState.showLineStrokeOptions }
+                    |> skipChange model
                     => []
 
             Undo ->
@@ -370,6 +415,7 @@ view ({ edits, mouse, keyboardState } as model) =
             ([ viewCanvas editState mouse keyboardState
              , viewControls editState
              , viewColorSelection editState
+             , viewLineStrokeDropdown editState
              , button [ Html.Events.onClick Export ] [ text "Export" ]
              , p [] [ text <| toString <| model ]
              ]
@@ -389,16 +435,7 @@ viewControls editState =
 
 viewColorSelection : EditState -> Html Msg
 viewColorSelection editState =
-    [ Color.red
-    , Color.orange
-    , Color.yellow
-    , Color.green
-    , Color.blue
-    , Color.purple
-    , Color.brown
-    , Color.black
-    , Color.white
-    ]
+    colorOptions
         |> List.map (viewColorOption editState.fill)
         |> div []
 
@@ -420,6 +457,92 @@ viewColorOption selectedColor color =
         , Html.Events.onClick (SelectColor color)
         ]
         []
+
+
+viewLineStrokeDropdown : EditState -> Html Msg
+viewLineStrokeDropdown editState =
+    div
+        [ style
+            [ "display" => "flex"
+            , "flex-direction" => "column"
+            , "width" => "40px"
+            ]
+        ]
+        [ button
+            [ Html.Events.onClick ToggleLineStrokeDropdown
+            , style
+                [ "border" => "0.5px solid #d8d8d8"
+                , "background-color" => "white"
+                , "padding" => "2px"
+                , "display" => "flex"
+                , "flex-direction" => "row"
+                , "justify-content" => "center"
+                , "align-items" => "center"
+                ]
+            ]
+            [ viewLineStrokeDropdownIcon
+            , Html.span [ style [ "font-size" => "20px", "color" => "grey" ] ] [ text "⌄" ]
+            ]
+        , if editState.showLineStrokeOptions then
+            viewLineStrokeOptions editState
+          else
+            text ""
+        ]
+
+
+viewLineStrokeOptions : EditState -> Html Msg
+viewLineStrokeOptions editState =
+    lineStrokeOptions
+        |> List.map (viewLineStrokeOption editState.stroke)
+        |> div
+            [ style
+                [ "border" => "1px solid grey"
+                , "width" => "40px"
+                , "display" => "flex"
+                , "flex-direction" => "column"
+                ]
+            ]
+
+
+viewLineStrokeOption : LineStroke -> LineStroke -> Html Msg
+viewLineStrokeOption selectedStroke stroke =
+    button
+        [ style
+            ([ "display" => "flex"
+             , "justify-content" => "center"
+             , "align-items" => "center"
+             , "padding" => "0"
+             , "border" => "none"
+             , "background-color" => "white"
+             , "border-top" => "1px solid grey"
+             ]
+                ++ if selectedStroke == stroke then
+                    [ "background-color" => "cyan" ]
+                   else
+                    []
+            )
+        , Html.Events.onClick (SelectLineStroke stroke)
+        ]
+        [ lineStrokeToSvg stroke ]
+
+
+viewLineStrokeDropdownIcon : Html Msg
+viewLineStrokeDropdownIcon =
+    Svg.svg [ Svg.Attributes.width "30", Svg.Attributes.height "30", Svg.Attributes.viewBox "0 0 30 30" ]
+        [ Svg.g [ Svg.Attributes.stroke "grey" ]
+            [ Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "30", Svg.Attributes.y1 "4", Svg.Attributes.y2 "4", Svg.Attributes.strokeWidth "2" ] []
+            , Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "30", Svg.Attributes.y1 "12", Svg.Attributes.y2 "12", Svg.Attributes.strokeWidth "4" ] []
+            , Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "30", Svg.Attributes.y1 "23", Svg.Attributes.y2 "23", Svg.Attributes.strokeWidth "6" ] []
+            ]
+        ]
+
+
+lineStrokeToSvg : LineStroke -> Html Msg
+lineStrokeToSvg lineStroke =
+    Svg.svg [ Svg.Attributes.width "20", Svg.Attributes.height "20", Svg.Attributes.viewBox "0 0 20 20" ]
+        [ Svg.g [ Svg.Attributes.stroke "grey" ]
+            [ Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "20", Svg.Attributes.y1 "10", Svg.Attributes.y2 "10", Svg.Attributes.strokeWidth <| toString <| strokeToWidth ] [] ]
+        ]
 
 
 viewEditOption : EditState -> EditMode -> Html Msg
@@ -518,7 +641,7 @@ viewCanvas editState curMouse keyboardState =
 
 
 viewDrawing : EditState -> Mouse.Position -> Keyboard.Extra.State -> Collage.Form
-viewDrawing { drawing, fill } mouse keyboardState =
+viewDrawing { drawing, fill, stroke } mouse keyboardState =
     case drawing of
         DrawArrow arrowDrawing ->
             case arrowDrawing of
@@ -526,7 +649,7 @@ viewDrawing { drawing, fill } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingArrow pos ->
-                    Arrow pos (normalizeMouse pos mouse keyboardState) fill
+                    Arrow pos (normalizeMouse pos mouse keyboardState) fill stroke
                         |> viewArrow
 
         DrawOval ovalDrawing ->
@@ -535,7 +658,7 @@ viewDrawing { drawing, fill } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingOval pos ->
-                    Oval pos mouse fill
+                    Oval pos mouse fill stroke
                         |> viewOval
 
         DrawTextBox textBoxDrawing ->
@@ -544,11 +667,11 @@ viewDrawing { drawing, fill } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingTextBox pos ->
-                    TextBox pos mouse "" fill
+                    TextBox pos mouse "" fill stroke
                         |> viewTextBox
 
                 EditingTextMode startPos endPos text ->
-                    TextBox startPos endPos text fill
+                    TextBox startPos endPos text fill stroke
                         |> viewTextBox
 
         DrawLine lineMode ->
@@ -557,7 +680,7 @@ viewDrawing { drawing, fill } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingLine pos ->
-                    Line pos (normalizeMouse pos mouse keyboardState) fill Medium
+                    Line pos (normalizeMouse pos mouse keyboardState) fill stroke
                         |> viewLine
 
         Selection ->
@@ -565,13 +688,19 @@ viewDrawing { drawing, fill } mouse keyboardState =
 
 
 viewArrow : Arrow -> Collage.Form
-viewArrow ({ start, end, fill } as arrow) =
+viewArrow ({ start, end, fill, stroke } as arrow) =
     let
+        strokeWidth =
+            toFloat <| strokeToWidth stroke
+
         lineStyle =
-            { defaultLine | width = 10, color = fill }
+            { defaultLine | width = strokeWidth, color = fill }
+
+        arrowHeadRadius =
+            strokeWidth * 2
     in
         Collage.group
-            [ Collage.ngon 3 15
+            [ Collage.ngon 3 arrowHeadRadius
                 |> filled fill
                 |> rotate (arrowAngle arrow)
                 |> rotate (degrees 90)
@@ -582,10 +711,10 @@ viewArrow ({ start, end, fill } as arrow) =
 
 
 viewOval : Oval -> Collage.Form
-viewOval ({ start, end, fill } as oval) =
+viewOval ({ start, end, fill, stroke } as oval) =
     let
         lineStyle =
-            { defaultLine | color = fill }
+            { defaultLine | color = fill, width = toFloat <| strokeToWidth stroke }
 
         delta =
             end.x
@@ -622,10 +751,10 @@ viewTextBox ({ start, end, text, fill } as textBox) =
 
 
 viewLine : Line -> Collage.Form
-viewLine { start, end, fill } =
+viewLine { start, end, fill, stroke } =
     let
         lineStyle =
-            { defaultLine | width = 10, color = fill }
+            { defaultLine | width = toFloat <| strokeToWidth stroke, color = fill }
     in
         Collage.segment (mouseOffset start) (mouseOffset end)
             |> Collage.traced lineStyle
@@ -805,6 +934,25 @@ normalizeMouse startPos curPos keyboardState =
         { curPos | x = startPos.x }
     else
         curPos
+
+
+strokeToWidth : LineStroke -> Int
+strokeToWidth stroke =
+    case stroke of
+        VeryThin ->
+            2
+
+        Thin ->
+            4
+
+        Medium ->
+            6
+
+        Thick ->
+            8
+
+        VeryThick ->
+            10
 
 
 
