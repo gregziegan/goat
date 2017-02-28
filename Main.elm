@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Char exposing (KeyCode)
 import Collage exposing (collage, defaultLine, filled, move, rotate, toForm)
 import Color exposing (Color)
 import Color.Convert
@@ -7,14 +8,14 @@ import Dom
 import Element exposing (image, toHtml)
 import Html exposing (Html, button, div, p, text)
 import Html.Attributes exposing (id, style, type_)
-import Html.Events exposing (keyCode, on, onInput, onWithOptions)
+import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
 import Json.Decode as Json
+import Keyboard.Extra
 import Mouse
 import Rocket exposing ((=>))
 import Task exposing (succeed)
 import Text
 import UndoList exposing (UndoList)
-import Keyboard.Extra
 
 
 -- MODEL
@@ -36,10 +37,16 @@ type TextMode
     | EditingTextMode Mouse.Position Mouse.Position String
 
 
+type LineMode
+    = NoLine
+    | DrawingLine Mouse.Position
+
+
 type Drawing
     = DrawArrow ArrowMode
     | DrawOval OvalMode
     | DrawTextBox TextMode
+    | DrawLine LineMode
     | Selection
 
 
@@ -47,6 +54,7 @@ type EditMode
     = EditArrow
     | EditOval
     | EditTextBox
+    | EditLine
     | Select
 
 
@@ -72,10 +80,27 @@ type alias TextBox =
     }
 
 
+type alias Line =
+    { start : Mouse.Position
+    , end : Mouse.Position
+    , fill : Color
+    , stroke : LineStroke
+    }
+
+
+type LineStroke
+    = VeryThin
+    | Thin
+    | Medium
+    | Thick
+    | VeryThick
+
+
 type alias EditState =
     { arrows : List Arrow
     , ovals : List Oval
     , textBoxes : List TextBox
+    , lines : List Line
     , drawing : Drawing
     , fill : Color
     }
@@ -96,6 +121,7 @@ editModes =
     [ EditArrow
     , EditOval
     , EditTextBox
+    , EditLine
     , Select
     ]
 
@@ -105,6 +131,7 @@ initialEditState =
     { arrows = []
     , ovals = []
     , textBoxes = []
+    , lines = []
     , drawing = Selection
     , fill = Color.red
     }
@@ -132,6 +159,8 @@ type Msg
     | PlaceTextBox Mouse.Position Mouse.Position
     | TextBoxInput TextMode String
     | AddTextBox TextMode
+    | StartLine Mouse.Position
+    | AddLine Mouse.Position Mouse.Position
     | SetMouse Mouse.Position
     | KeyboardMsg Keyboard.Extra.Msg
     | ChangeDrawing Drawing
@@ -233,6 +262,20 @@ update msg ({ edits, mouse } as model) =
                         |> skipChange model
                         => []
 
+            StartLine pos ->
+                { editState | drawing = DrawLine (DrawingLine pos) }
+                    |> logChange model
+                    |> updateMouse pos
+                    => []
+
+            AddLine startPos endPos ->
+                { editState
+                    | lines = Line startPos endPos editState.fill Medium :: editState.lines
+                    , drawing = DrawLine NoLine
+                }
+                    |> skipChange model
+                    => []
+
             SetMouse pos ->
                 { model | mouse = pos }
                     => []
@@ -273,16 +316,19 @@ update msg ({ edits, mouse } as model) =
 
 {-| Add this editState change to app history
 -}
+logChange : Model -> EditState -> Model
 logChange model editState =
     { model | edits = UndoList.new editState model.edits }
 
 
 {-| Do not add this editState change to app history
 -}
+skipChange : Model -> EditState -> Model
 skipChange model editState =
     { model | edits = UndoList.mapPresent (\_ -> editState) model.edits }
 
 
+updateMouse : Mouse.Position -> Model -> Model
 updateMouse pos model =
     { model | mouse = pos }
 
@@ -331,6 +377,7 @@ view ({ edits, mouse, keyboardState } as model) =
             )
 
 
+viewControls : EditState -> Html Msg
 viewControls editState =
     div []
         (button [ Html.Events.onClick Reset ] [ text "Reset" ]
@@ -340,6 +387,7 @@ viewControls editState =
         )
 
 
+viewColorSelection : EditState -> Html Msg
 viewColorSelection editState =
     [ Color.red
     , Color.orange
@@ -348,11 +396,14 @@ viewColorSelection editState =
     , Color.blue
     , Color.purple
     , Color.brown
+    , Color.black
+    , Color.white
     ]
         |> List.map (viewColorOption editState.fill)
         |> div []
 
 
+viewColorOption : Color -> Color -> Html Msg
 viewColorOption selectedColor color =
     button
         [ style
@@ -371,6 +422,7 @@ viewColorOption selectedColor color =
         []
 
 
+viewEditOption : EditState -> EditMode -> Html Msg
 viewEditOption editState editMode =
     let
         buttonStyle =
@@ -421,6 +473,14 @@ viewCanvas editState curMouse keyboardState =
                         EditingTextMode startPos endPos text ->
                             [ Html.Events.onClick <| AddTextBox <| EditingTextMode startPos endPos text ]
 
+                DrawLine lineDrawing ->
+                    case lineDrawing of
+                        NoLine ->
+                            [ onClick (Json.map StartLine Mouse.position) ]
+
+                        DrawingLine startPos ->
+                            [ onClick (Json.map (AddLine startPos) Mouse.position) ]
+
                 Selection ->
                     []
 
@@ -436,6 +496,9 @@ viewCanvas editState curMouse keyboardState =
         textBoxes =
             List.map viewTextBox editState.textBoxes
 
+        lines =
+            List.map viewLine editState.lines
+
         forms =
             List.concat
                 [ [ toForm viewImage
@@ -444,6 +507,7 @@ viewCanvas editState curMouse keyboardState =
                 , arrows
                 , ovals
                 , textBoxes
+                , lines
                 ]
     in
         forms
@@ -486,6 +550,15 @@ viewDrawing { drawing, fill } mouse keyboardState =
                 EditingTextMode startPos endPos text ->
                     TextBox startPos endPos text fill
                         |> viewTextBox
+
+        DrawLine lineMode ->
+            case lineMode of
+                NoLine ->
+                    toForm Element.empty
+
+                DrawingLine pos ->
+                    Line pos (normalizeMouse pos mouse keyboardState) fill Medium
+                        |> viewLine
 
         Selection ->
             toForm Element.empty
@@ -548,6 +621,16 @@ viewTextBox ({ start, end, text, fill } as textBox) =
             |> Collage.move ( (delta / 2), (toFloat <| start.y - end.y) )
 
 
+viewLine : Line -> Collage.Form
+viewLine { start, end, fill } =
+    let
+        lineStyle =
+            { defaultLine | width = 10, color = fill }
+    in
+        Collage.segment (mouseOffset start) (mouseOffset end)
+            |> Collage.traced lineStyle
+
+
 viewImage : Element.Element
 viewImage =
     image 300 200 "photo.jpg"
@@ -557,10 +640,12 @@ viewImage =
 -- HELPERS
 
 
-onClick toMsg =
-    on "click" toMsg
+onClick : Json.Decoder msg -> Html.Attribute msg
+onClick decodeToMsg =
+    on "click" decodeToMsg
 
 
+handleTextBoxInputKey : Msg -> KeyCode -> Result String Msg
 handleTextBoxInputKey submitMsg code =
     if code == 13 then
         Ok submitMsg
@@ -570,6 +655,7 @@ handleTextBoxInputKey submitMsg code =
         Err "not handling that key"
 
 
+fromKeyResult : Result String Msg -> Json.Decoder Msg
 fromKeyResult result =
     case result of
         Ok msg ->
@@ -579,11 +665,13 @@ fromKeyResult result =
             Json.fail errMsg
 
 
+decodeTextInputKey : Msg -> Json.Decoder Msg
 decodeTextInputKey submitMsg =
     Json.map (handleTextBoxInputKey submitMsg) keyCode
         |> Json.andThen fromKeyResult
 
 
+mouseOffset : Mouse.Position -> ( Float, Float )
 mouseOffset { x, y } =
     ( toFloat (x - 150), toFloat (100 - y) )
 
@@ -603,6 +691,7 @@ arrowAngle { start, end } =
         radians
 
 
+modeToString : EditMode -> String
 modeToString mode =
     case mode of
         EditArrow ->
@@ -614,10 +703,14 @@ modeToString mode =
         EditTextBox ->
             "Text"
 
+        EditLine ->
+            "Line"
+
         Select ->
             "Select"
 
 
+editToDrawing : EditMode -> Drawing
 editToDrawing editMode =
     case editMode of
         EditArrow ->
@@ -629,10 +722,14 @@ editToDrawing editMode =
         EditTextBox ->
             DrawTextBox NoText
 
+        EditLine ->
+            DrawLine NoLine
+
         Select ->
             Selection
 
 
+drawingToEditMode : Drawing -> EditMode
 drawingToEditMode drawing =
     case drawing of
         DrawArrow _ ->
@@ -643,6 +740,9 @@ drawingToEditMode drawing =
 
         DrawTextBox _ ->
             EditTextBox
+
+        DrawLine _ ->
+            EditLine
 
         Selection ->
             Select
@@ -675,18 +775,29 @@ trackMouse editState =
                 _ ->
                     False
 
+        DrawLine lineMode ->
+            case lineMode of
+                DrawingLine _ ->
+                    True
+
+                _ ->
+                    False
+
         Selection ->
             False
 
 
+shiftPressed : Keyboard.Extra.State -> Bool
 shiftPressed keyboardState =
     Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
 
 
+altPressed : Keyboard.Extra.State -> Bool
 altPressed keyboardState =
     Keyboard.Extra.isPressed Keyboard.Extra.Alt keyboardState
 
 
+normalizeMouse : Mouse.Position -> Mouse.Position -> Keyboard.Extra.State -> Mouse.Position
 normalizeMouse startPos curPos keyboardState =
     if shiftPressed keyboardState then
         { curPos | y = startPos.y }
@@ -707,6 +818,7 @@ port exportToImage : String -> Cmd msg
 -- SUBSCRIPTIONS
 
 
+subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ if trackMouse model.edits.present then
