@@ -102,7 +102,8 @@ type LineStroke
 
 
 type alias EditState =
-    { arrows : List Arrow
+    { photo : String
+    , arrows : List Arrow
     , ovals : List Oval
     , textBoxes : List TextBox
     , lines : List Line
@@ -159,7 +160,8 @@ editModes =
 
 initialEditState : EditState
 initialEditState =
-    { arrows = []
+    { photo = ""
+    , arrows = []
     , ovals = []
     , textBoxes = []
     , lines = []
@@ -195,6 +197,7 @@ type Msg
     | StartLine Mouse.Position
     | AddLine Mouse.Position Mouse.Position
     | SetMouse Mouse.Position
+    | SetImage String
     | KeyboardMsg Keyboard.Extra.Msg
     | ChangeDrawing Drawing
     | SelectColor Color
@@ -313,6 +316,11 @@ update msg ({ edits, mouse } as model) =
 
             SetMouse pos ->
                 { model | mouse = pos }
+                    => []
+
+            SetImage imageUrl ->
+                { editState | photo = imageUrl }
+                    |> logChange model
                     => []
 
             KeyboardMsg keyMsg ->
@@ -541,7 +549,7 @@ lineStrokeToSvg : LineStroke -> Html Msg
 lineStrokeToSvg lineStroke =
     Svg.svg [ Svg.Attributes.width "20", Svg.Attributes.height "20", Svg.Attributes.viewBox "0 0 20 20" ]
         [ Svg.g [ Svg.Attributes.stroke "grey" ]
-            [ Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "20", Svg.Attributes.y1 "10", Svg.Attributes.y2 "10", Svg.Attributes.strokeWidth <| toString <| strokeToWidth ] [] ]
+            [ Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "20", Svg.Attributes.y1 "10", Svg.Attributes.y2 "10", Svg.Attributes.strokeWidth <| toString <| strokeToWidth lineStroke ] [] ]
         ]
 
 
@@ -624,7 +632,7 @@ viewCanvas editState curMouse keyboardState =
 
         forms =
             List.concat
-                [ [ toForm viewImage
+                [ [ toForm <| viewImage editState.photo
                   , currentDrawing
                   ]
                 , arrows
@@ -760,9 +768,9 @@ viewLine { start, end, fill, stroke } =
             |> Collage.traced lineStyle
 
 
-viewImage : Element.Element
-viewImage =
-    image 300 200 "photo.jpg"
+viewImage : String -> Element.Element
+viewImage photo =
+    image 300 200 photo
 
 
 
@@ -962,6 +970,9 @@ strokeToWidth stroke =
 port exportToImage : String -> Cmd msg
 
 
+port importImage : (String -> msg) -> Sub msg
+
+
 
 -- SUBSCRIPTIONS
 
@@ -974,6 +985,7 @@ subscriptions model =
           else
             Sub.none
         , Sub.map KeyboardMsg Keyboard.Extra.subscriptions
+        , importImage SetImage
         ]
 
 

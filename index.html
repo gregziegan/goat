@@ -3,10 +3,37 @@
 
   <body>
     <div id="root"></div>
+    <div id="droparea" style="width: 200px; height: 200px; border: 1px solid red;"></div>
     <canvas id="export" width=100 height=100 style="display:none;"></canvas>
     <div id="export-image"></div>
     <script src="elm.js"></script>
+    <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
     <script>
+      var target = document.getElementById('droparea');
+      target.addEventListener("dragover", function(e) { e.preventDefault(); console.log('dragover') });
+      target.addEventListener("drop", function(e){
+      	  e.preventDefault()
+          console.log('drop')
+      	  loadImage(e.dataTransfer.files[0])
+      }, true);
+
+      function loadImage(src){
+      	//	Prevent any non-image file type from being read.
+      	if (!src.type.match(/image.*/)) {
+      		return
+      	}
+
+      	//	Create our FileReader and run the results through the render function.
+      	var reader = new FileReader();
+      	reader.onload = function(e) {
+          const contentType = 'image/jpeg';
+          const blob = b64toBlob(e.target.result.replace('data:image/jpeg;base64,', ''), contentType);
+          const blobUrl = URL.createObjectURL(blob);
+          console.log(blobUrl)
+      		app.ports.importImage.send(blobUrl)
+      	}
+      	reader.readAsDataURL(src)
+      }
       var app = Elm.Main.embed(document.getElementById("root"));
       app.ports.exportToImage.subscribe(function(id) {
         var canvas = document.getElementById('export')
@@ -37,5 +64,26 @@
         }
         img.src = 'photo.jpg'
       });
+      const b64toBlob = (b64Data, contentType='', sliceSize=512) => {
+        const byteCharacters = atob(b64Data);
+        const byteArrays = [];
+
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+          const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+          const byteNumbers = new Array(slice.length);
+          for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+
+          const byteArray = new Uint8Array(byteNumbers);
+
+          byteArrays.push(byteArray);
+        }
+
+        const blob = new Blob(byteArrays, {type: contentType});
+        return blob;
+      }
+      // app.ports.importImage.send('photo.jpg')
     </script>
   </body>
