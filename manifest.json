@@ -9,7 +9,7 @@
   "private": false,
   "location": {
     "support": {
-      "ticket_editor": "index.html"
+      "ticket_editor": "assets/index.html"
     }
   },
   "parameters": [],
