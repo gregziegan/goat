@@ -16,21 +16,18 @@
     "postversion": "zendency changelog && git push"
   },
   "main": "./",
-  "compiler": [
-    {
-      "from": "./elm.js",
-      "to": "./elm.js"
-    }
-  ],
+  "compiler": [],
   "directories": {
-    "translations": "./"
+    "translations": "./translations"
   },
   "files": [
-    "./index.html"
+    "./elm.js",
+    "./index.html",
+    "./style.css",
+    "./photo.jpg",
+    "./icon_ticket_editor.svg"
   ],
-  "directories": {
-  },
   "devDependencies": {
-    "zendency": "git+ssh://git@github.com/zendesk/zendency.git#v3.2.1"
+    "zendency": "git+ssh://git@github.com/zendesk/zendency.git#v3.2.2"
   }
 }
