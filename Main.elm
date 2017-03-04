@@ -7,36 +7,43 @@ import Color.Convert
 import Dom
 import Element exposing (image, toHtml)
 import Html exposing (Html, button, div, p, text)
-import Html.Attributes exposing (id, style, type_)
+import Html.Attributes exposing (class, classList, id, style, type_)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra
 import Mouse
 import Rocket exposing ((=>))
+import Svgs
 import Task exposing (succeed)
 import Text
 import UndoList exposing (UndoList)
-import Svg
-import Svg.Attributes
 
 
 -- MODEL
 
 
+type alias StartPosition =
+    Mouse.Position
+
+
+type alias EndPosition =
+    Mouse.Position
+
+
 type ArrowMode
     = NoArrow
-    | DrawingArrow Mouse.Position
+    | DrawingArrow StartPosition
 
 
 type OvalMode
     = NoOval
-    | DrawingOval Mouse.Position
+    | DrawingOval StartPosition
 
 
 type TextMode
     = NoText
-    | DrawingTextBox Mouse.Position
-    | EditingTextMode Mouse.Position Mouse.Position String
+    | DrawingTextBox StartPosition
+    | EditingTextMode StartPosition EndPosition String
 
 
 type LineMode
@@ -82,6 +89,7 @@ type alias TextBox =
     , text : String
     , fill : Color
     , stroke : LineStroke
+    , fontSize : Float
     }
 
 
@@ -110,7 +118,9 @@ type alias EditState =
     , drawing : Drawing
     , fill : Color
     , stroke : LineStroke
+    , fontSize : Float
     , showLineStrokeOptions : Bool
+    , showFontSizeOptions : Bool
     }
 
 
@@ -158,6 +168,17 @@ editModes =
     ]
 
 
+fontSizes : List Float
+fontSizes =
+    [ 10
+    , 12
+    , 14
+    , 16
+    , 18
+    , 20
+    ]
+
+
 initialEditState : EditState
 initialEditState =
     { photo = ""
@@ -166,9 +187,11 @@ initialEditState =
     , textBoxes = []
     , lines = []
     , drawing = Selection
-    , fill = Color.red
+    , fill = Color.black
     , stroke = Medium
+    , fontSize = 14
     , showLineStrokeOptions = False
+    , showFontSizeOptions = False
     }
 
 
@@ -187,9 +210,9 @@ init =
 
 type Msg
     = StartArrow Mouse.Position
-    | AddArrow Mouse.Position Mouse.Position
+    | AddArrow StartPosition Mouse.Position
     | StartOval Mouse.Position
-    | AddOval Mouse.Position Mouse.Position
+    | AddOval StartPosition Mouse.Position
     | StartTextBox Mouse.Position
     | PlaceTextBox Mouse.Position Mouse.Position
     | TextBoxInput TextMode String
@@ -202,7 +225,9 @@ type Msg
     | ChangeDrawing Drawing
     | SelectColor Color
     | SelectLineStroke LineStroke
+    | SelectFontSize Float
     | ToggleLineStrokeDropdown
+    | ToggleFontSizeDropdown
     | Undo
     | Redo
     | Reset
@@ -289,7 +314,7 @@ update msg ({ edits, mouse } as model) =
                         case textMode of
                             EditingTextMode startPos endPos text ->
                                 { editState
-                                    | textBoxes = TextBox startPos endPos text editState.fill editState.stroke :: editState.textBoxes
+                                    | textBoxes = TextBox startPos endPos text editState.fill editState.stroke editState.fontSize :: editState.textBoxes
                                     , drawing = DrawTextBox NoText
                                 }
 
@@ -345,8 +370,18 @@ update msg ({ edits, mouse } as model) =
                     |> logChange model
                     => []
 
+            SelectFontSize fontSize ->
+                { editState | fontSize = fontSize }
+                    |> logChange model
+                    => []
+
             ToggleLineStrokeDropdown ->
                 { editState | showLineStrokeOptions = not editState.showLineStrokeOptions }
+                    |> skipChange model
+                    => []
+
+            ToggleFontSizeDropdown ->
+                { editState | showFontSizeOptions = not editState.showFontSizeOptions }
                     |> skipChange model
                     => []
 
@@ -408,7 +443,7 @@ view ({ edits, mouse, keyboardState } as model) =
                                 [ id "text-box-edit"
                                 , onInput (TextBoxInput (EditingTextMode startPos endPos text))
                                 , onWithOptions "keydown" options (decodeTextInputKey <| AddTextBox <| EditingTextMode startPos endPos text)
-                                , style [ ( "opacity", "0" ) ]
+                                , class "hidden-input"
                                 ]
                                 [ Html.text text ]
                             ]
@@ -424,8 +459,8 @@ view ({ edits, mouse, keyboardState } as model) =
              , viewControls editState
              , viewColorSelection editState
              , viewLineStrokeDropdown editState
+             , viewTextSizeDropdown editState
              , button [ Html.Events.onClick Export ] [ text "Export" ]
-             , p [] [ text <| toString <| model ]
              ]
                 ++ offscreenInput
             )
@@ -441,6 +476,44 @@ viewControls editState =
         )
 
 
+viewTextSizeDropdown : EditState -> Html Msg
+viewTextSizeDropdown editState =
+    div
+        [ class "dropdown-things"
+        ]
+        [ button
+            [ Html.Events.onClick ToggleFontSizeDropdown
+            , class "dropdown-button"
+            ]
+            [ Svgs.viewTextIcon
+            , Svgs.viewDownArrow
+            ]
+        , if editState.showFontSizeOptions then
+            viewTextSizeOptions editState
+          else
+            text ""
+        ]
+
+
+viewTextSizeOptions : EditState -> Html Msg
+viewTextSizeOptions editState =
+    fontSizes
+        |> List.map (viewFontSizeOption editState.fontSize)
+        |> div [ class "dropdown-option" ]
+
+
+viewFontSizeOption : Float -> Float -> Html Msg
+viewFontSizeOption selectedFontSize fontSize =
+    button
+        [ classList
+            [ "dropdown-button" => True
+            , "dropdown-button--selected" => selectedFontSize == fontSize
+            ]
+        , Html.Events.onClick (SelectFontSize fontSize)
+        ]
+        [ text <| toString <| fontSize ]
+
+
 viewColorSelection : EditState -> Html Msg
 viewColorSelection editState =
     colorOptions
@@ -451,17 +524,8 @@ viewColorSelection editState =
 viewColorOption : Color -> Color -> Html Msg
 viewColorOption selectedColor color =
     button
-        [ style
-            ([ "width" => "20px"
-             , "height" => "20px"
-             , "background-color" => Color.Convert.colorToHex color
-             ]
-                ++ (if selectedColor == color then
-                        [ "border" => "1px solid black" ]
-                    else
-                        []
-                   )
-            )
+        [ classList [ "color-option" => True, "color-option--selected" => selectedColor == color ]
+        , style [ "background-color" => Color.Convert.colorToHex color ]
         , Html.Events.onClick (SelectColor color)
         ]
         []
@@ -470,25 +534,12 @@ viewColorOption selectedColor color =
 viewLineStrokeDropdown : EditState -> Html Msg
 viewLineStrokeDropdown editState =
     div
-        [ style
-            [ "display" => "flex"
-            , "flex-direction" => "column"
-            , "width" => "40px"
-            ]
-        ]
+        [ class "dropdown-things" ]
         [ button
             [ Html.Events.onClick ToggleLineStrokeDropdown
-            , style
-                [ "border" => "0.5px solid #d8d8d8"
-                , "background-color" => "white"
-                , "padding" => "2px"
-                , "display" => "flex"
-                , "flex-direction" => "row"
-                , "justify-content" => "center"
-                , "align-items" => "center"
-                ]
+            , class "dropdown-button"
             ]
-            [ viewLineStrokeDropdownIcon
+            [ Svgs.viewLineStrokeDropdownIcon
             , Html.span [ style [ "font-size" => "20px", "color" => "grey" ] ] [ text "⌄" ]
             ]
         , if editState.showLineStrokeOptions then
@@ -502,74 +553,28 @@ viewLineStrokeOptions : EditState -> Html Msg
 viewLineStrokeOptions editState =
     lineStrokeOptions
         |> List.map (viewLineStrokeOption editState.stroke)
-        |> div
-            [ style
-                [ "border" => "1px solid grey"
-                , "width" => "40px"
-                , "display" => "flex"
-                , "flex-direction" => "column"
-                ]
-            ]
+        |> div [ class "dropdown-option" ]
 
 
 viewLineStrokeOption : LineStroke -> LineStroke -> Html Msg
 viewLineStrokeOption selectedStroke stroke =
     button
-        [ style
-            ([ "display" => "flex"
-             , "justify-content" => "center"
-             , "align-items" => "center"
-             , "padding" => "0"
-             , "border" => "none"
-             , "background-color" => "white"
-             , "border-top" => "1px solid grey"
-             ]
-                ++ if selectedStroke == stroke then
-                    [ "background-color" => "cyan" ]
-                   else
-                    []
-            )
+        [ classList
+            [ "dropdown-button" => True
+            , "dropdown-button--selected" => selectedStroke == stroke
+            ]
         , Html.Events.onClick (SelectLineStroke stroke)
         ]
-        [ lineStrokeToSvg stroke ]
-
-
-viewLineStrokeDropdownIcon : Html Msg
-viewLineStrokeDropdownIcon =
-    Svg.svg [ Svg.Attributes.width "30", Svg.Attributes.height "30", Svg.Attributes.viewBox "0 0 30 30" ]
-        [ Svg.g [ Svg.Attributes.stroke "grey" ]
-            [ Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "30", Svg.Attributes.y1 "4", Svg.Attributes.y2 "4", Svg.Attributes.strokeWidth "2" ] []
-            , Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "30", Svg.Attributes.y1 "12", Svg.Attributes.y2 "12", Svg.Attributes.strokeWidth "4" ] []
-            , Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "30", Svg.Attributes.y1 "23", Svg.Attributes.y2 "23", Svg.Attributes.strokeWidth "6" ] []
-            ]
-        ]
-
-
-lineStrokeToSvg : LineStroke -> Html Msg
-lineStrokeToSvg lineStroke =
-    Svg.svg [ Svg.Attributes.width "20", Svg.Attributes.height "20", Svg.Attributes.viewBox "0 0 20 20" ]
-        [ Svg.g [ Svg.Attributes.stroke "grey" ]
-            [ Svg.line [ Svg.Attributes.x1 "0", Svg.Attributes.x2 "20", Svg.Attributes.y1 "10", Svg.Attributes.y2 "10", Svg.Attributes.strokeWidth <| toString <| strokeToWidth lineStroke ] [] ]
-        ]
+        [ Svgs.viewLineStroke (strokeToWidth stroke) ]
 
 
 viewEditOption : EditState -> EditMode -> Html Msg
 viewEditOption editState editMode =
-    let
-        buttonStyle =
-            style <|
-                if drawingToEditMode editState.drawing == editMode then
-                    [ ( "background-color", "cyan" )
-                    , ( "color", "white" )
-                    ]
-                else
-                    []
-    in
-        button
-            [ Html.Events.onClick (ChangeDrawing <| editToDrawing editMode)
-            , buttonStyle
-            ]
-            [ text <| modeToString editMode ]
+    button
+        [ Html.Events.onClick (ChangeDrawing <| editToDrawing editMode)
+        , classList [ "edit-mode--selected" => drawingToEditMode editState.drawing == editMode ]
+        ]
+        [ text <| modeToString editMode ]
 
 
 viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Html Msg
@@ -602,7 +607,11 @@ viewCanvas editState curMouse keyboardState =
                             [ onClick (Json.map (PlaceTextBox startPos) Mouse.position) ]
 
                         EditingTextMode startPos endPos text ->
-                            [ Html.Events.onClick <| AddTextBox <| EditingTextMode startPos endPos text ]
+                            [ if text == "" then
+                                Html.Events.onClick Undo
+                              else
+                                Html.Events.onClick <| AddTextBox <| EditingTextMode startPos endPos text
+                            ]
 
                 DrawLine lineDrawing ->
                     case lineDrawing of
@@ -625,7 +634,7 @@ viewCanvas editState curMouse keyboardState =
             List.map viewOval editState.ovals
 
         textBoxes =
-            List.map viewTextBox editState.textBoxes
+            List.map (viewTextBox False) editState.textBoxes
 
         lines =
             List.map viewLine editState.lines
@@ -649,7 +658,7 @@ viewCanvas editState curMouse keyboardState =
 
 
 viewDrawing : EditState -> Mouse.Position -> Keyboard.Extra.State -> Collage.Form
-viewDrawing { drawing, fill, stroke } mouse keyboardState =
+viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
     case drawing of
         DrawArrow arrowDrawing ->
             case arrowDrawing of
@@ -675,12 +684,12 @@ viewDrawing { drawing, fill, stroke } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingTextBox pos ->
-                    TextBox pos mouse "" fill stroke
-                        |> viewTextBox
+                    TextBox pos mouse "" fill stroke fontSize
+                        |> viewTextBox True
 
                 EditingTextMode startPos endPos text ->
-                    TextBox startPos endPos text fill stroke
-                        |> viewTextBox
+                    TextBox startPos endPos text fill stroke fontSize
+                        |> viewTextBox True
 
         DrawLine lineMode ->
             case lineMode of
@@ -738,8 +747,8 @@ viewOval ({ start, end, fill, stroke } as oval) =
             |> Collage.moveX (delta / 2)
 
 
-viewTextBox : TextBox -> Collage.Form
-viewTextBox ({ start, end, text, fill } as textBox) =
+viewTextBox : Bool -> TextBox -> Collage.Form
+viewTextBox showBorder ({ start, end, text, fill, fontSize } as textBox) =
     let
         delta =
             end.x
@@ -750,9 +759,14 @@ viewTextBox ({ start, end, text, fill } as textBox) =
             mouseOffset start
     in
         Collage.group
-            [ Collage.rect (toFloat (end.x - start.x)) (toFloat (end.y - start.y))
-                |> Collage.outlined (Collage.dotted fill)
-            , Collage.text <| Text.fromString text
+            [ if showBorder then
+                Collage.rect (toFloat (end.x - start.x)) (toFloat (end.y - start.y))
+                    |> Collage.outlined (Collage.dotted fill)
+              else
+                toForm Element.empty
+            , Text.fromString text
+                |> Text.height fontSize
+                |> Collage.text
             ]
             |> Collage.move ( offsetX, offsetY )
             |> Collage.move ( (delta / 2), (toFloat <| start.y - end.y) )
