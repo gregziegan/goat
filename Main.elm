@@ -78,7 +78,7 @@ type alias Arrow =
     }
 
 
-type alias Oval =
+type alias Ellipse =
     { start : Mouse.Position
     , end : Mouse.Position
     , fill : Color
@@ -115,7 +115,7 @@ type LineStroke
 type alias EditState =
     { photo : String
     , arrows : List Arrow
-    , ovals : List Oval
+    , ellipses : List Ellipse
     , textBoxes : List TextBox
     , lines : List Line
     , drawing : Drawing
@@ -186,7 +186,7 @@ initialEditState : EditState
 initialEditState =
     { photo = ""
     , arrows = []
-    , ovals = []
+    , ellipses = []
     , textBoxes = []
     , lines = []
     , drawing = Selection
@@ -266,7 +266,7 @@ update msg ({ edits, mouse } as model) =
 
             AddEllipse startPos endPos ->
                 { editState
-                    | ovals = Oval startPos endPos editState.fill editState.stroke :: editState.ovals
+                    | ellipses = Ellipse startPos endPos editState.fill editState.stroke :: editState.ellipses
                     , drawing = DrawEllipse NoOval
                 }
                     |> skipChange model
@@ -675,8 +675,8 @@ viewCanvas editState curMouse keyboardState =
                         DrawingDiscreteArrow startPos ->
                             [ onClick <| Json.map (AddArrow startPos << stepMouse startPos) Mouse.position ]
 
-                DrawEllipse ovalDrawing ->
-                    case ovalDrawing of
+                DrawEllipse ellipseDrawing ->
+                    case ellipseDrawing of
                         NoOval ->
                             [ onClick (Json.map StartOval Mouse.position) ]
 
@@ -684,7 +684,7 @@ viewCanvas editState curMouse keyboardState =
                             [ onClick <| Json.map (AddEllipse startPos) Mouse.position ]
 
                         DrawingCircle startPos ->
-                            [ onClick <| Json.map (AddEllipse startPos) Mouse.position ]
+                            [ onClick <| Json.map (AddEllipse startPos << circleMouse startPos) Mouse.position ]
 
                 DrawTextBox textBoxDrawing ->
                     case textBoxDrawing of
@@ -721,8 +721,8 @@ viewCanvas editState curMouse keyboardState =
         arrows =
             List.map viewArrow editState.arrows
 
-        ovals =
-            List.map viewOval editState.ovals
+        ellipses =
+            List.map viewEllipse editState.ellipses
 
         textBoxes =
             List.map (viewTextBox False) editState.textBoxes
@@ -736,7 +736,7 @@ viewCanvas editState curMouse keyboardState =
                   , currentDrawing
                   ]
                 , arrows
-                , ovals
+                , ellipses
                 , textBoxes
                 , lines
                 ]
@@ -764,18 +764,18 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     Arrow pos (stepMouse pos mouse) fill stroke
                         |> viewArrow
 
-        DrawEllipse ovalDrawing ->
-            case ovalDrawing of
+        DrawEllipse ellipseDrawing ->
+            case ellipseDrawing of
                 NoOval ->
                     toForm Element.empty
 
                 DrawingOval pos ->
-                    Oval pos mouse fill stroke
-                        |> viewOval
+                    Ellipse pos mouse fill stroke
+                        |> viewEllipse
 
                 DrawingCircle pos ->
-                    Oval pos mouse fill stroke
-                        |> viewOval
+                    Ellipse pos (circleMouse pos mouse) fill stroke
+                        |> viewEllipse
 
         DrawTextBox textBoxDrawing ->
             case textBoxDrawing of
@@ -830,24 +830,23 @@ viewArrow ({ start, end, fill, stroke } as arrow) =
             ]
 
 
-viewOval : Oval -> Collage.Form
-viewOval ({ start, end, fill, stroke } as oval) =
+viewEllipse : Ellipse -> Collage.Form
+viewEllipse ({ start, end, fill, stroke } as ellipse) =
     let
         lineStyle =
             { defaultLine | color = fill, width = toFloat <| strokeToWidth stroke }
 
-        delta =
-            end.x
-                - start.x
-                |> toFloat
-
-        ( offsetX, offsetY ) =
+        ( x1, y1 ) =
             mouseOffset start
+
+        ( x2, y2 ) =
+            mouseOffset end
     in
-        Collage.oval (toFloat (end.x - start.x)) (toFloat (end.y - start.y))
+        Collage.oval (x2 - x1) (y2 - y1)
             |> Collage.outlined lineStyle
-            |> Collage.move ( offsetX, offsetY )
-            |> Collage.moveX (delta / 2)
+            |> Collage.move ( x1, y1 )
+            |> Collage.moveX ((x2 - x1) / 2)
+            |> Collage.moveY ((y2 - y1) / 2)
 
 
 viewTextBox : Bool -> TextBox -> Collage.Form
@@ -1027,6 +1026,9 @@ trackMouse editState =
                 DrawingOval _ ->
                     True
 
+                DrawingCircle _ ->
+                    True
+
                 _ ->
                     False
 
@@ -1053,11 +1055,6 @@ trackMouse editState =
             False
 
 
-shiftPressed : Keyboard.Extra.State -> Bool
-shiftPressed keyboardState =
-    Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
-
-
 toDeltas : Float -> Float -> ( Int, Int )
 toDeltas h theta =
     ( round <| cos theta * h, round <| (sin theta) * h )
@@ -1068,7 +1065,7 @@ calcDistance ( x1, y1 ) ( x2, y2 ) =
     sqrt <| (x2 - x1) ^ 2 + (y2 - y1) ^ 2
 
 
-stepMouse : Mouse.Position -> Mouse.Position -> Mouse.Position
+stepMouse : StartPosition -> EndPosition -> EndPosition
 stepMouse startPos curPos =
     arrowAngle startPos curPos
         / (pi / 4)
@@ -1079,6 +1076,21 @@ stepMouse startPos curPos =
         |> Tuple.mapFirst ((+) startPos.x)
         |> Tuple.mapSecond ((-) startPos.y)
         |> uncurry Mouse.Position
+
+
+circleMouse : StartPosition -> EndPosition -> EndPosition
+circleMouse startPos endPos =
+    let
+        ( x1, _ ) =
+            mouseOffset startPos
+
+        ( x2, _ ) =
+            mouseOffset endPos
+    in
+        if endPos.y < startPos.y then
+            { endPos | y = startPos.y - (round <| abs x2 - x1) }
+        else
+            { endPos | y = startPos.y + (round <| abs x2 - x1) }
 
 
 strokeToWidth : LineStroke -> Int

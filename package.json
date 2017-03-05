@@ -1,7 +1,7 @@
 {
   "name": "annotation-app",
   "version": "1.0.0",
-  "repository": "https://github.com/thebritican/annotation-app",
+  "repository": "https://github.com/thebritican/annotation-editor",
   "description": "Annotation app for the app framework",
   "author": "greg.ziegan@gmail.com",
   "license": "MIT",
