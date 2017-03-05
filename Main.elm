@@ -22,12 +22,16 @@ import UndoList exposing (UndoList)
 -- MODEL
 
 
+type alias Position =
+    ( Float, Float )
+
+
 type alias StartPosition =
-    Mouse.Position
+    Position
 
 
 type alias EndPosition =
-    Mouse.Position
+    Position
 
 
 type ArrowMode
@@ -72,24 +76,24 @@ type EditMode
 
 
 type alias Arrow =
-    { start : Mouse.Position
-    , end : Mouse.Position
+    { start : Position
+    , end : Position
     , fill : Color
     , stroke : LineStroke
     }
 
 
 type alias Ellipse =
-    { start : Mouse.Position
-    , end : Mouse.Position
+    { start : Position
+    , end : Position
     , fill : Color
     , stroke : LineStroke
     }
 
 
 type alias TextBox =
-    { start : Mouse.Position
-    , end : Mouse.Position
+    { start : Position
+    , end : Position
     , text : String
     , fill : Color
     , stroke : LineStroke
@@ -99,8 +103,8 @@ type alias TextBox =
 
 
 type alias Line =
-    { start : Mouse.Position
-    , end : Mouse.Position
+    { start : Position
+    , end : Position
     , fill : Color
     , stroke : LineStroke
     }
@@ -216,7 +220,7 @@ init =
 type Msg
     = StartArrow StartPosition
     | AddArrow StartPosition EndPosition
-    | StartOval Mouse.Position
+    | StartOval StartPosition
     | AddEllipse StartPosition EndPosition
     | StartTextBox StartPosition
     | PlaceTextBox StartPosition EndPosition
@@ -251,7 +255,7 @@ update msg ({ edits, mouse } as model) =
             StartArrow pos ->
                 { editState | drawing = DrawArrow (DrawingArrow pos) }
                     |> logChange model
-                    |> updateMouse pos
+                    |> updateMouse (fromPosition pos)
                     => []
 
             AddArrow startPos endPos ->
@@ -265,7 +269,7 @@ update msg ({ edits, mouse } as model) =
             StartOval pos ->
                 { editState | drawing = DrawEllipse (DrawingOval pos) }
                     |> logChange model
-                    |> updateMouse pos
+                    |> updateMouse (fromPosition pos)
                     => []
 
             AddEllipse startPos endPos ->
@@ -279,7 +283,7 @@ update msg ({ edits, mouse } as model) =
             StartTextBox pos ->
                 { editState | drawing = DrawTextBox (DrawingTextBox pos) }
                     |> logChange model
-                    |> updateMouse pos
+                    |> updateMouse (fromPosition pos)
                     => []
 
             PlaceTextBox startPos endPos ->
@@ -324,7 +328,7 @@ update msg ({ edits, mouse } as model) =
             StartLine pos ->
                 { editState | drawing = DrawLine (DrawingLine pos) }
                     |> logChange model
-                    |> updateMouse pos
+                    |> updateMouse (fromPosition pos)
                     => []
 
             AddLine startPos endPos ->
@@ -433,7 +437,7 @@ updateDrawingIfRotating mouse editState =
         DrawTextBox textMode ->
             case textMode of
                 RotatingText textBox ->
-                    { editState | drawing = DrawTextBox <| RotatingText { textBox | angle = arrowAngle textBox.start mouse } }
+                    { editState | drawing = DrawTextBox <| RotatingText { textBox | angle = arrowAngle textBox.start (toPosition mouse) } }
 
                 _ ->
                     editState
@@ -678,35 +682,35 @@ viewCanvas editState curMouse keyboardState =
                 DrawArrow arrowDrawing ->
                     case arrowDrawing of
                         NoArrow ->
-                            [ onClick (Json.map StartArrow Mouse.position) ]
+                            [ onClick (Json.map (StartArrow << toPosition) Mouse.position) ]
 
                         DrawingArrow startPos ->
-                            [ onClick <| Json.map (AddArrow startPos) Mouse.position ]
+                            [ onClick <| Json.map (AddArrow startPos << toPosition) Mouse.position ]
 
                         DrawingDiscreteArrow startPos ->
-                            [ onClick <| Json.map (AddArrow startPos << stepMouse startPos) Mouse.position ]
+                            [ onClick <| Json.map (AddArrow startPos << stepMouse startPos << toPosition) Mouse.position ]
 
                 DrawEllipse ellipseDrawing ->
                     case ellipseDrawing of
                         NoOval ->
-                            [ onClick (Json.map StartOval Mouse.position) ]
+                            [ onClick (Json.map (StartOval << toPosition) Mouse.position) ]
 
                         DrawingOval startPos ->
-                            [ onClick <| Json.map (AddEllipse startPos) Mouse.position ]
+                            [ onClick <| Json.map (AddEllipse startPos << toPosition) Mouse.position ]
 
                         DrawingCircle startPos ->
-                            [ onClick <| Json.map (AddEllipse startPos << circleMouse startPos) Mouse.position ]
+                            [ onClick <| Json.map (AddEllipse startPos << circleMouse startPos << toPosition) Mouse.position ]
 
                 DrawTextBox textBoxDrawing ->
                     case textBoxDrawing of
                         NoText ->
-                            [ onClick (Json.map StartTextBox Mouse.position) ]
+                            [ onClick (Json.map (StartTextBox << toPosition) Mouse.position) ]
 
                         DrawingTextBox start ->
-                            [ onClick (Json.map (PlaceTextBox start) Mouse.position) ]
+                            [ onClick (Json.map (PlaceTextBox start << toPosition) Mouse.position) ]
 
                         EditingText ({ start, end, text, angle } as textBox) ->
-                            [ if mouseIsOverRotateButton (rotateButtonPosition start end) (mouseOffset curMouse) then
+                            [ if mouseIsOverRotateButton (rotateButtonPosition start end) (toPosition curMouse) then
                                 Html.Events.onClick <| BeginRotatingTextBox 0 textBox
                               else if text == "" then
                                 Html.Events.onClick Undo
@@ -715,24 +719,24 @@ viewCanvas editState curMouse keyboardState =
                             ]
 
                         RotatingText ({ start } as textBox) ->
-                            [ onClick <| Json.map (FinishRotatingTextBox textBox << arrowAngle start) Mouse.position ]
+                            [ onClick <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toPosition) Mouse.position ]
 
                 DrawLine lineDrawing ->
                     case lineDrawing of
                         NoLine ->
-                            [ onClick (Json.map StartLine Mouse.position) ]
+                            [ onClick (Json.map (StartLine << toPosition) Mouse.position) ]
 
                         DrawingLine startPos ->
-                            [ onClick (Json.map (AddLine startPos) Mouse.position) ]
+                            [ onClick (Json.map (AddLine startPos << toPosition) Mouse.position) ]
 
                         DrawingDiscreteLine startPos ->
-                            [ onClick <| Json.map (AddLine startPos << stepMouse startPos) Mouse.position ]
+                            [ onClick <| Json.map (AddLine startPos << stepMouse startPos << toPosition) Mouse.position ]
 
                 Selection ->
                     []
 
         currentDrawing =
-            viewDrawing editState curMouse keyboardState
+            viewDrawing editState (toPosition curMouse) keyboardState
 
         arrows =
             List.map viewArrow editState.arrows
@@ -764,7 +768,7 @@ viewCanvas editState curMouse keyboardState =
             |> div (attrs ++ [ id "canvas" ])
 
 
-viewDrawing : EditState -> Mouse.Position -> Keyboard.Extra.State -> Collage.Form
+viewDrawing : EditState -> Position -> Keyboard.Extra.State -> Collage.Form
 viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
     case drawing of
         DrawArrow arrowDrawing ->
@@ -844,8 +848,8 @@ viewArrow ({ start, end, fill, stroke } as arrow) =
                 |> filled fill
                 |> rotate (arrowAngle arrow.start arrow.end)
                 |> rotate (degrees 60)
-                |> move (mouseOffset start)
-            , Collage.segment (mouseOffset start) (mouseOffset end)
+                |> move start
+            , Collage.segment start end
                 |> Collage.traced lineStyle
             ]
 
@@ -857,10 +861,10 @@ viewEllipse ({ start, end, fill, stroke } as ellipse) =
             { defaultLine | color = fill, width = toFloat <| strokeToWidth stroke }
 
         ( x1, y1 ) =
-            mouseOffset start
+            start
 
         ( x2, y2 ) =
-            mouseOffset end
+            end
     in
         Collage.oval (x2 - x1) (y2 - y1)
             |> Collage.outlined lineStyle
@@ -879,10 +883,10 @@ viewTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
             y2 - y1
 
         ( x1, y1 ) =
-            mouseOffset start
+            start
 
         ( x2, y2 ) =
-            mouseOffset end
+            end
     in
         Collage.group
             [ Text.fromString text
@@ -904,10 +908,10 @@ viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
             y2 - y1
 
         ( x1, y1 ) =
-            mouseOffset start
+            start
 
         ( x2, y2 ) =
-            mouseOffset end
+            end
     in
         Collage.group
             [ Collage.rect dx dy
@@ -931,10 +935,10 @@ viewTextBoxWithRotateButton ({ start, end, text, fill, fontSize, angle } as text
             y2 - y1
 
         ( x1, y1 ) =
-            mouseOffset start
+            start
 
         ( x2, y2 ) =
-            mouseOffset end
+            end
     in
         Collage.group
             [ Collage.circle 7
@@ -961,10 +965,10 @@ viewRotatingTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
             y2 - y1
 
         ( x1, y1 ) =
-            mouseOffset start
+            start
 
         ( x2, y2 ) =
-            mouseOffset end
+            end
     in
         Collage.group
             [ Collage.circle 7
@@ -987,7 +991,7 @@ viewLine { start, end, fill, stroke } =
         lineStyle =
             { defaultLine | width = toFloat <| strokeToWidth stroke, color = fill }
     in
-        Collage.segment (mouseOffset start) (mouseOffset end)
+        Collage.segment start end
             |> Collage.traced lineStyle
 
 
@@ -1031,20 +1035,19 @@ decodeTextInputKey submitMsg =
         |> Json.andThen fromKeyResult
 
 
-mouseOffset : Mouse.Position -> ( Float, Float )
-mouseOffset { x, y } =
+toPosition : Mouse.Position -> Position
+toPosition { x, y } =
     ( toFloat (x - 150), toFloat (100 - y) )
 
 
-arrowAngle : Mouse.Position -> Mouse.Position -> Float
-arrowAngle start end =
+fromPosition : Position -> Mouse.Position
+fromPosition ( x, y ) =
+    Mouse.Position (round x + 150) (round ((y * -1) + 100))
+
+
+arrowAngle : StartPosition -> EndPosition -> Float
+arrowAngle ( x1, y1 ) ( x2, y2 ) =
     let
-        ( x1, y1 ) =
-            mouseOffset start
-
-        ( x2, y2 ) =
-            mouseOffset end
-
         theta =
             atan2 (y2 - y1) (x2 - x1)
 
@@ -1168,42 +1171,34 @@ trackMouse editState =
             False
 
 
-toDeltas : Float -> Float -> ( Int, Int )
+toDeltas : Float -> Float -> Position
 toDeltas h theta =
-    ( round <| cos theta * h, round <| (sin theta) * h )
+    ( cos theta * h, (sin theta) * h )
 
 
-calcDistance : ( number, number ) -> ( number, number ) -> Float
+calcDistance : Position -> Position -> Float
 calcDistance ( x1, y1 ) ( x2, y2 ) =
     sqrt <| (x2 - x1) ^ 2 + (y2 - y1) ^ 2
 
 
 stepMouse : StartPosition -> EndPosition -> EndPosition
-stepMouse startPos curPos =
+stepMouse (( x1, y1 ) as startPos) (( x2, y2 ) as curPos) =
     arrowAngle startPos curPos
         / (pi / 4)
         |> round
         |> toFloat
         |> (*) (pi / 4)
-        |> toDeltas (calcDistance (mouseOffset startPos) (mouseOffset curPos))
-        |> Tuple.mapFirst ((+) startPos.x)
-        |> Tuple.mapSecond ((-) startPos.y)
-        |> uncurry Mouse.Position
+        |> toDeltas (calcDistance startPos curPos)
+        |> Tuple.mapFirst ((+) x1)
+        |> Tuple.mapSecond ((+) y1)
 
 
 circleMouse : StartPosition -> EndPosition -> EndPosition
-circleMouse startPos endPos =
-    let
-        ( x1, _ ) =
-            mouseOffset startPos
-
-        ( x2, _ ) =
-            mouseOffset endPos
-    in
-        if endPos.y < startPos.y then
-            { endPos | y = startPos.y - (round <| abs x2 - x1) }
-        else
-            { endPos | y = startPos.y + (round <| abs x2 - x1) }
+circleMouse ( x1, y1 ) ( x2, y2 ) =
+    if y2 < y1 then
+        ( x2, y1 - abs x2 - x1 )
+    else
+        ( x2, y1 + abs x2 - x1 )
 
 
 strokeToWidth : LineStroke -> Int
@@ -1225,15 +1220,9 @@ strokeToWidth stroke =
             10
 
 
-rotateButtonPosition : StartPosition -> EndPosition -> ( Float, Float )
-rotateButtonPosition startPos endPos =
+rotateButtonPosition : StartPosition -> EndPosition -> Position
+rotateButtonPosition ( x1, y1 ) ( x2, y2 ) =
     let
-        ( x1, y1 ) =
-            mouseOffset startPos
-
-        ( x2, y2 ) =
-            mouseOffset endPos
-
         dy =
             y2 - y1
 
