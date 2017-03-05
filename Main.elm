@@ -10,7 +10,7 @@ import Html exposing (Html, button, div, p, text)
 import Html.Attributes exposing (class, classList, id, style, type_)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
 import Json.Decode as Json
-import Keyboard.Extra exposing (KeyChange(..), Key)
+import Keyboard.Extra exposing (Key, KeyChange(..))
 import Mouse
 import Rocket exposing ((=>))
 import Svgs
@@ -45,7 +45,8 @@ type EllipseMode
 type TextMode
     = NoText
     | DrawingTextBox StartPosition
-    | EditingTextMode StartPosition EndPosition String
+    | EditingText TextBox
+    | RotatingText TextBox
 
 
 type LineMode
@@ -93,6 +94,7 @@ type alias TextBox =
     , fill : Color
     , stroke : LineStroke
     , fontSize : Float
+    , angle : Float
     }
 
 
@@ -218,8 +220,10 @@ type Msg
     | AddEllipse StartPosition EndPosition
     | StartTextBox StartPosition
     | PlaceTextBox StartPosition EndPosition
-    | TextBoxInput TextMode String
-    | AddTextBox TextMode
+    | TextBoxInput TextBox String
+    | BeginRotatingTextBox Float TextBox
+    | FinishRotatingTextBox TextBox Float
+    | AddTextBox TextBox
     | StartLine StartPosition
     | AddLine StartPosition EndPosition
     | SetMouse Mouse.Position
@@ -280,53 +284,42 @@ update msg ({ edits, mouse } as model) =
 
             PlaceTextBox startPos endPos ->
                 let
-                    initialEdit =
-                        EditingTextMode startPos endPos ""
+                    initialEditState =
+                        TextBox startPos endPos "" editState.fill editState.stroke editState.fontSize 0
 
                     tryToEdit result =
                         case result of
                             Ok _ ->
-                                TextBoxInput initialEdit ""
+                                TextBoxInput initialEditState ""
 
                             Err _ ->
                                 Undo
                 in
-                    { editState | drawing = DrawTextBox initialEdit }
+                    { editState | drawing = DrawTextBox <| EditingText initialEditState }
                         |> skipChange model
                         => [ Dom.focus "text-box-edit"
                                 |> Task.attempt tryToEdit
                            ]
 
-            TextBoxInput textMode inputString ->
-                let
-                    newEditState =
-                        case textMode of
-                            EditingTextMode startPos endPos text ->
-                                { editState | drawing = DrawTextBox (EditingTextMode startPos endPos inputString) }
+            TextBoxInput textBox inputString ->
+                { editState | drawing = DrawTextBox <| EditingText { textBox | text = inputString } }
+                    |> skipChange model
+                    => []
 
-                            _ ->
-                                editState
-                in
-                    newEditState
-                        |> skipChange model
-                        => []
+            BeginRotatingTextBox angle textBox ->
+                { editState | drawing = DrawTextBox <| RotatingText { textBox | angle = angle } }
+                    |> skipChange model
+                    => []
 
-            AddTextBox textMode ->
-                let
-                    newEditState =
-                        case textMode of
-                            EditingTextMode startPos endPos text ->
-                                { editState
-                                    | textBoxes = TextBox startPos endPos text editState.fill editState.stroke editState.fontSize :: editState.textBoxes
-                                    , drawing = DrawTextBox NoText
-                                }
+            FinishRotatingTextBox textBox angle ->
+                { editState | drawing = DrawTextBox <| EditingText { textBox | angle = angle } }
+                    |> skipChange model
+                    => []
 
-                            _ ->
-                                editState
-                in
-                    newEditState
-                        |> skipChange model
-                        => []
+            AddTextBox textBox ->
+                { editState | textBoxes = textBox :: editState.textBoxes, drawing = DrawTextBox NoText }
+                    |> skipChange model
+                    => []
 
             StartLine pos ->
                 { editState | drawing = DrawLine (DrawingLine pos) }
@@ -343,7 +336,10 @@ update msg ({ edits, mouse } as model) =
                     => []
 
             SetMouse pos ->
-                { model | mouse = pos }
+                editState
+                    |> updateDrawingIfRotating pos
+                    |> skipChange model
+                    |> updateMouse pos
                     => []
 
             SetImage imageUrl ->
@@ -429,6 +425,21 @@ updateMouse pos model =
 updateDrawing : EditState -> Drawing -> EditState
 updateDrawing editState drawing =
     { editState | drawing = drawing }
+
+
+updateDrawingIfRotating : Mouse.Position -> EditState -> EditState
+updateDrawingIfRotating mouse editState =
+    case editState.drawing of
+        DrawTextBox textMode ->
+            case textMode of
+                RotatingText textBox ->
+                    { editState | drawing = DrawTextBox <| RotatingText { textBox | angle = arrowAngle textBox.start mouse } }
+
+                _ ->
+                    editState
+
+        _ ->
+            editState
 
 
 transitionOnShift : Drawing -> Drawing
@@ -520,14 +531,14 @@ view ({ edits, mouse, keyboardState } as model) =
             case editState.drawing of
                 DrawTextBox textBoxDrawing ->
                     case textBoxDrawing of
-                        EditingTextMode startPos endPos text ->
+                        EditingText textBox ->
                             [ Html.input
                                 [ id "text-box-edit"
-                                , onInput (TextBoxInput (EditingTextMode startPos endPos text))
-                                , onWithOptions "keydown" options (decodeTextInputKey <| AddTextBox <| EditingTextMode startPos endPos text)
+                                , onInput <| TextBoxInput textBox
+                                , onWithOptions "keydown" options (decodeTextInputKey <| AddTextBox textBox)
                                 , class "hidden-input"
                                 ]
-                                [ Html.text text ]
+                                [ Html.text textBox.text ]
                             ]
 
                         _ ->
@@ -691,15 +702,20 @@ viewCanvas editState curMouse keyboardState =
                         NoText ->
                             [ onClick (Json.map StartTextBox Mouse.position) ]
 
-                        DrawingTextBox startPos ->
-                            [ onClick (Json.map (PlaceTextBox startPos) Mouse.position) ]
+                        DrawingTextBox start ->
+                            [ onClick (Json.map (PlaceTextBox start) Mouse.position) ]
 
-                        EditingTextMode startPos endPos text ->
-                            [ if text == "" then
+                        EditingText ({ start, end, text, angle } as textBox) ->
+                            [ if mouseIsOverRotateButton (rotateButtonPosition start end) (mouseOffset curMouse) then
+                                Html.Events.onClick <| BeginRotatingTextBox 0 textBox
+                              else if text == "" then
                                 Html.Events.onClick Undo
                               else
-                                Html.Events.onClick <| AddTextBox <| EditingTextMode startPos endPos text
+                                Html.Events.onClick <| AddTextBox textBox
                             ]
+
+                        RotatingText ({ start } as textBox) ->
+                            [ onClick <| Json.map (FinishRotatingTextBox textBox << arrowAngle start) Mouse.position ]
 
                 DrawLine lineDrawing ->
                     case lineDrawing of
@@ -725,7 +741,7 @@ viewCanvas editState curMouse keyboardState =
             List.map viewEllipse editState.ellipses
 
         textBoxes =
-            List.map (viewTextBox False) editState.textBoxes
+            List.map viewTextBox editState.textBoxes
 
         lines =
             List.map viewLine editState.lines
@@ -783,12 +799,16 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingTextBox pos ->
-                    TextBox pos mouse "" fill stroke fontSize
-                        |> viewTextBox True
+                    TextBox pos mouse "" fill stroke fontSize 0
+                        |> viewTextBoxWithBorder
 
-                EditingTextMode startPos endPos text ->
-                    TextBox startPos endPos text fill stroke fontSize
-                        |> viewTextBox True
+                EditingText textBox ->
+                    { textBox | fill = fill, stroke = stroke, fontSize = fontSize }
+                        |> viewTextBoxWithRotateButton
+
+                RotatingText textBox ->
+                    { textBox | fill = fill, stroke = stroke, fontSize = fontSize }
+                        |> viewRotatingTextBox
 
         DrawLine lineMode ->
             case lineMode of
@@ -849,29 +869,116 @@ viewEllipse ({ start, end, fill, stroke } as ellipse) =
             |> Collage.moveY ((y2 - y1) / 2)
 
 
-viewTextBox : Bool -> TextBox -> Collage.Form
-viewTextBox showBorder ({ start, end, text, fill, fontSize } as textBox) =
+viewTextBox : TextBox -> Collage.Form
+viewTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
     let
-        delta =
-            end.x
-                - start.x
-                |> toFloat
+        dx =
+            x2 - x1
 
-        ( offsetX, offsetY ) =
+        dy =
+            y2 - y1
+
+        ( x1, y1 ) =
             mouseOffset start
+
+        ( x2, y2 ) =
+            mouseOffset end
     in
         Collage.group
-            [ if showBorder then
-                Collage.rect (toFloat (end.x - start.x)) (toFloat (end.y - start.y))
-                    |> Collage.outlined (Collage.dotted fill)
-              else
-                toForm Element.empty
+            [ Text.fromString text
+                |> Text.height fontSize
+                |> Collage.text
+            ]
+            |> Collage.move ( x1, y1 )
+            |> Collage.move ( (dx / 2), (dy / 2) )
+            |> Collage.rotate angle
+
+
+viewTextBoxWithBorder : TextBox -> Collage.Form
+viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
+    let
+        dx =
+            x2 - x1
+
+        dy =
+            y2 - y1
+
+        ( x1, y1 ) =
+            mouseOffset start
+
+        ( x2, y2 ) =
+            mouseOffset end
+    in
+        Collage.group
+            [ Collage.rect dx dy
+                |> Collage.outlined (Collage.dotted fill)
             , Text.fromString text
                 |> Text.height fontSize
                 |> Collage.text
             ]
-            |> Collage.move ( offsetX, offsetY )
-            |> Collage.move ( (delta / 2), (toFloat <| start.y - end.y) )
+            |> Collage.move ( x1, y1 )
+            |> Collage.move ( (dx / 2), (dy / 2) )
+            |> Collage.rotate angle
+
+
+viewTextBoxWithRotateButton : TextBox -> Collage.Form
+viewTextBoxWithRotateButton ({ start, end, text, fill, fontSize, angle } as textBox) =
+    let
+        dx =
+            x2 - x1
+
+        dy =
+            y2 - y1
+
+        ( x1, y1 ) =
+            mouseOffset start
+
+        ( x2, y2 ) =
+            mouseOffset end
+    in
+        Collage.group
+            [ Collage.circle 7
+                |> Collage.filled Color.green
+                |> Collage.moveY (3 * dy / 4)
+            , Collage.rect dx dy
+                |> Collage.outlined (Collage.dotted fill)
+            , Text.fromString text
+                |> Text.height fontSize
+                |> Collage.text
+            ]
+            |> Collage.move ( x1, y1 )
+            |> Collage.move ( (dx / 2), (dy / 2) )
+            |> Collage.rotate angle
+
+
+viewRotatingTextBox : TextBox -> Collage.Form
+viewRotatingTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
+    let
+        dx =
+            x2 - x1
+
+        dy =
+            y2 - y1
+
+        ( x1, y1 ) =
+            mouseOffset start
+
+        ( x2, y2 ) =
+            mouseOffset end
+    in
+        Collage.group
+            [ Collage.circle 7
+                |> Collage.filled Color.green
+                |> Collage.moveY (3 * dy / 4)
+            , Collage.rect dx dy
+                |> Collage.outlined (Collage.dotted fill)
+            , Text.fromString text
+                |> Text.height fontSize
+                |> Collage.text
+            ]
+            |> Collage.move ( x1, y1 )
+            |> Collage.move ( (dx / 2), (dy / 2) )
+            |> Collage.rotate angle
 
 
 viewLine : Line -> Collage.Form
@@ -1037,6 +1144,12 @@ trackMouse editState =
                 DrawingTextBox _ ->
                     True
 
+                EditingText _ ->
+                    True
+
+                RotatingText _ ->
+                    True
+
                 _ ->
                     False
 
@@ -1110,6 +1223,36 @@ strokeToWidth stroke =
 
         VeryThick ->
             10
+
+
+rotateButtonPosition : StartPosition -> EndPosition -> ( Float, Float )
+rotateButtonPosition startPos endPos =
+    let
+        ( x1, y1 ) =
+            mouseOffset startPos
+
+        ( x2, y2 ) =
+            mouseOffset endPos
+
+        dy =
+            y2 - y1
+
+        buttonY =
+            Basics.max y1 y2 + dy / 4
+    in
+        (x1 + ((x2 - x1) / 2)) => buttonY
+
+
+mouseIsOverRotateButton : ( Float, Float ) -> ( Float, Float ) -> Bool
+mouseIsOverRotateButton ( x1, y1 ) ( x2, y2 ) =
+    let
+        logButton =
+            Debug.log "buttonPos" <| toString ( x1, y1 )
+
+        logMouse =
+            Debug.log "mousePos" <| toString ( x2, y2 )
+    in
+        abs (x1 - x2) < 10 && (abs y2 - y1) < 10
 
 
 
