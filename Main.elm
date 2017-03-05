@@ -10,7 +10,7 @@ import Html exposing (Html, button, div, p, text)
 import Html.Attributes exposing (class, classList, id, style, type_)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
 import Json.Decode as Json
-import Keyboard.Extra
+import Keyboard.Extra exposing (KeyChange(..), Key)
 import Mouse
 import Rocket exposing ((=>))
 import Svgs
@@ -33,11 +33,13 @@ type alias EndPosition =
 type ArrowMode
     = NoArrow
     | DrawingArrow StartPosition
+    | DrawingDiscreteArrow StartPosition
 
 
-type OvalMode
+type EllipseMode
     = NoOval
     | DrawingOval StartPosition
+    | DrawingCircle StartPosition
 
 
 type TextMode
@@ -49,11 +51,12 @@ type TextMode
 type LineMode
     = NoLine
     | DrawingLine StartPosition
+    | DrawingDiscreteLine StartPosition
 
 
 type Drawing
     = DrawArrow ArrowMode
-    | DrawOval OvalMode
+    | DrawEllipse EllipseMode
     | DrawTextBox TextMode
     | DrawLine LineMode
     | Selection
@@ -212,7 +215,7 @@ type Msg
     = StartArrow StartPosition
     | AddArrow StartPosition EndPosition
     | StartOval Mouse.Position
-    | AddOval StartPosition EndPosition
+    | AddEllipse StartPosition EndPosition
     | StartTextBox StartPosition
     | PlaceTextBox StartPosition EndPosition
     | TextBoxInput TextMode String
@@ -256,15 +259,15 @@ update msg ({ edits, mouse } as model) =
                     => []
 
             StartOval pos ->
-                { editState | drawing = DrawOval (DrawingOval pos) }
+                { editState | drawing = DrawEllipse (DrawingOval pos) }
                     |> logChange model
                     |> updateMouse pos
                     => []
 
-            AddOval startPos endPos ->
+            AddEllipse startPos endPos ->
                 { editState
                     | ovals = Oval startPos endPos editState.fill editState.stroke :: editState.ovals
-                    , drawing = DrawOval NoOval
+                    , drawing = DrawEllipse NoOval
                 }
                     |> skipChange model
                     => []
@@ -349,11 +352,13 @@ update msg ({ edits, mouse } as model) =
                     => []
 
             KeyboardMsg keyMsg ->
-                { model
-                    | keyboardState =
-                        Keyboard.Extra.update keyMsg model.keyboardState
-                }
-                    => []
+                let
+                    ( keyboardState, maybeKeyChange ) =
+                        Keyboard.Extra.updateWithKeyChange keyMsg model.keyboardState
+                in
+                    { model | keyboardState = keyboardState }
+                        |> alterDrawingsWithKeyboard maybeKeyChange
+                        => []
 
             ChangeDrawing drawing ->
                 { editState | drawing = drawing }
@@ -419,6 +424,83 @@ skipChange model editState =
 updateMouse : Mouse.Position -> Model -> Model
 updateMouse pos model =
     { model | mouse = pos }
+
+
+updateDrawing : EditState -> Drawing -> EditState
+updateDrawing editState drawing =
+    { editState | drawing = drawing }
+
+
+transitionOnShift : Drawing -> Drawing
+transitionOnShift drawing =
+    case drawing of
+        DrawArrow arrowMode ->
+            DrawArrow <|
+                case arrowMode of
+                    DrawingArrow startPos ->
+                        DrawingDiscreteArrow startPos
+
+                    DrawingDiscreteArrow startPos ->
+                        DrawingArrow startPos
+
+                    _ ->
+                        arrowMode
+
+        DrawEllipse ellipseMode ->
+            DrawEllipse <|
+                case ellipseMode of
+                    DrawingOval startPos ->
+                        DrawingCircle startPos
+
+                    DrawingCircle startPos ->
+                        DrawingOval startPos
+
+                    _ ->
+                        ellipseMode
+
+        DrawLine lineMode ->
+            DrawLine <|
+                case lineMode of
+                    DrawingLine startPos ->
+                        DrawingDiscreteLine startPos
+
+                    DrawingDiscreteLine startPos ->
+                        DrawingLine startPos
+
+                    _ ->
+                        lineMode
+
+        _ ->
+            drawing
+
+
+alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> Model
+alterDrawingsWithKeyboard maybeKeyChange model =
+    let
+        drawingUpdate =
+            updateDrawing model.edits.present
+    in
+        case maybeKeyChange of
+            Just keyChange ->
+                case keyChange of
+                    KeyDown key ->
+                        case key of
+                            Keyboard.Extra.Shift ->
+                                { model | edits = UndoList.mapPresent (drawingUpdate << transitionOnShift << .drawing) model.edits }
+
+                            _ ->
+                                model
+
+                    KeyUp key ->
+                        case key of
+                            Keyboard.Extra.Shift ->
+                                { model | edits = UndoList.mapPresent (drawingUpdate << transitionOnShift << .drawing) model.edits }
+
+                            _ ->
+                                model
+
+            Nothing ->
+                model
 
 
 
@@ -588,15 +670,21 @@ viewCanvas editState curMouse keyboardState =
                             [ onClick (Json.map StartArrow Mouse.position) ]
 
                         DrawingArrow startPos ->
-                            [ onClick (Json.map (AddArrow startPos) Mouse.position) ]
+                            [ onClick <| Json.map (AddArrow startPos) Mouse.position ]
 
-                DrawOval ovalDrawing ->
+                        DrawingDiscreteArrow startPos ->
+                            [ onClick <| Json.map (AddArrow startPos << stepMouse startPos) Mouse.position ]
+
+                DrawEllipse ovalDrawing ->
                     case ovalDrawing of
                         NoOval ->
                             [ onClick (Json.map StartOval Mouse.position) ]
 
                         DrawingOval startPos ->
-                            [ onClick (Json.map (AddOval startPos) Mouse.position) ]
+                            [ onClick <| Json.map (AddEllipse startPos) Mouse.position ]
+
+                        DrawingCircle startPos ->
+                            [ onClick <| Json.map (AddEllipse startPos) Mouse.position ]
 
                 DrawTextBox textBoxDrawing ->
                     case textBoxDrawing of
@@ -620,6 +708,9 @@ viewCanvas editState curMouse keyboardState =
 
                         DrawingLine startPos ->
                             [ onClick (Json.map (AddLine startPos) Mouse.position) ]
+
+                        DrawingDiscreteLine startPos ->
+                            [ onClick <| Json.map (AddLine startPos << stepMouse startPos) Mouse.position ]
 
                 Selection ->
                     []
@@ -666,15 +757,23 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingArrow pos ->
-                    Arrow pos (stepMouse pos mouse keyboardState) fill stroke
+                    Arrow pos mouse fill stroke
                         |> viewArrow
 
-        DrawOval ovalDrawing ->
+                DrawingDiscreteArrow pos ->
+                    Arrow pos (stepMouse pos mouse) fill stroke
+                        |> viewArrow
+
+        DrawEllipse ovalDrawing ->
             case ovalDrawing of
                 NoOval ->
                     toForm Element.empty
 
                 DrawingOval pos ->
+                    Oval pos mouse fill stroke
+                        |> viewOval
+
+                DrawingCircle pos ->
                     Oval pos mouse fill stroke
                         |> viewOval
 
@@ -697,7 +796,11 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingLine pos ->
-                    Line pos (stepMouse pos mouse keyboardState) fill stroke
+                    Line pos mouse fill stroke
+                        |> viewLine
+
+                DrawingDiscreteLine pos ->
+                    Line pos (stepMouse pos mouse) fill stroke
                         |> viewLine
 
         Selection ->
@@ -874,7 +977,7 @@ editToDrawing editMode =
             DrawArrow NoArrow
 
         EditOval ->
-            DrawOval NoOval
+            DrawEllipse NoOval
 
         EditTextBox ->
             DrawTextBox NoText
@@ -892,7 +995,7 @@ drawingToEditMode drawing =
         DrawArrow _ ->
             EditArrow
 
-        DrawOval _ ->
+        DrawEllipse _ ->
             EditOval
 
         DrawTextBox _ ->
@@ -913,11 +1016,14 @@ trackMouse editState =
                 DrawingArrow _ ->
                     True
 
+                DrawingDiscreteArrow _ ->
+                    True
+
                 _ ->
                     False
 
-        DrawOval ovalMode ->
-            case ovalMode of
+        DrawEllipse ellipseMode ->
+            case ellipseMode of
                 DrawingOval _ ->
                     True
 
@@ -935,6 +1041,9 @@ trackMouse editState =
         DrawLine lineMode ->
             case lineMode of
                 DrawingLine _ ->
+                    True
+
+                DrawingDiscreteLine _ ->
                     True
 
                 _ ->
@@ -959,20 +1068,17 @@ calcDistance ( x1, y1 ) ( x2, y2 ) =
     sqrt <| (x2 - x1) ^ 2 + (y2 - y1) ^ 2
 
 
-stepMouse : Mouse.Position -> Mouse.Position -> Keyboard.Extra.State -> Mouse.Position
-stepMouse startPos curPos keyboardState =
-    if shiftPressed keyboardState then
-        arrowAngle startPos curPos
-            / (pi / 4)
-            |> round
-            |> toFloat
-            |> (*) (pi / 4)
-            |> toDeltas (calcDistance (mouseOffset startPos) (mouseOffset curPos))
-            |> Tuple.mapFirst ((+) startPos.x)
-            |> Tuple.mapSecond ((-) startPos.y)
-            |> uncurry Mouse.Position
-    else
-        curPos
+stepMouse : Mouse.Position -> Mouse.Position -> Mouse.Position
+stepMouse startPos curPos =
+    arrowAngle startPos curPos
+        / (pi / 4)
+        |> round
+        |> toFloat
+        |> (*) (pi / 4)
+        |> toDeltas (calcDistance (mouseOffset startPos) (mouseOffset curPos))
+        |> Tuple.mapFirst ((+) startPos.x)
+        |> Tuple.mapSecond ((-) startPos.y)
+        |> uncurry Mouse.Position
 
 
 strokeToWidth : LineStroke -> Int
