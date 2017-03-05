@@ -48,7 +48,7 @@ type TextMode
 
 type LineMode
     = NoLine
-    | DrawingLine Mouse.Position
+    | DrawingLine StartPosition
 
 
 type Drawing
@@ -209,16 +209,16 @@ init =
 
 
 type Msg
-    = StartArrow Mouse.Position
-    | AddArrow StartPosition Mouse.Position
+    = StartArrow StartPosition
+    | AddArrow StartPosition EndPosition
     | StartOval Mouse.Position
-    | AddOval StartPosition Mouse.Position
-    | StartTextBox Mouse.Position
-    | PlaceTextBox Mouse.Position Mouse.Position
+    | AddOval StartPosition EndPosition
+    | StartTextBox StartPosition
+    | PlaceTextBox StartPosition EndPosition
     | TextBoxInput TextMode String
     | AddTextBox TextMode
-    | StartLine Mouse.Position
-    | AddLine Mouse.Position Mouse.Position
+    | StartLine StartPosition
+    | AddLine StartPosition EndPosition
     | SetMouse Mouse.Position
     | SetImage String
     | KeyboardMsg Keyboard.Extra.Msg
@@ -666,7 +666,7 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingArrow pos ->
-                    Arrow pos (normalizeMouse pos mouse keyboardState) fill stroke
+                    Arrow pos (stepMouse pos mouse keyboardState) fill stroke
                         |> viewArrow
 
         DrawOval ovalDrawing ->
@@ -697,7 +697,7 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingLine pos ->
-                    Line pos (normalizeMouse pos mouse keyboardState) fill stroke
+                    Line pos (stepMouse pos mouse keyboardState) fill stroke
                         |> viewLine
 
         Selection ->
@@ -719,8 +719,8 @@ viewArrow ({ start, end, fill, stroke } as arrow) =
         Collage.group
             [ Collage.ngon 3 arrowHeadRadius
                 |> filled fill
-                |> rotate (arrowAngle arrow)
-                |> rotate (degrees 90)
+                |> rotate (arrowAngle arrow.start arrow.end)
+                |> rotate (degrees 60)
                 |> move (mouseOffset start)
             , Collage.segment (mouseOffset start) (mouseOffset end)
                 |> Collage.traced lineStyle
@@ -827,11 +827,17 @@ mouseOffset { x, y } =
     ( toFloat (x - 150), toFloat (100 - y) )
 
 
-arrowAngle : Arrow -> Float
-arrowAngle { start, end } =
+arrowAngle : Mouse.Position -> Mouse.Position -> Float
+arrowAngle start end =
     let
+        ( x1, y1 ) =
+            mouseOffset start
+
+        ( x2, y2 ) =
+            mouseOffset end
+
         theta =
-            atan2 (toFloat (end.x - start.x)) (toFloat (end.y - start.y))
+            atan2 (y2 - y1) (x2 - x1)
 
         radians =
             if theta < 0.0 then
@@ -943,17 +949,28 @@ shiftPressed keyboardState =
     Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
 
 
-altPressed : Keyboard.Extra.State -> Bool
-altPressed keyboardState =
-    Keyboard.Extra.isPressed Keyboard.Extra.Alt keyboardState
+toDeltas : Float -> Float -> ( Int, Int )
+toDeltas h theta =
+    ( round <| cos theta * h, round <| (sin theta) * h )
 
 
-normalizeMouse : Mouse.Position -> Mouse.Position -> Keyboard.Extra.State -> Mouse.Position
-normalizeMouse startPos curPos keyboardState =
+calcDistance : ( number, number ) -> ( number, number ) -> Float
+calcDistance ( x1, y1 ) ( x2, y2 ) =
+    sqrt <| (x2 - x1) ^ 2 + (y2 - y1) ^ 2
+
+
+stepMouse : Mouse.Position -> Mouse.Position -> Keyboard.Extra.State -> Mouse.Position
+stepMouse startPos curPos keyboardState =
     if shiftPressed keyboardState then
-        { curPos | y = startPos.y }
-    else if altPressed keyboardState then
-        { curPos | x = startPos.x }
+        arrowAngle startPos curPos
+            / (pi / 4)
+            |> round
+            |> toFloat
+            |> (*) (pi / 4)
+            |> toDeltas (calcDistance (mouseOffset startPos) (mouseOffset curPos))
+            |> Tuple.mapFirst ((+) startPos.x)
+            |> Tuple.mapSecond ((-) startPos.y)
+            |> uncurry Mouse.Position
     else
         curPos
 
