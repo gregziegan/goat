@@ -7,7 +7,7 @@ import Color.Convert
 import Dom
 import Element exposing (image, toHtml)
 import Html exposing (Html, button, div, p, text)
-import Html.Attributes exposing (class, classList, id, style, type_)
+import Html.Attributes exposing (class, classList, id, start, style, type_)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra exposing (Key, KeyChange(..))
@@ -843,146 +843,77 @@ viewArrow ({ start, end, fill, stroke } as arrow) =
         arrowHeadRadius =
             strokeWidth * 2
     in
-        Collage.group
-            [ Collage.ngon 3 arrowHeadRadius
-                |> filled fill
-                |> rotate (arrowAngle arrow.start arrow.end)
-                |> rotate (degrees 60)
-                |> move start
-            , Collage.segment start end
-                |> Collage.traced lineStyle
-            ]
+        [ Collage.ngon 3 arrowHeadRadius
+            |> filled fill
+            |> rotate (arrowAngle start end)
+            |> rotate (degrees 60)
+            |> move start
+        , Collage.segment start end
+            |> Collage.traced lineStyle
+        ]
+            |> Collage.group
 
 
 viewEllipse : Ellipse -> Collage.Form
 viewEllipse ({ start, end, fill, stroke } as ellipse) =
-    let
-        lineStyle =
-            { defaultLine | color = fill, width = toFloat <| strokeToWidth stroke }
+    Collage.oval (dx start end) (dy start end)
+        |> Collage.outlined { defaultLine | color = fill, width = toFloat <| strokeToWidth stroke }
+        |> alignWithMouse start end 0
 
-        ( x1, y1 ) =
-            start
 
-        ( x2, y2 ) =
-            end
-    in
-        Collage.oval (x2 - x1) (y2 - y1)
-            |> Collage.outlined lineStyle
-            |> Collage.move ( x1, y1 )
-            |> Collage.moveX ((x2 - x1) / 2)
-            |> Collage.moveY ((y2 - y1) / 2)
+viewText : String -> Float -> Collage.Form
+viewText text fontSize =
+    Text.fromString text
+        |> Text.height fontSize
+        |> Collage.text
+
+
+viewTextBoxBorder : StartPosition -> EndPosition -> Color -> Collage.Form
+viewTextBoxBorder start end fill =
+    Collage.rect (dx start end) (dy start end)
+        |> Collage.outlined (Collage.dotted fill)
+
+
+viewRotateButton : StartPosition -> EndPosition -> Collage.Form
+viewRotateButton start end =
+    Collage.circle 7
+        |> Collage.filled Color.green
+        |> Collage.moveY (3 * (dy start end) / 4)
 
 
 viewTextBox : TextBox -> Collage.Form
 viewTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
-    let
-        dx =
-            x2 - x1
-
-        dy =
-            y2 - y1
-
-        ( x1, y1 ) =
-            start
-
-        ( x2, y2 ) =
-            end
-    in
-        Collage.group
-            [ Text.fromString text
-                |> Text.height fontSize
-                |> Collage.text
-            ]
-            |> Collage.move ( x1, y1 )
-            |> Collage.move ( (dx / 2), (dy / 2) )
-            |> Collage.rotate angle
+    viewText text fontSize
+        |> alignWithMouse start end angle
 
 
 viewTextBoxWithBorder : TextBox -> Collage.Form
 viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
-    let
-        dx =
-            x2 - x1
-
-        dy =
-            y2 - y1
-
-        ( x1, y1 ) =
-            start
-
-        ( x2, y2 ) =
-            end
-    in
-        Collage.group
-            [ Collage.rect dx dy
-                |> Collage.outlined (Collage.dotted fill)
-            , Text.fromString text
-                |> Text.height fontSize
-                |> Collage.text
-            ]
-            |> Collage.move ( x1, y1 )
-            |> Collage.move ( (dx / 2), (dy / 2) )
-            |> Collage.rotate angle
+    [ viewTextBoxBorder start end fill
+    , viewText text fontSize
+    ]
+        |> Collage.group
+        |> alignWithMouse start end angle
 
 
 viewTextBoxWithRotateButton : TextBox -> Collage.Form
 viewTextBoxWithRotateButton ({ start, end, text, fill, fontSize, angle } as textBox) =
-    let
-        dx =
-            x2 - x1
-
-        dy =
-            y2 - y1
-
-        ( x1, y1 ) =
-            start
-
-        ( x2, y2 ) =
-            end
-    in
-        Collage.group
-            [ Collage.circle 7
-                |> Collage.filled Color.green
-                |> Collage.moveY (3 * dy / 4)
-            , Collage.rect dx dy
-                |> Collage.outlined (Collage.dotted fill)
-            , Text.fromString text
-                |> Text.height fontSize
-                |> Collage.text
-            ]
-            |> Collage.move ( x1, y1 )
-            |> Collage.move ( (dx / 2), (dy / 2) )
-            |> Collage.rotate angle
+    [ viewRotateButton start end
+    , viewTextBoxBorder start end fill
+    , viewText text fontSize
+    ]
+        |> Collage.group
+        |> alignWithMouse start end angle
 
 
 viewRotatingTextBox : TextBox -> Collage.Form
 viewRotatingTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
-    let
-        dx =
-            x2 - x1
-
-        dy =
-            y2 - y1
-
-        ( x1, y1 ) =
-            start
-
-        ( x2, y2 ) =
-            end
-    in
-        Collage.group
-            [ Collage.circle 7
-                |> Collage.filled Color.green
-                |> Collage.moveY (3 * dy / 4)
-            , Collage.rect dx dy
-                |> Collage.outlined (Collage.dotted fill)
-            , Text.fromString text
-                |> Text.height fontSize
-                |> Collage.text
-            ]
-            |> Collage.move ( x1, y1 )
-            |> Collage.move ( (dx / 2), (dy / 2) )
-            |> Collage.rotate angle
+    [ viewRotateButton start end
+    , viewTextBoxBorder start end fill
+    , viewText text fontSize
+    ]
+        |> Collage.group
+        |> alignWithMouse start end angle
 
 
 viewLine : Line -> Collage.Form
@@ -1176,6 +1107,30 @@ toDeltas h theta =
     ( cos theta * h, (sin theta) * h )
 
 
+toDelta : Position -> Position -> Position
+toDelta ( x1, y1 ) ( x2, y2 ) =
+    ( x2 - x1, y2 - y1 )
+
+
+dx : Position -> Position -> Float
+dx ( x1, _ ) ( x2, _ ) =
+    x2 - x1
+
+
+dy : Position -> Position -> Float
+dy ( _, y1 ) ( _, y2 ) =
+    y2 - y1
+
+
+halfDistance : Position -> Position -> Position
+halfDistance start end =
+    let
+        ( dx, dy ) =
+            toDelta start end
+    in
+        ( dx / 2, dy / 2 )
+
+
 calcDistance : Position -> Position -> Float
 calcDistance ( x1, y1 ) ( x2, y2 ) =
     sqrt <| (x2 - x1) ^ 2 + (y2 - y1) ^ 2
@@ -1229,19 +1184,20 @@ rotateButtonPosition ( x1, y1 ) ( x2, y2 ) =
         buttonY =
             Basics.max y1 y2 + dy / 4
     in
-        (x1 + ((x2 - x1) / 2)) => buttonY
+        ( (x1 + ((x2 - x1) / 2)), buttonY )
 
 
 mouseIsOverRotateButton : ( Float, Float ) -> ( Float, Float ) -> Bool
 mouseIsOverRotateButton ( x1, y1 ) ( x2, y2 ) =
-    let
-        logButton =
-            Debug.log "buttonPos" <| toString ( x1, y1 )
+    abs (x1 - x2) < 10 && (abs y2 - y1) < 10
 
-        logMouse =
-            Debug.log "mousePos" <| toString ( x2, y2 )
-    in
-        abs (x1 - x2) < 10 && (abs y2 - y1) < 10
+
+alignWithMouse : StartPosition -> EndPosition -> Float -> Collage.Form -> Collage.Form
+alignWithMouse start end angle form =
+    form
+        |> Collage.move start
+        |> Collage.move (halfDistance start end)
+        |> Collage.rotate angle
 
 
 
