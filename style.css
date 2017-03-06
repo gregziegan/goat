@@ -11,6 +11,7 @@
   flex-direction: row;
   justify-content: center;
   align-items: center;
+  cursor: pointer;
 }
 
 .dropdown-things {
@@ -21,8 +22,7 @@
 
 .dropdown-option {
   position: absolute;
-  z-index: 1;
-  margin-top: 25px;
+  margin-top: 26px;
   margin-left: -2px;
   border: 1px solid grey;
   width: 40px;
@@ -37,7 +37,6 @@
   padding: 0;
   border: none;
   background-color: white;
-  border-top: 1px solid grey;
 }
 
 .dropdown-button--selected {
@@ -81,6 +80,7 @@
   align-items: center;
   border: 1px solid rgb(67, 187, 184);
   border-radius: 4px;
+  padding: 5px;
 }
 
 .controls {
@@ -89,4 +89,19 @@
   align-items: center;
   border-top: 1px solid #f8f8f8;
   padding: 10px;
+}
+
+.flip {
+  transform: scaleX(-1);
+}
+
+.history-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  border: none;
+  background-color: white;
+  color: grey;
+  cursor: pointer;
 }

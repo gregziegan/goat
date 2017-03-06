@@ -215,7 +215,7 @@ initialEditState =
     , textBoxes = []
     , lines = []
     , drawing = Selection
-    , fill = Color.black
+    , fill = Color.red
     , stroke = Medium
     , fontSize = 14
     , currentDropdown = Nothing
@@ -622,9 +622,9 @@ viewButtonGroup buttons =
 viewHistoryControls : Html Msg
 viewHistoryControls =
     div [ class "history-controls" ]
-        [ button [ Html.Events.onClick Reset ] [ text "Reset" ]
-        , button [ Html.Events.onClick Undo ] [ text "Undo" ]
-        , button [ Html.Events.onClick Redo ] [ text "Redo" ]
+        [ button [ Html.Events.onClick Reset, class "history-button" ] [ Svgs.viewResetArrow ]
+        , button [ Html.Events.onClick Undo, class "history-button" ] [ Svgs.viewUndoArrow ]
+        , button [ Html.Events.onClick Redo, class "history-button flip" ] [ Svgs.viewUndoArrow ]
         ]
 
 
