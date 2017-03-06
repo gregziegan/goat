@@ -1,23 +1,10 @@
 #annotation-app {
-  width: 400px;
-}
-
-.dropdown-button {
-  position: relative;
-  border: 0.5px solid #d8d8d8;
-  background-color: white;
-  padding: 2px;
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
+  width: 450px;
 }
 
 .dropdown-things {
   display: flex;
   flex-direction: column;
-  width: 40px;
 }
 
 .dropdown-option {
@@ -34,9 +21,10 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0;
+  padding: 5px;
   border: none;
   background-color: white;
+  border-left: 1px solid rgb(67, 187, 184);
 }
 
 .dropdown-button--selected {
@@ -80,7 +68,11 @@
   align-items: center;
   border: 1px solid rgb(67, 187, 184);
   border-radius: 4px;
-  padding: 5px;
+  overflow: hidden;
+}
+
+.dropdown-things:first-of-type > .dropdown-button {
+  border-left: none;
 }
 
 .controls {
