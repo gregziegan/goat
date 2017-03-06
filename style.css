@@ -2,6 +2,10 @@
   width: 450px;
 }
 
+.image-edit {
+  padding: 10px;
+}
+
 .dropdown-things {
   display: flex;
   flex-direction: column;
@@ -9,10 +13,12 @@
 
 .dropdown-option {
   position: absolute;
-  margin-top: 26px;
+  margin-top: 31px;
   margin-left: -2px;
-  border: 1px solid grey;
-  width: 40px;
+  border: 1px solid rgb(67, 187, 184);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 50px;
   display: flex;
   flex-direction: column;
 }
@@ -28,16 +34,7 @@
 }
 
 .dropdown-button--selected {
-  background-color: cyan;
-}
-
-.color-option {
-  width: 20px;
-  height: 20px;
-}
-
-.color-option--selected {
-  border: 1px solid black;
+  background-color: rgb(67, 187, 184);
 }
 
 .hidden-input {
@@ -45,7 +42,7 @@
 }
 
 .edit-mode--selected {
-  background-color: cyan;
+  background-color: rgb(67, 187, 184);
   color: white;
 }
 

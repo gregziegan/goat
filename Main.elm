@@ -372,7 +372,7 @@ update msg ({ edits, mouse } as model) =
 
             SetImage imageUrl ->
                 { editState | photo = imageUrl }
-                    |> logChange model
+                    |> skipChange model
                     => []
 
             KeyboardMsg keyMsg ->
@@ -391,17 +391,17 @@ update msg ({ edits, mouse } as model) =
 
             SelectFill fill ->
                 { editState | fill = fill }
-                    |> logChange model
+                    |> skipChange model
                     => []
 
             SelectLineStroke lineStroke ->
                 { editState | stroke = lineStroke }
-                    |> logChange model
+                    |> skipChange model
                     => []
 
             SelectFontSize fontSize ->
                 { editState | fontSize = fontSize }
-                    |> logChange model
+                    |> skipChange model
                     => []
 
             ToggleDropdown editOption ->
@@ -662,8 +662,8 @@ viewFillOption : Color -> Color -> Html Msg
 viewFillOption selectedFill fill =
     button
         [ classList
-            [ "color-option" => True
-            , "color-option--selected" => selectedFill == fill
+            [ "dropdown-button" => True
+            , "dropdown-button--selected" => selectedFill == fill
             ]
         , Html.Events.onClick (SelectFill fill)
         ]
@@ -846,7 +846,7 @@ viewEditOption editState editMode =
 viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Html Msg
 viewCanvas editState curMouse keyboardState =
     let
-        attrs =
+        canvasEvents =
             case editState.drawing of
                 DrawArrow arrowDrawing ->
                     case arrowDrawing of
@@ -904,6 +904,10 @@ viewCanvas editState curMouse keyboardState =
                 Selection ->
                     []
 
+        attrs =
+            canvasEvents
+                ++ [ class "image-edit" ]
+
         currentDrawing =
             viewDrawing editState (toPosition curMouse) keyboardState
 
@@ -931,7 +935,7 @@ viewCanvas editState curMouse keyboardState =
                 ]
     in
         forms
-            |> collage 300 200
+            |> collage 400 300
             |> toHtml
             |> List.singleton
             |> div (attrs ++ [ id "canvas" ])
@@ -1098,7 +1102,7 @@ viewLine { start, end, fill, stroke } =
 
 viewImage : String -> Element.Element
 viewImage photo =
-    image 300 200 photo
+    image 400 300 photo
 
 
 
@@ -1138,12 +1142,12 @@ decodeTextInputKey submitMsg =
 
 toPosition : Mouse.Position -> Position
 toPosition { x, y } =
-    ( toFloat (x - 150), toFloat (100 - y) )
+    ( toFloat (x - 210), toFloat (160 - y) )
 
 
 fromPosition : Position -> Mouse.Position
 fromPosition ( x, y ) =
-    Mouse.Position (round x + 150) (round ((y * -1) + 100))
+    Mouse.Position (round x + 210) (round ((y * -1) + 160))
 
 
 arrowAngle : StartPosition -> EndPosition -> Float

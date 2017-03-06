@@ -26,9 +26,8 @@ viewUndoArrow =
 
 viewArrowIcon : Html msg
 viewArrowIcon =
-    svg [ width "20", height "20", viewBox "0 0 20 20" ]
-        [ g [ stroke "grey" ]
-            [ line [ x1 "5", x2 "15", y1 "16", y2 "4", strokeWidth "4" ] [] ]
+    svg [ width "20", height "20", viewBox "0 0 347.341 347.341" ]
+        [ polygon [ points "347.341,107.783 347.339,0 239.559,0.002 282.843,43.285 0,326.128 21.213,347.341 304.056,64.498", fill "grey" ] []
         ]
 
 
@@ -42,7 +41,14 @@ viewOvalIcon =
 viewFillIcon : Color -> Html msg
 viewFillIcon fillColor =
     svg [ width "20", height "20", viewBox "0 0 20 20" ]
-        [ circle [ cx "10", cy "10", r "10", fill <| colorToHex fillColor ] []
+        [ circle
+            ([ cx "10", cy "10", r "10", fill <| colorToHex fillColor ]
+                ++ if fillColor == Color.white then
+                    [ stroke "black", r "9" ]
+                   else
+                    []
+            )
+            []
         ]
 
 
