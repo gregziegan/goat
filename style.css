@@ -1,4 +1,9 @@
+#annotation-app {
+  width: 400px;
+}
+
 .dropdown-button {
+  position: relative;
   border: 0.5px solid #d8d8d8;
   background-color: white;
   padding: 2px;
@@ -15,6 +20,10 @@
 }
 
 .dropdown-option {
+  position: absolute;
+  z-index: 1;
+  margin-top: 25px;
+  margin-left: -2px;
   border: 1px solid grey;
   width: 40px;
   display: flex;
@@ -51,4 +60,33 @@
 .edit-mode--selected {
   background-color: cyan;
   color: white;
+}
+
+.history-controls {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.export-button {
+  background-color: rgb(67, 187, 184);
+  color: #f8f8f8;
+  border: none;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.button-group {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgb(67, 187, 184);
+  border-radius: 4px;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #f8f8f8;
+  padding: 10px;
 }

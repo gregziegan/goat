@@ -9,6 +9,7 @@
     <script src="elm.js"></script>
     <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
     <script>
+      var editImageBlobUrl
       var target = document.getElementById('droparea');
       target.addEventListener("dragover", function(e) { e.preventDefault(); console.log('dragover') });
       target.addEventListener("drop", function(e){
@@ -28,9 +29,8 @@
       	reader.onload = function(e) {
           const contentType = 'image/jpeg';
           const blob = b64toBlob(e.target.result.replace('data:image/jpeg;base64,', ''), contentType);
-          const blobUrl = URL.createObjectURL(blob);
-          console.log(blobUrl)
-      		app.ports.importImage.send(blobUrl)
+          editImageBlobUrl = URL.createObjectURL(blob);
+      		app.ports.importImage.send(editImageBlobUrl)
       	}
       	reader.readAsDataURL(src)
       }
@@ -62,7 +62,7 @@
             document.body.replaceChild(exportImage, document.getElementById('export-image'))
           })
         }
-        img.src = 'photo.jpg'
+        img.src = editImageBlobUrl
       });
       const b64toBlob = (b64Data, contentType='', sliceSize=512) => {
         const byteCharacters = atob(b64Data);
@@ -84,6 +84,5 @@
         const blob = new Blob(byteArrays, {type: contentType});
         return blob;
       }
-      // app.ports.importImage.send('photo.jpg')
     </script>
   </body>
