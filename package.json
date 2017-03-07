@@ -2,32 +2,7 @@
   "name": "annotation-app",
   "version": "1.0.0",
   "repository": "https://github.com/thebritican/annotation-editor",
-  "description": "Annotation app for the app framework",
+  "description": "Minimal image annotation tool",
   "author": "greg.ziegan@gmail.com",
   "license": "MIT",
-  "config": {
-    "port": "4567"
-  },
-  "scripts": {
-    "start": "zendency development",
-    "compile": "zendency compile $1",
-    "bundle": "zendency bundle $1",
-    "version": "zendency version manifest.json && git add -A",
-    "postversion": "zendency changelog && git push"
-  },
-  "main": "./",
-  "compiler": [],
-  "directories": {
-    "translations": "./translations"
-  },
-  "files": [
-    "./elm.js",
-    "./index.html",
-    "./style.css",
-    "./photo.jpg",
-    "./icon_ticket_editor.svg"
-  ],
-  "devDependencies": {
-    "zendency": "git+ssh://git@github.com/zendesk/zendency.git#v3.2.2"
-  }
 }
