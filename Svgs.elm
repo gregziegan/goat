@@ -7,6 +7,21 @@ import Svg exposing (..)
 import Svg.Attributes exposing (..)
 
 
+viewSolidIcon : Html msg
+viewSolidIcon =
+    viewLineStroke 4 []
+
+
+viewDottedIcon : Html msg
+viewDottedIcon =
+    viewLineStroke 4 [ strokeDasharray "5, 5" ]
+
+
+viewDashedIcon : Html msg
+viewDashedIcon =
+    viewLineStroke 4 [ strokeDasharray "10, 5" ]
+
+
 viewResetArrow : Html msg
 viewResetArrow =
     svg [ width "20", height "20", viewBox "0 0 14.155 14.155" ]
@@ -75,17 +90,19 @@ viewLineStrokeDropdownIcon =
         ]
 
 
-viewLineStroke : number -> Html msg
-viewLineStroke strokeWidth =
+viewLineStroke : number -> List (Attribute msg) -> Html msg
+viewLineStroke strokeWidth attrs =
     svg [ width "20", height "20", viewBox "0 0 20 20" ]
         [ g [ stroke "grey" ]
             [ line
-                [ x1 "0"
-                , x2 "20"
-                , y1 "10"
-                , y2 "10"
-                , Svg.Attributes.strokeWidth <| toString <| strokeWidth
-                ]
+                ([ x1 "0"
+                 , x2 "20"
+                 , y1 "10"
+                 , y2 "10"
+                 , Svg.Attributes.strokeWidth <| toString <| strokeWidth
+                 ]
+                    ++ attrs
+                )
                 []
             ]
         ]

@@ -1,7 +1,7 @@
 port module Main exposing (main)
 
 import Char exposing (KeyCode)
-import Collage exposing (collage, defaultLine, filled, move, rotate, toForm)
+import Collage exposing (collage, filled, move, rotate, toForm)
 import Color exposing (Color)
 import Dom
 import Element exposing (image, toHtml)
@@ -95,6 +95,7 @@ type alias Arrow =
     , end : Position
     , fill : Color
     , stroke : LineStroke
+    , strokeStyle : StrokeStyle
     }
 
 
@@ -103,6 +104,7 @@ type alias Rect =
     , end : Position
     , fill : Color
     , stroke : LineStroke
+    , strokeStyle : StrokeStyle
     , rounded : Bool
     }
 
@@ -112,6 +114,7 @@ type alias Ellipse =
     , end : Position
     , fill : Color
     , stroke : LineStroke
+    , strokeStyle : StrokeStyle
     }
 
 
@@ -131,6 +134,7 @@ type alias Line =
     , end : Position
     , fill : Color
     , stroke : LineStroke
+    , strokeStyle : StrokeStyle
     }
 
 
@@ -140,6 +144,12 @@ type LineStroke
     | Medium
     | Thick
     | VeryThick
+
+
+type StrokeStyle
+    = Solid
+    | Dotted
+    | Dashed
 
 
 type EditOption
@@ -160,6 +170,7 @@ type alias EditState =
     , drawing : Drawing
     , fill : Color
     , stroke : LineStroke
+    , strokeStyle : StrokeStyle
     , fontSize : Float
     , currentDropdown : Maybe EditOption
     }
@@ -196,6 +207,14 @@ lineStrokeOptions =
     ]
 
 
+strokeStyles : List StrokeStyle
+strokeStyles =
+    [ Solid
+    , Dotted
+    , Dashed
+    ]
+
+
 shapeOptions : List EditMode
 shapeOptions =
     [ EditRect
@@ -208,19 +227,6 @@ lineOptions : List EditMode
 lineOptions =
     [ EditArrow
     , EditLine
-    ]
-
-
-{-|
-  The Order of Edit Controls in the UI
--}
-editModes : List EditMode
-editModes =
-    [ EditArrow
-    , EditOval
-    , EditTextBox
-    , EditLine
-    , Select
     ]
 
 
@@ -246,6 +252,7 @@ initialEditState =
     , drawing = Selection
     , fill = Color.red
     , stroke = Medium
+    , strokeStyle = Solid
     , fontSize = 14
     , currentDropdown = Nothing
     }
@@ -287,6 +294,7 @@ type Msg
     | ChangeDrawing Drawing
     | SelectFill Color
     | SelectLineStroke LineStroke
+    | SelectStrokeStyle StrokeStyle
     | SelectFontSize Float
     | ToggleDropdown EditOption
     | CloseDropdown
@@ -302,7 +310,7 @@ update msg ({ edits, mouse } as model) =
         editState =
             edits.present
 
-        { fill, fontSize, stroke } =
+        { fill, fontSize, stroke, strokeStyle } =
             editState
     in
         case msg of
@@ -313,7 +321,7 @@ update msg ({ edits, mouse } as model) =
                     => []
 
             AddRect start end ->
-                { editState | rectangles = Rect start end fill stroke False :: editState.rectangles, drawing = DrawRect <| NoRect }
+                { editState | rectangles = Rect start end fill stroke strokeStyle False :: editState.rectangles, drawing = DrawRect <| NoRect }
                     |> logChange model
                     => []
 
@@ -324,7 +332,7 @@ update msg ({ edits, mouse } as model) =
                     => []
 
             AddRoundedRect start end ->
-                { editState | rectangles = Rect start end fill stroke True :: editState.rectangles, drawing = DrawRoundedRect <| NoRoundedRect }
+                { editState | rectangles = Rect start end fill stroke strokeStyle True :: editState.rectangles, drawing = DrawRoundedRect <| NoRoundedRect }
                     |> logChange model
                     => []
 
@@ -336,7 +344,7 @@ update msg ({ edits, mouse } as model) =
 
             AddArrow startPos endPos ->
                 { editState
-                    | arrows = Arrow startPos endPos fill stroke :: editState.arrows
+                    | arrows = Arrow startPos endPos fill stroke strokeStyle :: editState.arrows
                     , drawing = DrawArrow NoArrow
                 }
                     |> skipChange model
@@ -350,7 +358,7 @@ update msg ({ edits, mouse } as model) =
 
             AddEllipse startPos endPos ->
                 { editState
-                    | ellipses = Ellipse startPos endPos fill stroke :: editState.ellipses
+                    | ellipses = Ellipse startPos endPos fill stroke strokeStyle :: editState.ellipses
                     , drawing = DrawEllipse NoOval
                 }
                     |> skipChange model
@@ -412,7 +420,7 @@ update msg ({ edits, mouse } as model) =
 
             AddLine startPos endPos ->
                 { editState
-                    | lines = Line startPos endPos fill stroke :: editState.lines
+                    | lines = Line startPos endPos fill stroke strokeStyle :: editState.lines
                     , drawing = DrawLine NoLine
                 }
                     |> skipChange model
@@ -451,6 +459,11 @@ update msg ({ edits, mouse } as model) =
 
             SelectLineStroke lineStroke ->
                 { editState | stroke = lineStroke }
+                    |> skipChange model
+                    => []
+
+            SelectStrokeStyle strokeStyle ->
+                { editState | strokeStyle = strokeStyle }
                     |> skipChange model
                     => []
 
@@ -884,7 +897,7 @@ viewShapeSvg editMode =
             Svgs.viewArrowIcon
 
         EditLine ->
-            Svgs.viewLineStroke 4
+            Svgs.viewLineStroke 4 []
 
         EditTextBox ->
             Svgs.viewTextIcon
@@ -902,9 +915,32 @@ viewLineOptions editState =
 
 viewLineStrokeOptions : EditState -> Html Msg
 viewLineStrokeOptions editState =
-    lineStrokeOptions
-        |> List.map (viewLineStrokeOption editState.stroke)
+    [ List.map (viewLineStrokeOption editState.stroke) lineStrokeOptions
+    , List.map (viewStrokeStyleOption editState.strokeStyle) strokeStyles
+    ]
+        |> List.concat
         |> div [ class "dropdown-option" ]
+
+
+viewStrokeStyleOption : StrokeStyle -> StrokeStyle -> Html Msg
+viewStrokeStyleOption selectedStrokeStyle strokeStyle =
+    button
+        [ classList
+            [ "dropdown-button" => True
+            , "dropdown-button--selected" => selectedStrokeStyle == strokeStyle
+            ]
+        , Html.Events.onClick (SelectStrokeStyle strokeStyle)
+        ]
+        [ case strokeStyle of
+            Solid ->
+                Svgs.viewSolidIcon
+
+            Dotted ->
+                Svgs.viewDottedIcon
+
+            Dashed ->
+                Svgs.viewDashedIcon
+        ]
 
 
 viewLineStrokeOption : LineStroke -> LineStroke -> Html Msg
@@ -914,9 +950,9 @@ viewLineStrokeOption selectedStroke stroke =
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedStroke == stroke
             ]
-        , Html.Events.onClick (SelectLineStroke stroke)
+        , Html.Events.onClick <| SelectLineStroke stroke
         ]
-        [ Svgs.viewLineStroke (strokeToWidth stroke) ]
+        [ Svgs.viewLineStroke (strokeToWidth stroke) [] ]
 
 
 viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Html Msg
@@ -1044,7 +1080,7 @@ viewCanvas editState curMouse keyboardState =
 
 
 viewDrawing : EditState -> Position -> Keyboard.Extra.State -> Collage.Form
-viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
+viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState =
     case drawing of
         DrawRect rectMode ->
             case rectMode of
@@ -1052,11 +1088,11 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingRect startPos ->
-                    Rect startPos mouse fill stroke False
+                    Rect startPos mouse fill stroke strokeStyle False
                         |> viewRect
 
                 DrawingSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) fill stroke False
+                    Rect startPos (circleMouse startPos mouse) fill stroke strokeStyle False
                         |> viewRect
 
         DrawRoundedRect rectMode ->
@@ -1065,11 +1101,11 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingRoundedRect startPos ->
-                    Rect startPos mouse fill stroke True
+                    Rect startPos mouse fill stroke strokeStyle True
                         |> viewRect
 
                 DrawingRoundedSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) fill stroke True
+                    Rect startPos (circleMouse startPos mouse) fill stroke strokeStyle True
                         |> viewRect
 
         DrawArrow arrowDrawing ->
@@ -1078,11 +1114,11 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingArrow pos ->
-                    Arrow pos mouse fill stroke
+                    Arrow pos mouse fill stroke strokeStyle
                         |> viewArrow
 
                 DrawingDiscreteArrow pos ->
-                    Arrow pos (stepMouse pos mouse) fill stroke
+                    Arrow pos (stepMouse pos mouse) fill stroke strokeStyle
                         |> viewArrow
 
         DrawEllipse ellipseDrawing ->
@@ -1091,11 +1127,11 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingOval pos ->
-                    Ellipse pos mouse fill stroke
+                    Ellipse pos mouse fill stroke strokeStyle
                         |> viewEllipse
 
                 DrawingCircle pos ->
-                    Ellipse pos (circleMouse pos mouse) fill stroke
+                    Ellipse pos (circleMouse pos mouse) fill stroke strokeStyle
                         |> viewEllipse
 
         DrawTextBox textBoxDrawing ->
@@ -1121,11 +1157,11 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
                     toForm Element.empty
 
                 DrawingLine pos ->
-                    Line pos mouse fill stroke
+                    Line pos mouse fill stroke strokeStyle
                         |> viewLine
 
                 DrawingDiscreteLine pos ->
-                    Line pos (stepMouse pos mouse) fill stroke
+                    Line pos (stepMouse pos mouse) fill stroke strokeStyle
                         |> viewLine
 
         Selection ->
@@ -1133,29 +1169,40 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
 
 
 viewRect : Rect -> Collage.Form
-viewRect ({ start, end, fill, stroke, rounded } as rect) =
-    Collage.rect (dx start end) (dy start end)
-        |> Collage.outlined
-            { defaultLine
-                | color = fill
-                , width = toFloat <| strokeToWidth stroke
-                , join =
-                    if rounded then
-                        Collage.Smooth
-                    else
-                        Collage.Sharp 10
-            }
-        |> alignWithMouse start end 0
+viewRect ({ start, end, fill, stroke, strokeStyle, rounded } as rect) =
+    let
+        styledLine =
+            styleLine fill stroke strokeStyle
+    in
+        Collage.rect (dx start end) (dy start end)
+            |> Collage.outlined
+                { styledLine
+                    | join =
+                        if rounded then
+                            Collage.Smooth
+                        else
+                            Collage.Sharp 10
+                }
+            |> alignWithMouse start end 0
 
 
-viewArrow : Arrow -> Collage.Form
-viewArrow ({ start, end, fill, stroke } as arrow) =
+styleLine : Color -> LineStroke -> StrokeStyle -> Collage.LineStyle
+styleLine fill stroke strokeStyle =
     let
         strokeWidth =
             toFloat <| strokeToWidth stroke
 
-        lineStyle =
-            { defaultLine | width = strokeWidth, color = fill }
+        lineStrokeStyled =
+            toLineStyle strokeStyle
+    in
+        { lineStrokeStyled | width = strokeWidth, color = fill }
+
+
+viewArrow : Arrow -> Collage.Form
+viewArrow ({ start, end, fill, stroke, strokeStyle } as arrow) =
+    let
+        strokeWidth =
+            toFloat <| strokeToWidth stroke
 
         arrowHeadRadius =
             strokeWidth * 2
@@ -1166,15 +1213,15 @@ viewArrow ({ start, end, fill, stroke } as arrow) =
             |> rotate (degrees 60)
             |> move start
         , Collage.segment start end
-            |> Collage.traced lineStyle
+            |> Collage.traced (styleLine fill stroke strokeStyle)
         ]
             |> Collage.group
 
 
 viewEllipse : Ellipse -> Collage.Form
-viewEllipse ({ start, end, fill, stroke } as ellipse) =
+viewEllipse ({ start, end, fill, stroke, strokeStyle } as ellipse) =
     Collage.oval (dx start end) (dy start end)
-        |> Collage.outlined { defaultLine | color = fill, width = toFloat <| strokeToWidth stroke }
+        |> Collage.outlined (styleLine fill stroke strokeStyle)
         |> alignWithMouse start end 0
 
 
@@ -1235,13 +1282,9 @@ viewRotatingTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
 
 
 viewLine : Line -> Collage.Form
-viewLine { start, end, fill, stroke } =
-    let
-        lineStyle =
-            { defaultLine | width = toFloat <| strokeToWidth stroke, color = fill }
-    in
-        Collage.segment start end
-            |> Collage.traced lineStyle
+viewLine { start, end, fill, stroke, strokeStyle } =
+    Collage.segment start end
+        |> Collage.traced (styleLine fill stroke strokeStyle)
 
 
 viewImage : String -> Element.Element
@@ -1531,6 +1574,19 @@ alignWithMouse start end angle form =
         |> Collage.move start
         |> Collage.move (halfDistance start end)
         |> Collage.rotate angle
+
+
+toLineStyle : StrokeStyle -> Collage.LineStyle
+toLineStyle strokeStyle =
+    case strokeStyle of
+        Solid ->
+            Collage.defaultLine
+
+        Dotted ->
+            Collage.dotted Color.black
+
+        Dashed ->
+            Collage.dashed Color.black
 
 
 
