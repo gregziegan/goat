@@ -160,13 +160,17 @@ type EditOption
     | Strokes
 
 
+type Annotation
+    = Arrow_ Arrow
+    | Rect_ Rect
+    | Ellipse_ Ellipse
+    | TextBox_ TextBox
+    | Line_ Line
+
+
 type alias EditState =
     { photo : String
-    , arrows : List Arrow
-    , ellipses : List Ellipse
-    , rectangles : List Rect
-    , textBoxes : List TextBox
-    , lines : List Line
+    , annotations : List Annotation
     , drawing : Drawing
     , fill : Color
     , stroke : LineStroke
@@ -244,11 +248,7 @@ fontSizes =
 initialEditState : EditState
 initialEditState =
     { photo = ""
-    , arrows = []
-    , ellipses = []
-    , rectangles = []
-    , textBoxes = []
-    , lines = []
+    , annotations = []
     , drawing = Selection
     , fill = Color.red
     , stroke = Medium
@@ -321,7 +321,10 @@ update msg ({ edits, mouse } as model) =
                     => []
 
             AddRect start end ->
-                { editState | rectangles = Rect start end fill stroke strokeStyle False :: editState.rectangles, drawing = DrawRect <| NoRect }
+                { editState
+                    | annotations = Rect_ (Rect start end fill stroke strokeStyle False) :: editState.annotations
+                    , drawing = DrawRect <| NoRect
+                }
                     |> logChange model
                     => []
 
@@ -332,7 +335,10 @@ update msg ({ edits, mouse } as model) =
                     => []
 
             AddRoundedRect start end ->
-                { editState | rectangles = Rect start end fill stroke strokeStyle True :: editState.rectangles, drawing = DrawRoundedRect <| NoRoundedRect }
+                { editState
+                    | annotations = Rect_ (Rect start end fill stroke strokeStyle True) :: editState.annotations
+                    , drawing = DrawRoundedRect <| NoRoundedRect
+                }
                     |> logChange model
                     => []
 
@@ -344,7 +350,7 @@ update msg ({ edits, mouse } as model) =
 
             AddArrow startPos endPos ->
                 { editState
-                    | arrows = Arrow startPos endPos fill stroke strokeStyle :: editState.arrows
+                    | annotations = Arrow_ (Arrow startPos endPos fill stroke strokeStyle) :: editState.annotations
                     , drawing = DrawArrow NoArrow
                 }
                     |> skipChange model
@@ -358,7 +364,7 @@ update msg ({ edits, mouse } as model) =
 
             AddEllipse startPos endPos ->
                 { editState
-                    | ellipses = Ellipse startPos endPos fill stroke strokeStyle :: editState.ellipses
+                    | annotations = Ellipse_ (Ellipse startPos endPos fill stroke strokeStyle) :: editState.annotations
                     , drawing = DrawEllipse NoEllipse
                 }
                     |> skipChange model
@@ -406,7 +412,7 @@ update msg ({ edits, mouse } as model) =
 
             AddTextBox { start, end, text, angle } ->
                 { editState
-                    | textBoxes = TextBox start end text fill stroke fontSize angle :: editState.textBoxes
+                    | annotations = TextBox_ (TextBox start end text fill stroke fontSize angle) :: editState.annotations
                     , drawing = DrawTextBox NoText
                 }
                     |> skipChange model
@@ -420,7 +426,7 @@ update msg ({ edits, mouse } as model) =
 
             AddLine startPos endPos ->
                 { editState
-                    | lines = Line startPos endPos fill stroke strokeStyle :: editState.lines
+                    | annotations = Line_ (Line startPos endPos fill stroke strokeStyle) :: editState.annotations
                     , drawing = DrawLine NoLine
                 }
                     |> skipChange model
@@ -1046,38 +1052,38 @@ viewCanvas editState curMouse keyboardState =
         currentDrawing =
             viewDrawing editState (toPosition curMouse) keyboardState
 
-        arrows =
-            List.map viewArrow editState.arrows
-
-        ellipses =
-            List.map viewEllipse editState.ellipses
-
-        textBoxes =
-            List.map viewTextBox editState.textBoxes
-
-        lines =
-            List.map viewLine editState.lines
-
-        rectangles =
-            List.map viewRect editState.rectangles
+        annotations =
+            editState.annotations
+                |> List.reverse
+                |> List.map (viewAnnotation editState)
 
         forms =
-            List.concat
-                [ [ toForm <| viewImage editState.photo
-                  , currentDrawing
-                  ]
-                , arrows
-                , ellipses
-                , textBoxes
-                , lines
-                , rectangles
-                ]
+            viewImage editState.photo :: (annotations ++ [ currentDrawing ])
     in
         forms
             |> collage 400 300
             |> toHtml
             |> List.singleton
             |> div (attrs ++ [ id "canvas" ])
+
+
+viewAnnotation : EditState -> Annotation -> Collage.Form
+viewAnnotation editState annotation =
+    case annotation of
+        Arrow_ arrow ->
+            viewArrow arrow
+
+        Rect_ rect ->
+            viewRect rect
+
+        Ellipse_ ellipse ->
+            viewEllipse ellipse
+
+        Line_ line ->
+            viewLine line
+
+        TextBox_ textBox ->
+            viewTextBox textBox
 
 
 viewDrawing : EditState -> Position -> Keyboard.Extra.State -> Collage.Form
@@ -1290,9 +1296,9 @@ viewLine { start, end, fill, stroke, strokeStyle } =
         |> Collage.traced (styleLine fill stroke strokeStyle)
 
 
-viewImage : String -> Element.Element
+viewImage : String -> Collage.Form
 viewImage photo =
-    image 400 300 photo
+    toForm <| image 400 300 photo
 
 
 
