@@ -1,5 +1,6 @@
 # Image Annotation App
 
+![Travis](https://travis-ci.org/thebritican/annotation-editor.svg?branch=master)
 ![Example](https://cloud.githubusercontent.com/assets/3099999/23642939/5134b788-02b3-11e7-9b38-8b73e5a22b71.png)
 
 Minimally annotate images with common features like:
