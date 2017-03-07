@@ -12,7 +12,7 @@ import Json.Decode as Json
 import Keyboard.Extra exposing (Key, KeyChange(..))
 import Mouse
 import Rocket exposing ((=>))
-import Svgs exposing (viewDownArrow)
+import Svgs exposing (viewDownArrow, viewRectangleIcon)
 import Task exposing (succeed)
 import Text
 import UndoList exposing (UndoList)
@@ -39,6 +39,18 @@ type ArrowMode
     | DrawingDiscreteArrow StartPosition
 
 
+type RectMode
+    = NoRect
+    | DrawingRect StartPosition
+    | DrawingSquare StartPosition
+
+
+type RoundedRectMode
+    = NoRoundedRect
+    | DrawingRoundedRect StartPosition
+    | DrawingRoundedSquare StartPosition
+
+
 type EllipseMode
     = NoOval
     | DrawingOval StartPosition
@@ -60,6 +72,8 @@ type LineMode
 
 type Drawing
     = DrawArrow ArrowMode
+    | DrawRect RectMode
+    | DrawRoundedRect RoundedRectMode
     | DrawEllipse EllipseMode
     | DrawTextBox TextMode
     | DrawLine LineMode
@@ -67,7 +81,9 @@ type Drawing
 
 
 type EditMode
-    = EditOval
+    = EditRect
+    | EditRoundedRect
+    | EditOval
     | EditArrow
     | EditLine
     | EditTextBox
@@ -79,6 +95,15 @@ type alias Arrow =
     , end : Position
     , fill : Color
     , stroke : LineStroke
+    }
+
+
+type alias Rect =
+    { start : Position
+    , end : Position
+    , fill : Color
+    , stroke : LineStroke
+    , rounded : Bool
     }
 
 
@@ -129,6 +154,7 @@ type alias EditState =
     { photo : String
     , arrows : List Arrow
     , ellipses : List Ellipse
+    , rectangles : List Rect
     , textBoxes : List TextBox
     , lines : List Line
     , drawing : Drawing
@@ -172,7 +198,9 @@ lineStrokeOptions =
 
 shapeOptions : List EditMode
 shapeOptions =
-    [ EditOval
+    [ EditRect
+    , EditRoundedRect
+    , EditOval
     ]
 
 
@@ -212,6 +240,7 @@ initialEditState =
     { photo = ""
     , arrows = []
     , ellipses = []
+    , rectangles = []
     , textBoxes = []
     , lines = []
     , drawing = Selection
@@ -236,9 +265,13 @@ init =
 
 
 type Msg
-    = StartArrow StartPosition
+    = StartRect StartPosition
+    | AddRect StartPosition EndPosition
+    | StartRoundedRect StartPosition
+    | AddRoundedRect StartPosition EndPosition
+    | StartArrow StartPosition
     | AddArrow StartPosition EndPosition
-    | StartOval StartPosition
+    | StartEllipse StartPosition
     | AddEllipse StartPosition EndPosition
     | StartTextBox StartPosition
     | PlaceTextBox StartPosition EndPosition
@@ -273,6 +306,28 @@ update msg ({ edits, mouse } as model) =
             editState
     in
         case msg of
+            StartRect pos ->
+                { editState | drawing = DrawRect <| DrawingRect pos }
+                    |> logChange model
+                    |> updateMouse (fromPosition pos)
+                    => []
+
+            AddRect start end ->
+                { editState | rectangles = Rect start end fill stroke False :: editState.rectangles, drawing = DrawRect <| NoRect }
+                    |> logChange model
+                    => []
+
+            StartRoundedRect pos ->
+                { editState | drawing = DrawRoundedRect <| DrawingRoundedRect pos }
+                    |> logChange model
+                    |> updateMouse (fromPosition pos)
+                    => []
+
+            AddRoundedRect start end ->
+                { editState | rectangles = Rect start end fill stroke True :: editState.rectangles, drawing = DrawRoundedRect <| NoRoundedRect }
+                    |> logChange model
+                    => []
+
             StartArrow pos ->
                 { editState | drawing = DrawArrow (DrawingArrow pos) }
                     |> logChange model
@@ -287,7 +342,7 @@ update msg ({ edits, mouse } as model) =
                     |> skipChange model
                     => []
 
-            StartOval pos ->
+            StartEllipse pos ->
                 { editState | drawing = DrawEllipse <| DrawingOval pos }
                     |> logChange model
                     |> updateMouse (fromPosition pos)
@@ -494,6 +549,30 @@ updateDrawingIfRotating mouse editState =
 transitionOnShift : Drawing -> Drawing
 transitionOnShift drawing =
     case drawing of
+        DrawRect rectMode ->
+            DrawRect <|
+                case rectMode of
+                    DrawingRect start ->
+                        DrawingSquare start
+
+                    DrawingSquare start ->
+                        DrawingRect start
+
+                    _ ->
+                        rectMode
+
+        DrawRoundedRect rectMode ->
+            DrawRoundedRect <|
+                case rectMode of
+                    DrawingRoundedRect start ->
+                        DrawingRoundedSquare start
+
+                    DrawingRoundedSquare start ->
+                        DrawingRoundedRect start
+
+                    _ ->
+                        rectMode
+
         DrawArrow arrowMode ->
             DrawArrow <|
                 case arrowMode of
@@ -792,8 +871,14 @@ viewShapeOption drawing editMode =
 viewShapeSvg : EditMode -> Html Msg
 viewShapeSvg editMode =
     case editMode of
+        EditRect ->
+            Svgs.viewRectangleIcon
+
+        EditRoundedRect ->
+            Svgs.viewRoundedRectangleIcon
+
         EditOval ->
-            Svgs.viewOvalIcon
+            Svgs.viewEllipseIcon
 
         EditArrow ->
             Svgs.viewArrowIcon
@@ -834,22 +919,35 @@ viewLineStrokeOption selectedStroke stroke =
         [ Svgs.viewLineStroke (strokeToWidth stroke) ]
 
 
-viewEditOption : EditState -> EditMode -> Html Msg
-viewEditOption editState editMode =
-    button
-        [ Html.Events.onClick (ChangeDrawing <| editToDrawing editMode)
-        , classList [ "edit-mode--selected" => drawingToEditMode editState.drawing == editMode ]
-        ]
-        [ text <| modeToString editMode ]
-
-
 viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Html Msg
 viewCanvas editState curMouse keyboardState =
     let
         canvasEvents =
             case editState.drawing of
-                DrawArrow arrowDrawing ->
-                    case arrowDrawing of
+                DrawRect rectMode ->
+                    case rectMode of
+                        NoRect ->
+                            [ onClick <| Json.map (StartRect << toPosition) Mouse.position ]
+
+                        DrawingRect startPos ->
+                            [ onClick <| Json.map (AddRect startPos << toPosition) Mouse.position ]
+
+                        DrawingSquare startPos ->
+                            [ onClick <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
+
+                DrawRoundedRect rectMode ->
+                    case rectMode of
+                        NoRoundedRect ->
+                            [ onClick <| Json.map (StartRoundedRect << toPosition) Mouse.position ]
+
+                        DrawingRoundedRect startPos ->
+                            [ onClick <| Json.map (AddRoundedRect startPos << toPosition) Mouse.position ]
+
+                        DrawingRoundedSquare startPos ->
+                            [ onClick <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
+
+                DrawArrow arrowMode ->
+                    case arrowMode of
                         NoArrow ->
                             [ onClick (Json.map (StartArrow << toPosition) Mouse.position) ]
 
@@ -862,7 +960,7 @@ viewCanvas editState curMouse keyboardState =
                 DrawEllipse ellipseDrawing ->
                     case ellipseDrawing of
                         NoOval ->
-                            [ onClick (Json.map (StartOval << toPosition) Mouse.position) ]
+                            [ onClick (Json.map (StartEllipse << toPosition) Mouse.position) ]
 
                         DrawingOval startPos ->
                             [ onClick <| Json.map (AddEllipse startPos << toPosition) Mouse.position ]
@@ -923,6 +1021,9 @@ viewCanvas editState curMouse keyboardState =
         lines =
             List.map viewLine editState.lines
 
+        rectangles =
+            List.map viewRect editState.rectangles
+
         forms =
             List.concat
                 [ [ toForm <| viewImage editState.photo
@@ -932,6 +1033,7 @@ viewCanvas editState curMouse keyboardState =
                 , ellipses
                 , textBoxes
                 , lines
+                , rectangles
                 ]
     in
         forms
@@ -944,6 +1046,32 @@ viewCanvas editState curMouse keyboardState =
 viewDrawing : EditState -> Position -> Keyboard.Extra.State -> Collage.Form
 viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
     case drawing of
+        DrawRect rectMode ->
+            case rectMode of
+                NoRect ->
+                    toForm Element.empty
+
+                DrawingRect startPos ->
+                    Rect startPos mouse fill stroke False
+                        |> viewRect
+
+                DrawingSquare startPos ->
+                    Rect startPos (circleMouse startPos mouse) fill stroke False
+                        |> viewRect
+
+        DrawRoundedRect rectMode ->
+            case rectMode of
+                NoRoundedRect ->
+                    toForm Element.empty
+
+                DrawingRoundedRect startPos ->
+                    Rect startPos mouse fill stroke True
+                        |> viewRect
+
+                DrawingRoundedSquare startPos ->
+                    Rect startPos (circleMouse startPos mouse) fill stroke True
+                        |> viewRect
+
         DrawArrow arrowDrawing ->
             case arrowDrawing of
                 NoArrow ->
@@ -1002,6 +1130,22 @@ viewDrawing { drawing, fill, stroke, fontSize } mouse keyboardState =
 
         Selection ->
             toForm Element.empty
+
+
+viewRect : Rect -> Collage.Form
+viewRect ({ start, end, fill, stroke, rounded } as rect) =
+    Collage.rect (dx start end) (dy start end)
+        |> Collage.outlined
+            { defaultLine
+                | color = fill
+                , width = toFloat <| strokeToWidth stroke
+                , join =
+                    if rounded then
+                        Collage.Smooth
+                    else
+                        Collage.Sharp 10
+            }
+        |> alignWithMouse start end 0
 
 
 viewArrow : Arrow -> Collage.Form
@@ -1165,28 +1309,15 @@ arrowAngle ( x1, y1 ) ( x2, y2 ) =
         radians
 
 
-modeToString : EditMode -> String
-modeToString mode =
-    case mode of
-        EditArrow ->
-            "Arrow"
-
-        EditOval ->
-            "Oval"
-
-        EditTextBox ->
-            "Text"
-
-        EditLine ->
-            "Line"
-
-        Select ->
-            "Select"
-
-
 editToDrawing : EditMode -> Drawing
 editToDrawing editMode =
     case editMode of
+        EditRect ->
+            DrawRect NoRect
+
+        EditRoundedRect ->
+            DrawRoundedRect NoRoundedRect
+
         EditArrow ->
             DrawArrow NoArrow
 
@@ -1206,6 +1337,12 @@ editToDrawing editMode =
 drawingToEditMode : Drawing -> EditMode
 drawingToEditMode drawing =
     case drawing of
+        DrawRect _ ->
+            EditRect
+
+        DrawRoundedRect _ ->
+            EditRoundedRect
+
         DrawArrow _ ->
             EditArrow
 
@@ -1231,6 +1368,28 @@ trackMouse editState =
                     True
 
                 DrawingDiscreteArrow _ ->
+                    True
+
+                _ ->
+                    False
+
+        DrawRoundedRect rectMode ->
+            case rectMode of
+                DrawingRoundedRect _ ->
+                    True
+
+                DrawingRoundedSquare _ ->
+                    True
+
+                _ ->
+                    False
+
+        DrawRect rectMode ->
+            case rectMode of
+                DrawingRect _ ->
+                    True
+
+                DrawingSquare _ ->
                     True
 
                 _ ->

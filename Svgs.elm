@@ -31,8 +31,22 @@ viewArrowIcon =
         ]
 
 
-viewOvalIcon : Html msg
-viewOvalIcon =
+viewRectangleIcon : Html msg
+viewRectangleIcon =
+    svg [ width "20", height "20", viewBox "0 0 40 40" ]
+        [ rect [ x "10", y "10", width "20", height "20", fill "white", stroke "grey" ] []
+        ]
+
+
+viewRoundedRectangleIcon : Html msg
+viewRoundedRectangleIcon =
+    svg [ width "20", height "20", viewBox "0 0 40 40" ]
+        [ rect [ x "10", y "10", width "20", height "20", rx "2", ry "2", fill "white", stroke "grey" ] []
+        ]
+
+
+viewEllipseIcon : Html msg
+viewEllipseIcon =
     svg [ width "20", height "20", viewBox "0 0 20 20" ]
         [ ellipse [ cx "10", cy "10", rx "8", ry "5", stroke "grey", strokeWidth "2", fill "white" ] []
         ]
