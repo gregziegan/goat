@@ -5,7 +5,7 @@ import Collage exposing (collage, filled, move, rotate, toForm)
 import Color exposing (Color)
 import Dom
 import Element exposing (image, toHtml)
-import Html exposing (Html, button, div, p, text)
+import Html exposing (Html, Attribute, button, div, p, text)
 import Html.Attributes exposing (class, classList, id, start, style, type_)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
 import Json.Decode as Json
@@ -955,92 +955,93 @@ viewLineStrokeOption selectedStroke stroke =
         [ Svgs.viewLineStroke (strokeToWidth stroke) [] ]
 
 
+canvasEvents : Drawing -> Mouse.Position -> List (Attribute Msg)
+canvasEvents drawing curMouse =
+    case drawing of
+        DrawRect rectMode ->
+            case rectMode of
+                NoRect ->
+                    [ onMouseDown <| Json.map (StartRect << toPosition) Mouse.position ]
+
+                DrawingRect startPos ->
+                    [ onMouseUp <| Json.map (AddRect startPos << toPosition) Mouse.position ]
+
+                DrawingSquare startPos ->
+                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
+
+        DrawRoundedRect rectMode ->
+            case rectMode of
+                NoRoundedRect ->
+                    [ onMouseDown <| Json.map (StartRoundedRect << toPosition) Mouse.position ]
+
+                DrawingRoundedRect startPos ->
+                    [ onMouseUp <| Json.map (AddRoundedRect startPos << toPosition) Mouse.position ]
+
+                DrawingRoundedSquare startPos ->
+                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
+
+        DrawArrow arrowMode ->
+            case arrowMode of
+                NoArrow ->
+                    [ onMouseDown (Json.map (StartArrow << toPosition) Mouse.position) ]
+
+                DrawingArrow startPos ->
+                    [ onMouseUp <| Json.map (AddArrow startPos << toPosition) Mouse.position ]
+
+                DrawingDiscreteArrow startPos ->
+                    [ onMouseUp <| Json.map (AddArrow startPos << stepMouse startPos << toPosition) Mouse.position ]
+
+        DrawEllipse ellipseDrawing ->
+            case ellipseDrawing of
+                NoEllipse ->
+                    [ onMouseDown (Json.map (StartEllipse << toPosition) Mouse.position) ]
+
+                DrawingOval startPos ->
+                    [ onMouseUp <| Json.map (AddEllipse startPos << toPosition) Mouse.position ]
+
+                DrawingCircle startPos ->
+                    [ onMouseUp <| Json.map (AddEllipse startPos << circleMouse startPos << toPosition) Mouse.position ]
+
+        DrawTextBox textBoxDrawing ->
+            case textBoxDrawing of
+                NoText ->
+                    [ onMouseDown (Json.map (StartTextBox << toPosition) Mouse.position) ]
+
+                DrawingTextBox start ->
+                    [ onMouseUp (Json.map (PlaceTextBox start << toPosition) Mouse.position) ]
+
+                EditingText ({ start, end, text, angle } as textBox) ->
+                    [ if mouseIsOverRotateButton (rotateButtonPosition start end) (toPosition curMouse) then
+                        Html.Events.onMouseDown <| BeginRotatingTextBox 0 textBox
+                      else if text == "" then
+                        onClick Undo
+                      else
+                        onClick <| AddTextBox textBox
+                    ]
+
+                RotatingText ({ start } as textBox) ->
+                    [ onMouseUp <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toPosition) Mouse.position ]
+
+        DrawLine lineDrawing ->
+            case lineDrawing of
+                NoLine ->
+                    [ onMouseDown (Json.map (StartLine << toPosition) Mouse.position) ]
+
+                DrawingLine startPos ->
+                    [ onMouseUp (Json.map (AddLine startPos << toPosition) Mouse.position) ]
+
+                DrawingDiscreteLine startPos ->
+                    [ onMouseUp <| Json.map (AddLine startPos << stepMouse startPos << toPosition) Mouse.position ]
+
+        Selection ->
+            []
+
+
 viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Html Msg
 viewCanvas editState curMouse keyboardState =
     let
-        canvasEvents =
-            case editState.drawing of
-                DrawRect rectMode ->
-                    case rectMode of
-                        NoRect ->
-                            [ onMouseDown <| Json.map (StartRect << toPosition) Mouse.position ]
-
-                        DrawingRect startPos ->
-                            [ onMouseUp <| Json.map (AddRect startPos << toPosition) Mouse.position ]
-
-                        DrawingSquare startPos ->
-                            [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
-
-                DrawRoundedRect rectMode ->
-                    case rectMode of
-                        NoRoundedRect ->
-                            [ onMouseDown <| Json.map (StartRoundedRect << toPosition) Mouse.position ]
-
-                        DrawingRoundedRect startPos ->
-                            [ onMouseUp <| Json.map (AddRoundedRect startPos << toPosition) Mouse.position ]
-
-                        DrawingRoundedSquare startPos ->
-                            [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
-
-                DrawArrow arrowMode ->
-                    case arrowMode of
-                        NoArrow ->
-                            [ onMouseDown (Json.map (StartArrow << toPosition) Mouse.position) ]
-
-                        DrawingArrow startPos ->
-                            [ onMouseUp <| Json.map (AddArrow startPos << toPosition) Mouse.position ]
-
-                        DrawingDiscreteArrow startPos ->
-                            [ onMouseUp <| Json.map (AddArrow startPos << stepMouse startPos << toPosition) Mouse.position ]
-
-                DrawEllipse ellipseDrawing ->
-                    case ellipseDrawing of
-                        NoEllipse ->
-                            [ onMouseDown (Json.map (StartEllipse << toPosition) Mouse.position) ]
-
-                        DrawingOval startPos ->
-                            [ onMouseUp <| Json.map (AddEllipse startPos << toPosition) Mouse.position ]
-
-                        DrawingCircle startPos ->
-                            [ onMouseUp <| Json.map (AddEllipse startPos << circleMouse startPos << toPosition) Mouse.position ]
-
-                DrawTextBox textBoxDrawing ->
-                    case textBoxDrawing of
-                        NoText ->
-                            [ onMouseDown (Json.map (StartTextBox << toPosition) Mouse.position) ]
-
-                        DrawingTextBox start ->
-                            [ onMouseUp (Json.map (PlaceTextBox start << toPosition) Mouse.position) ]
-
-                        EditingText ({ start, end, text, angle } as textBox) ->
-                            [ if mouseIsOverRotateButton (rotateButtonPosition start end) (toPosition curMouse) then
-                                Html.Events.onMouseDown <| BeginRotatingTextBox 0 textBox
-                              else if text == "" then
-                                onClick Undo
-                              else
-                                onClick <| AddTextBox textBox
-                            ]
-
-                        RotatingText ({ start } as textBox) ->
-                            [ onMouseUp <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toPosition) Mouse.position ]
-
-                DrawLine lineDrawing ->
-                    case lineDrawing of
-                        NoLine ->
-                            [ onMouseDown (Json.map (StartLine << toPosition) Mouse.position) ]
-
-                        DrawingLine startPos ->
-                            [ onMouseUp (Json.map (AddLine startPos << toPosition) Mouse.position) ]
-
-                        DrawingDiscreteLine startPos ->
-                            [ onMouseUp <| Json.map (AddLine startPos << stepMouse startPos << toPosition) Mouse.position ]
-
-                Selection ->
-                    []
-
         attrs =
-            canvasEvents
-                ++ [ class "image-edit" ]
+            canvasEvents editState.drawing curMouse ++ [ class "image-edit" ]
 
         currentDrawing =
             viewDrawing editState (toPosition curMouse) keyboardState
