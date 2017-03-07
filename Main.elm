@@ -702,7 +702,7 @@ viewControls editState =
         [ viewButtonGroup [ viewShapeDropdown editState, viewLineDropdown editState, viewTextSizeDropdown editState ]
         , viewButtonGroup [ viewFillDropdown editState, viewLineStrokeDropdown editState ]
         , viewHistoryControls
-        , button [ Html.Events.onClick Export, class "export-button" ] [ text "Export" ]
+        , button [ onClick Export, class "export-button" ] [ text "Export" ]
         ]
 
 
@@ -714,9 +714,9 @@ viewButtonGroup buttons =
 viewHistoryControls : Html Msg
 viewHistoryControls =
     div [ class "history-controls" ]
-        [ button [ Html.Events.onClick Reset, class "history-button" ] [ Svgs.viewResetArrow ]
-        , button [ Html.Events.onClick Undo, class "history-button" ] [ Svgs.viewUndoArrow ]
-        , button [ Html.Events.onClick Redo, class "history-button flip" ] [ Svgs.viewUndoArrow ]
+        [ button [ onClick Reset, class "history-button" ] [ Svgs.viewResetArrow ]
+        , button [ onClick Undo, class "history-button" ] [ Svgs.viewUndoArrow ]
+        , button [ onClick Redo, class "history-button flip" ] [ Svgs.viewUndoArrow ]
         ]
 
 
@@ -726,7 +726,7 @@ viewTextSizeDropdown editState =
         [ class "dropdown-things"
         ]
         [ button
-            [ Html.Events.onClick <| ToggleDropdown Fonts
+            [ onClick <| ToggleDropdown Fonts
             , class "dropdown-button"
             ]
             [ Svgs.viewTextIcon
@@ -757,7 +757,7 @@ viewFillOption selectedFill fill =
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedFill == fill
             ]
-        , Html.Events.onClick (SelectFill fill)
+        , onClick (SelectFill fill)
         ]
         [ Svgs.viewFillIcon fill ]
 
@@ -769,7 +769,7 @@ viewFontSizeOption selectedFontSize fontSize =
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedFontSize == fontSize
             ]
-        , Html.Events.onClick (SelectFontSize fontSize)
+        , onClick (SelectFontSize fontSize)
         ]
         [ text <| toString <| fontSize ]
 
@@ -779,7 +779,7 @@ viewLineStrokeDropdown editState =
     div
         [ class "dropdown-things" ]
         [ button
-            [ Html.Events.onClick <| ToggleDropdown Strokes
+            [ onClick <| ToggleDropdown Strokes
             , class "dropdown-button"
             ]
             [ Svgs.viewLineStrokeDropdownIcon
@@ -794,7 +794,7 @@ viewFillDropdown editState =
     div
         [ class "dropdown-things" ]
         [ button
-            [ Html.Events.onClick <| ToggleDropdown Fills
+            [ onClick <| ToggleDropdown Fills
             , class "dropdown-button"
             ]
             [ Svgs.viewFillIcon editState.fill
@@ -837,7 +837,7 @@ viewShapeDropdown editState =
     div
         [ class "dropdown-things" ]
         [ button
-            [ Html.Events.onClick <| ToggleDropdown Shapes
+            [ onClick <| ToggleDropdown Shapes
             , class "dropdown-button"
             ]
             [ viewShapeSvg EditOval
@@ -852,7 +852,7 @@ viewLineDropdown editState =
     div
         [ class "dropdown-things" ]
         [ button
-            [ Html.Events.onClick <| ToggleDropdown Lines
+            [ onClick <| ToggleDropdown Lines
             , class "dropdown-button"
             ]
             [ viewShapeSvg EditArrow
@@ -876,7 +876,7 @@ viewShapeOption drawing editMode =
             [ "dropdown-button" => True
             , "dropdown-button--selected" => drawingToEditMode drawing == editMode
             ]
-        , Html.Events.onClick <| ChangeDrawing <| editToDrawing editMode
+        , onClick <| ChangeDrawing <| editToDrawing editMode
         ]
         [ viewShapeSvg editMode ]
 
@@ -929,7 +929,7 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedStrokeStyle == strokeStyle
             ]
-        , Html.Events.onClick (SelectStrokeStyle strokeStyle)
+        , onClick (SelectStrokeStyle strokeStyle)
         ]
         [ case strokeStyle of
             Solid ->
@@ -950,7 +950,7 @@ viewLineStrokeOption selectedStroke stroke =
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedStroke == stroke
             ]
-        , Html.Events.onClick <| SelectLineStroke stroke
+        , onClick <| SelectLineStroke stroke
         ]
         [ Svgs.viewLineStroke (strokeToWidth stroke) [] ]
 
@@ -963,77 +963,77 @@ viewCanvas editState curMouse keyboardState =
                 DrawRect rectMode ->
                     case rectMode of
                         NoRect ->
-                            [ onClick <| Json.map (StartRect << toPosition) Mouse.position ]
+                            [ onMouseDown <| Json.map (StartRect << toPosition) Mouse.position ]
 
                         DrawingRect startPos ->
-                            [ onClick <| Json.map (AddRect startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddRect startPos << toPosition) Mouse.position ]
 
                         DrawingSquare startPos ->
-                            [ onClick <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
 
                 DrawRoundedRect rectMode ->
                     case rectMode of
                         NoRoundedRect ->
-                            [ onClick <| Json.map (StartRoundedRect << toPosition) Mouse.position ]
+                            [ onMouseDown <| Json.map (StartRoundedRect << toPosition) Mouse.position ]
 
                         DrawingRoundedRect startPos ->
-                            [ onClick <| Json.map (AddRoundedRect startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddRoundedRect startPos << toPosition) Mouse.position ]
 
                         DrawingRoundedSquare startPos ->
-                            [ onClick <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
 
                 DrawArrow arrowMode ->
                     case arrowMode of
                         NoArrow ->
-                            [ onClick (Json.map (StartArrow << toPosition) Mouse.position) ]
+                            [ onMouseDown (Json.map (StartArrow << toPosition) Mouse.position) ]
 
                         DrawingArrow startPos ->
-                            [ onClick <| Json.map (AddArrow startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddArrow startPos << toPosition) Mouse.position ]
 
                         DrawingDiscreteArrow startPos ->
-                            [ onClick <| Json.map (AddArrow startPos << stepMouse startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddArrow startPos << stepMouse startPos << toPosition) Mouse.position ]
 
                 DrawEllipse ellipseDrawing ->
                     case ellipseDrawing of
                         NoOval ->
-                            [ onClick (Json.map (StartEllipse << toPosition) Mouse.position) ]
+                            [ onMouseDown (Json.map (StartEllipse << toPosition) Mouse.position) ]
 
                         DrawingOval startPos ->
-                            [ onClick <| Json.map (AddEllipse startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddEllipse startPos << toPosition) Mouse.position ]
 
                         DrawingCircle startPos ->
-                            [ onClick <| Json.map (AddEllipse startPos << circleMouse startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddEllipse startPos << circleMouse startPos << toPosition) Mouse.position ]
 
                 DrawTextBox textBoxDrawing ->
                     case textBoxDrawing of
                         NoText ->
-                            [ onClick (Json.map (StartTextBox << toPosition) Mouse.position) ]
+                            [ onMouseDown (Json.map (StartTextBox << toPosition) Mouse.position) ]
 
                         DrawingTextBox start ->
-                            [ onClick (Json.map (PlaceTextBox start << toPosition) Mouse.position) ]
+                            [ onMouseUp (Json.map (PlaceTextBox start << toPosition) Mouse.position) ]
 
                         EditingText ({ start, end, text, angle } as textBox) ->
                             [ if mouseIsOverRotateButton (rotateButtonPosition start end) (toPosition curMouse) then
-                                Html.Events.onClick <| BeginRotatingTextBox 0 textBox
+                                Html.Events.onMouseDown <| BeginRotatingTextBox 0 textBox
                               else if text == "" then
-                                Html.Events.onClick Undo
+                                onClick Undo
                               else
-                                Html.Events.onClick <| AddTextBox textBox
+                                onClick <| AddTextBox textBox
                             ]
 
                         RotatingText ({ start } as textBox) ->
-                            [ onClick <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toPosition) Mouse.position ]
 
                 DrawLine lineDrawing ->
                     case lineDrawing of
                         NoLine ->
-                            [ onClick (Json.map (StartLine << toPosition) Mouse.position) ]
+                            [ onMouseDown (Json.map (StartLine << toPosition) Mouse.position) ]
 
                         DrawingLine startPos ->
-                            [ onClick (Json.map (AddLine startPos << toPosition) Mouse.position) ]
+                            [ onMouseUp (Json.map (AddLine startPos << toPosition) Mouse.position) ]
 
                         DrawingDiscreteLine startPos ->
-                            [ onClick <| Json.map (AddLine startPos << stepMouse startPos << toPosition) Mouse.position ]
+                            [ onMouseUp <| Json.map (AddLine startPos << stepMouse startPos << toPosition) Mouse.position ]
 
                 Selection ->
                     []
@@ -1296,9 +1296,14 @@ viewImage photo =
 -- HELPERS
 
 
-onClick : Json.Decoder msg -> Html.Attribute msg
-onClick decodeToMsg =
-    on "click" decodeToMsg
+onMouseDown : Json.Decoder msg -> Html.Attribute msg
+onMouseDown decodeToMsg =
+    on "mousedown" decodeToMsg
+
+
+onMouseUp : Json.Decoder msg -> Html.Attribute msg
+onMouseUp decodeToMsg =
+    on "mouseup" decodeToMsg
 
 
 handleTextBoxInputKey : Msg -> KeyCode -> Result String Msg
