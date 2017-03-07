@@ -1173,16 +1173,18 @@ viewRect ({ start, end, fill, stroke, strokeStyle, rounded } as rect) =
     let
         styledLine =
             styleLine fill stroke strokeStyle
+
+        lineStyle =
+            { styledLine
+                | join =
+                    if rounded then
+                        Collage.Smooth
+                    else
+                        Collage.Sharp 10
+            }
     in
         Collage.rect (dx start end) (dy start end)
-            |> Collage.outlined
-                { styledLine
-                    | join =
-                        if rounded then
-                            Collage.Smooth
-                        else
-                            Collage.Sharp 10
-                }
+            |> Collage.outlined lineStyle
             |> alignWithMouse start end 0
 
 
