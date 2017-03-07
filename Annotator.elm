@@ -1,4 +1,4 @@
-port module Main exposing (main)
+port module Annotator exposing (..)
 
 import Char exposing (KeyCode)
 import Collage exposing (collage, filled, move, rotate, toForm)
@@ -52,7 +52,7 @@ type RoundedRectMode
 
 
 type EllipseMode
-    = NoOval
+    = NoEllipse
     | DrawingOval StartPosition
     | DrawingCircle StartPosition
 
@@ -359,7 +359,7 @@ update msg ({ edits, mouse } as model) =
             AddEllipse startPos endPos ->
                 { editState
                     | ellipses = Ellipse startPos endPos fill stroke strokeStyle :: editState.ellipses
-                    , drawing = DrawEllipse NoOval
+                    , drawing = DrawEllipse NoEllipse
                 }
                     |> skipChange model
                     => []
@@ -995,7 +995,7 @@ viewCanvas editState curMouse keyboardState =
 
                 DrawEllipse ellipseDrawing ->
                     case ellipseDrawing of
-                        NoOval ->
+                        NoEllipse ->
                             [ onMouseDown (Json.map (StartEllipse << toPosition) Mouse.position) ]
 
                         DrawingOval startPos ->
@@ -1123,7 +1123,7 @@ viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState
 
         DrawEllipse ellipseDrawing ->
             case ellipseDrawing of
-                NoOval ->
+                NoEllipse ->
                     toForm Element.empty
 
                 DrawingOval pos ->
@@ -1370,7 +1370,7 @@ editToDrawing editMode =
             DrawArrow NoArrow
 
         EditOval ->
-            DrawEllipse NoOval
+            DrawEllipse NoEllipse
 
         EditTextBox ->
             DrawTextBox NoText
@@ -1407,9 +1407,9 @@ drawingToEditMode drawing =
             Select
 
 
-trackMouse : EditState -> Bool
-trackMouse editState =
-    case editState.drawing of
+trackMouse : Drawing -> Bool
+trackMouse drawing =
+    case drawing of
         DrawArrow arrowMode ->
             case arrowMode of
                 DrawingArrow _ ->
@@ -1611,7 +1611,7 @@ port importImage : (String -> msg) -> Sub msg
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ if trackMouse model.edits.present then
+        [ if trackMouse model.edits.present.drawing then
             Mouse.moves SetMouse
           else
             Sub.none

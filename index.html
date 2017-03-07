@@ -35,7 +35,7 @@
       	}
       	reader.readAsDataURL(src)
       }
-      var app = Elm.Main.embed(document.getElementById("root"));
+      var app = Elm.Annotator.embed(document.getElementById("root"));
       app.ports.exportToImage.subscribe(function(id) {
         var canvas = document.getElementById('export')
         var ctx = canvas.getContext("2d")
