@@ -19,5 +19,5 @@ This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/
 Use `elm-live` (`npm i -g elm-live`)
 
 ```
-elm-live Annotator.elm --output=elm.js --open --debug
+elm-live src/Annotator.elm --output=elm.js --open --debug
 ```
