@@ -4,12 +4,13 @@ import Char exposing (KeyCode)
 import Collage exposing (collage, filled, move, rotate, toForm)
 import Color exposing (Color)
 import Dom
-import Element exposing (image, toHtml)
-import Html exposing (Html, Attribute, button, div, p, text)
+import Element exposing (toHtml)
+import Html exposing (Attribute, Html, button, div, p, text)
 import Html.Attributes exposing (class, classList, id, start, style, type_)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra exposing (Key, KeyChange(..))
+import List.Zipper exposing (Zipper)
 import Mouse
 import Rocket exposing ((=>))
 import Svgs exposing (viewDownArrow, viewRectangleIcon)
@@ -138,6 +139,15 @@ type alias Line =
     }
 
 
+type alias Image =
+    { url : String
+    , width : Float
+    , height : Float
+    , originalWidth : Float
+    , originalHeight : Float
+    }
+
+
 type LineStroke
     = VeryThin
     | Thin
@@ -169,8 +179,7 @@ type Annotation
 
 
 type alias EditState =
-    { photo : String
-    , annotations : List Annotation
+    { annotations : List Annotation
     , drawing : Drawing
     , fill : Color
     , stroke : LineStroke
@@ -184,6 +193,7 @@ type alias Model =
     { edits : UndoList EditState
     , mouse : Mouse.Position
     , keyboardState : Keyboard.Extra.State
+    , images : Maybe (Zipper Image)
     }
 
 
@@ -247,8 +257,7 @@ fontSizes =
 
 initialEditState : EditState
 initialEditState =
-    { photo = ""
-    , annotations = []
+    { annotations = []
     , drawing = Selection
     , fill = Color.red
     , stroke = Medium
@@ -263,6 +272,7 @@ init =
     { edits = UndoList.fresh initialEditState
     , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.Extra.initialState
+    , images = List.Zipper.fromList []
     }
         => []
 
@@ -288,8 +298,8 @@ type Msg
     | AddTextBox TextBox
     | StartLine StartPosition
     | AddLine StartPosition EndPosition
-    | SetMouse Mouse.Position
-    | SetImage String
+    | SetMouse Image Mouse.Position
+    | SetImages (List Image)
     | KeyboardMsg Keyboard.Extra.Msg
     | ChangeDrawing Drawing
     | SelectFill Color
@@ -305,7 +315,7 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, mouse } as model) =
+update msg ({ edits, mouse, images } as model) =
     let
         editState =
             edits.present
@@ -317,7 +327,7 @@ update msg ({ edits, mouse } as model) =
             StartRect pos ->
                 { editState | drawing = DrawRect <| DrawingRect pos }
                     |> logChange model
-                    |> updateMouse (fromPosition pos)
+                    |> updateMouse images pos
                     => []
 
             AddRect start end ->
@@ -331,7 +341,7 @@ update msg ({ edits, mouse } as model) =
             StartRoundedRect pos ->
                 { editState | drawing = DrawRoundedRect <| DrawingRoundedRect pos }
                     |> logChange model
-                    |> updateMouse (fromPosition pos)
+                    |> updateMouse images pos
                     => []
 
             AddRoundedRect start end ->
@@ -345,7 +355,7 @@ update msg ({ edits, mouse } as model) =
             StartArrow pos ->
                 { editState | drawing = DrawArrow (DrawingArrow pos) }
                     |> logChange model
-                    |> updateMouse (fromPosition pos)
+                    |> updateMouse images pos
                     => []
 
             AddArrow startPos endPos ->
@@ -359,7 +369,7 @@ update msg ({ edits, mouse } as model) =
             StartEllipse pos ->
                 { editState | drawing = DrawEllipse <| DrawingOval pos }
                     |> logChange model
-                    |> updateMouse (fromPosition pos)
+                    |> updateMouse images pos
                     => []
 
             AddEllipse startPos endPos ->
@@ -373,7 +383,7 @@ update msg ({ edits, mouse } as model) =
             StartTextBox pos ->
                 { editState | drawing = DrawTextBox (DrawingTextBox pos) }
                     |> logChange model
-                    |> updateMouse (fromPosition pos)
+                    |> updateMouse images pos
                     => []
 
             PlaceTextBox startPos endPos ->
@@ -421,7 +431,7 @@ update msg ({ edits, mouse } as model) =
             StartLine pos ->
                 { editState | drawing = DrawLine <| DrawingLine pos }
                     |> logChange model
-                    |> updateMouse (fromPosition pos)
+                    |> updateMouse images pos
                     => []
 
             AddLine startPos endPos ->
@@ -432,16 +442,15 @@ update msg ({ edits, mouse } as model) =
                     |> skipChange model
                     => []
 
-            SetMouse pos ->
+            SetMouse { width, height } pos ->
                 editState
-                    |> updateDrawingIfRotating pos
+                    |> updateDrawingIfRotating (toPosition width height pos)
                     |> skipChange model
-                    |> updateMouse pos
+                    |> setMouse pos
                     => []
 
-            SetImage imageUrl ->
-                { editState | photo = imageUrl }
-                    |> skipChange model
+            SetImages images ->
+                { model | images = List.Zipper.fromList images }
                     => []
 
             KeyboardMsg keyMsg ->
@@ -523,7 +532,13 @@ update msg ({ edits, mouse } as model) =
 
             Export ->
                 model
-                    => [ exportToImage "annotation-app" ]
+                    => [ case model.images of
+                            Just images ->
+                                exportToImage <| List.Zipper.current images
+
+                            Nothing ->
+                                Cmd.none
+                       ]
 
 
 {-| Add this editState change to app history
@@ -540,9 +555,26 @@ skipChange model editState =
     { model | edits = UndoList.mapPresent (\_ -> editState) model.edits }
 
 
-updateMouse : Mouse.Position -> Model -> Model
-updateMouse pos model =
-    { model | mouse = pos }
+updateMouse : Maybe (Zipper Image) -> Position -> Model -> Model
+updateMouse maybeImages mouse model =
+    case maybeImages of
+        Nothing ->
+            model
+
+        Just images ->
+            let
+                { width, height } =
+                    List.Zipper.current images
+
+                pos =
+                    fromPosition width height mouse
+            in
+                { model | mouse = pos }
+
+
+setMouse : Mouse.Position -> Model -> Model
+setMouse mouse model =
+    { model | mouse = mouse }
 
 
 updateDrawing : EditState -> Drawing -> EditState
@@ -550,13 +582,13 @@ updateDrawing editState drawing =
     { editState | drawing = drawing }
 
 
-updateDrawingIfRotating : Mouse.Position -> EditState -> EditState
-updateDrawingIfRotating mouse editState =
+updateDrawingIfRotating : Position -> EditState -> EditState
+updateDrawingIfRotating position editState =
     case editState.drawing of
         DrawTextBox textMode ->
             case textMode of
                 RotatingText textBox ->
-                    { editState | drawing = DrawTextBox <| RotatingText { textBox | angle = arrowAngle textBox.start (toPosition mouse) } }
+                    { editState | drawing = DrawTextBox <| RotatingText { textBox | angle = arrowAngle textBox.start position } }
 
                 _ ->
                     editState
@@ -666,40 +698,57 @@ alterDrawingsWithKeyboard maybeKeyChange model =
 
 
 view : Model -> Html Msg
-view ({ edits, mouse, keyboardState } as model) =
+view model =
+    case model.images of
+        Nothing ->
+            viewInfoScreen
+
+        Just images ->
+            viewImageAnnotator model <| List.Zipper.current images
+
+
+viewInfoScreen : Html Msg
+viewInfoScreen =
+    div []
+        [ text "please upload an image!" ]
+
+
+viewImageAnnotator : Model -> Image -> Html Msg
+viewImageAnnotator ({ edits, mouse, keyboardState } as model) selectedImage =
     let
         editState =
             edits.present
-
-        options =
-            { preventDefault = True, stopPropagation = False }
-
-        offscreenInput =
-            case editState.drawing of
-                DrawTextBox textBoxDrawing ->
-                    case textBoxDrawing of
-                        EditingText textBox ->
-                            [ Html.input
-                                [ id "text-box-edit"
-                                , onInput <| TextBoxInput textBox
-                                , onWithOptions "keydown" options (decodeTextInputKey <| AddTextBox textBox)
-                                , class "hidden-input"
-                                ]
-                                [ Html.text textBox.text ]
-                            ]
-
-                        _ ->
-                            []
-
-                _ ->
-                    []
     in
         div [ id "annotation-app" ]
-            ([ viewCanvas editState mouse keyboardState
-             , viewControls editState
-             ]
-                ++ offscreenInput
-            )
+            [ viewCanvas editState mouse keyboardState selectedImage
+            , viewControls editState
+            , viewOffscreenInput editState.drawing
+            ]
+
+
+viewOffscreenInput : Drawing -> Html Msg
+viewOffscreenInput drawing =
+    let
+        options =
+            { preventDefault = True, stopPropagation = False }
+    in
+        case drawing of
+            DrawTextBox textBoxDrawing ->
+                case textBoxDrawing of
+                    EditingText textBox ->
+                        Html.input
+                            [ id "text-box-edit"
+                            , onInput <| TextBoxInput textBox
+                            , onWithOptions "keydown" options (decodeTextInputKey <| AddTextBox textBox)
+                            , class "hidden-input"
+                            ]
+                            [ Html.text textBox.text ]
+
+                    _ ->
+                        text ""
+
+            _ ->
+                text ""
 
 
 viewControls : EditState -> Html Msg
@@ -961,63 +1010,63 @@ viewLineStrokeOption selectedStroke stroke =
         [ Svgs.viewLineStroke (strokeToWidth stroke) [] ]
 
 
-canvasEvents : Drawing -> Mouse.Position -> List (Attribute Msg)
-canvasEvents drawing curMouse =
+canvasEvents : (Mouse.Position -> Position) -> Drawing -> Mouse.Position -> List (Attribute Msg)
+canvasEvents toPos drawing curMouse =
     case drawing of
         DrawRect rectMode ->
             case rectMode of
                 NoRect ->
-                    [ onMouseDown <| Json.map (StartRect << toPosition) Mouse.position ]
+                    [ onMouseDown <| Json.map (StartRect << toPos) Mouse.position ]
 
                 DrawingRect startPos ->
-                    [ onMouseUp <| Json.map (AddRect startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRect startPos << toPos) Mouse.position ]
 
                 DrawingSquare startPos ->
-                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPos) Mouse.position ]
 
         DrawRoundedRect rectMode ->
             case rectMode of
                 NoRoundedRect ->
-                    [ onMouseDown <| Json.map (StartRoundedRect << toPosition) Mouse.position ]
+                    [ onMouseDown <| Json.map (StartRoundedRect << toPos) Mouse.position ]
 
                 DrawingRoundedRect startPos ->
-                    [ onMouseUp <| Json.map (AddRoundedRect startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRoundedRect startPos << toPos) Mouse.position ]
 
                 DrawingRoundedSquare startPos ->
-                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPos) Mouse.position ]
 
         DrawArrow arrowMode ->
             case arrowMode of
                 NoArrow ->
-                    [ onMouseDown (Json.map (StartArrow << toPosition) Mouse.position) ]
+                    [ onMouseDown (Json.map (StartArrow << toPos) Mouse.position) ]
 
                 DrawingArrow startPos ->
-                    [ onMouseUp <| Json.map (AddArrow startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddArrow startPos << toPos) Mouse.position ]
 
                 DrawingDiscreteArrow startPos ->
-                    [ onMouseUp <| Json.map (AddArrow startPos << stepMouse startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddArrow startPos << stepMouse startPos << toPos) Mouse.position ]
 
         DrawEllipse ellipseDrawing ->
             case ellipseDrawing of
                 NoEllipse ->
-                    [ onMouseDown (Json.map (StartEllipse << toPosition) Mouse.position) ]
+                    [ onMouseDown (Json.map (StartEllipse << toPos) Mouse.position) ]
 
                 DrawingOval startPos ->
-                    [ onMouseUp <| Json.map (AddEllipse startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddEllipse startPos << toPos) Mouse.position ]
 
                 DrawingCircle startPos ->
-                    [ onMouseUp <| Json.map (AddEllipse startPos << circleMouse startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddEllipse startPos << circleMouse startPos << toPos) Mouse.position ]
 
         DrawTextBox textBoxDrawing ->
             case textBoxDrawing of
                 NoText ->
-                    [ onMouseDown (Json.map (StartTextBox << toPosition) Mouse.position) ]
+                    [ onMouseDown (Json.map (StartTextBox << toPos) Mouse.position) ]
 
                 DrawingTextBox start ->
-                    [ onMouseUp (Json.map (PlaceTextBox start << toPosition) Mouse.position) ]
+                    [ onMouseUp (Json.map (PlaceTextBox start << toPos) Mouse.position) ]
 
                 EditingText ({ start, end, text, angle } as textBox) ->
-                    [ if mouseIsOverRotateButton (rotateButtonPosition start end) (toPosition curMouse) then
+                    [ if mouseIsOverRotateButton (rotateButtonPosition start end) (toPos curMouse) then
                         Html.Events.onMouseDown <| BeginRotatingTextBox 0 textBox
                       else if text == "" then
                         onClick Undo
@@ -1026,31 +1075,34 @@ canvasEvents drawing curMouse =
                     ]
 
                 RotatingText ({ start } as textBox) ->
-                    [ onMouseUp <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toPos) Mouse.position ]
 
         DrawLine lineDrawing ->
             case lineDrawing of
                 NoLine ->
-                    [ onMouseDown (Json.map (StartLine << toPosition) Mouse.position) ]
+                    [ onMouseDown (Json.map (StartLine << toPos) Mouse.position) ]
 
                 DrawingLine startPos ->
-                    [ onMouseUp (Json.map (AddLine startPos << toPosition) Mouse.position) ]
+                    [ onMouseUp (Json.map (AddLine startPos << toPos) Mouse.position) ]
 
                 DrawingDiscreteLine startPos ->
-                    [ onMouseUp <| Json.map (AddLine startPos << stepMouse startPos << toPosition) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddLine startPos << stepMouse startPos << toPos) Mouse.position ]
 
         Selection ->
             []
 
 
-viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Html Msg
-viewCanvas editState curMouse keyboardState =
+viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Image -> Html Msg
+viewCanvas editState curMouse keyboardState image =
     let
+        toPos =
+            toPosition image.width image.height
+
         attrs =
-            canvasEvents editState.drawing curMouse ++ [ class "image-edit" ]
+            canvasEvents toPos editState.drawing curMouse ++ [ id "canvas", class "image-edit" ]
 
         currentDrawing =
-            viewDrawing editState (toPosition curMouse) keyboardState
+            viewDrawing editState (toPos curMouse) keyboardState
 
         annotations =
             editState.annotations
@@ -1058,13 +1110,13 @@ viewCanvas editState curMouse keyboardState =
                 |> List.map (viewAnnotation editState)
 
         forms =
-            viewImage editState.photo :: (annotations ++ [ currentDrawing ])
+            viewImage image :: (annotations ++ [ currentDrawing ])
     in
         forms
-            |> collage 400 300
+            |> collage (round image.width) (round image.height)
             |> toHtml
             |> List.singleton
-            |> div (attrs ++ [ id "canvas" ])
+            |> div attrs
 
 
 viewAnnotation : EditState -> Annotation -> Collage.Form
@@ -1237,7 +1289,7 @@ viewEllipse ({ start, end, fill, stroke, strokeStyle } as ellipse) =
 viewText : String -> Color -> Float -> Collage.Form
 viewText text fill fontSize =
     Text.fromString text
-        |> Text.height (Debug.log "fontSize" fontSize)
+        |> Text.height fontSize
         |> Text.color fill
         |> Collage.text
 
@@ -1296,9 +1348,9 @@ viewLine { start, end, fill, stroke, strokeStyle } =
         |> Collage.traced (styleLine fill stroke strokeStyle)
 
 
-viewImage : String -> Collage.Form
-viewImage photo =
-    toForm <| image 400 300 photo
+viewImage : Image -> Collage.Form
+viewImage { width, height, url } =
+    toForm <| Element.image (round width) (round height) url
 
 
 
@@ -1341,14 +1393,14 @@ decodeTextInputKey submitMsg =
         |> Json.andThen fromKeyResult
 
 
-toPosition : Mouse.Position -> Position
-toPosition { x, y } =
-    ( toFloat (x - 210), toFloat (160 - y) )
+toPosition : Float -> Float -> Mouse.Position -> Position
+toPosition width height { x, y } =
+    ( toFloat x - ((width + 10) / 2), ((height + 10) / 2) - toFloat y )
 
 
-fromPosition : Position -> Mouse.Position
-fromPosition ( x, y ) =
-    Mouse.Position (round x + 210) (round ((y * -1) + 160))
+fromPosition : Float -> Float -> Position -> Mouse.Position
+fromPosition width height ( x, y ) =
+    Mouse.Position (round (x + ((width + 10) / 2))) (round ((y * -1) + ((height + 10) / 2)))
 
 
 arrowAngle : StartPosition -> EndPosition -> Float
@@ -1607,10 +1659,10 @@ toLineStyle strokeStyle =
 -- PORTS
 
 
-port exportToImage : String -> Cmd msg
+port exportToImage : Image -> Cmd msg
 
 
-port importImage : (String -> msg) -> Sub msg
+port setImages : (List Image -> msg) -> Sub msg
 
 
 
@@ -1620,12 +1672,17 @@ port importImage : (String -> msg) -> Sub msg
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ if trackMouse model.edits.present.drawing then
-            Mouse.moves SetMouse
-          else
-            Sub.none
+        [ case model.images of
+            Nothing ->
+                Sub.none
+
+            Just images ->
+                if trackMouse model.edits.present.drawing then
+                    Mouse.moves (SetMouse (List.Zipper.current images))
+                else
+                    Sub.none
         , Sub.map KeyboardMsg Keyboard.Extra.subscriptions
-        , importImage SetImage
+        , setImages SetImages
         ]
 
 

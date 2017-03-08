@@ -4,5 +4,8 @@
   "repository": "https://github.com/thebritican/annotation-editor",
   "description": "Minimal image annotation tool",
   "author": "greg.ziegan@gmail.com",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "test": "elm-test"
+  }
 }

@@ -3,59 +3,23 @@
 
   <body>
     <div id="root"></div>
-    <div id="droparea"></div>
-    <!-- <div id="droparea" style="position: fixed; top: 0; left: 0; bottom: 0; right: 0; z-index:1;"></div> -->
     <canvas id="export" width=100 height=100 style="display:none;"></canvas>
     <div id="export-image"></div>
     <script src="elm.js"></script>
     <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
     <script>
-      var editImageBlobUrl
-      var target = document.getElementById('droparea');
-      target.addEventListener("dragover", function(e) { e.preventDefault(); });
-      target.addEventListener("drop", function(e){
-      	  e.preventDefault()
-      	  loadImage(e.dataTransfer.files[0])
-          document.body.removeChild(document.getElementById('droparea'));
-      }, true);
-
-      function loadImage(src){
-      	//	Prevent any non-image file type from being read.
-      	if (!src.type.match(/image.*/)) {
-      		return
-      	}
-
-      	//	Create our FileReader and run the results through the render function.
-      	var reader = new FileReader();
-      	reader.onload = function(e) {
-          const contentType = 'image/jpeg';
-          const blob = b64toBlob(e.target.result.replace('data:image/jpeg;base64,', ''), contentType);
-          editImageBlobUrl = URL.createObjectURL(blob);
-      		app.ports.importImage.send(editImageBlobUrl)
-      	}
-      	reader.readAsDataURL(src)
-      }
       var app = Elm.Annotator.embed(document.getElementById("root"));
-      app.ports.exportToImage.subscribe(function(id) {
+      app.ports.exportToImage.subscribe(function(image) {
         var canvas = document.getElementById('export')
         var ctx = canvas.getContext("2d")
 
         var img = new Image()
         img.onload = function() {
-          var oc = document.createElement('canvas')
-          var octx = oc.getContext('2d')
-          oc.width = img.width * 0.5;
-          oc.height = img.height * 0.5;
-
-          octx.drawImage(img, 0, 0, oc.width, oc.height)
-          octx.drawImage(oc, 0, 0, oc.width * 0.5, oc.height * 0.5);
-
-          canvas.width = 400
-          canvas.height = 300
-          ctx.drawImage(oc,0,0, oc.width * 0.5, oc.height * 0.5,
-                             0,0, canvas.width,canvas.height);
           var drawing = document.querySelector('#annotation-app canvas')
-          ctx.drawImage(drawing,0,0, 400, 300)
+          canvas.width = image.width;
+          canvas.height = image.height;
+          ctx.drawImage(img, 0, 0, image.width, image.height)
+          ctx.drawImage(drawing, 0, 0, image.width, image.height)
           canvas.toBlob(blob => {
             var exportImage = new Image()
             exportImage.id = 'export-image'
@@ -63,27 +27,27 @@
             document.body.replaceChild(exportImage, document.getElementById('export-image'))
           })
         }
-        img.src = editImageBlobUrl
+        img.src = image.url
       });
-      const b64toBlob = (b64Data, contentType='', sliceSize=512) => {
-        const byteCharacters = atob(b64Data);
-        const byteArrays = [];
 
-        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-          const slice = byteCharacters.slice(offset, offset + sliceSize);
+      const testEditorHtml = '<div><p>​<img data-imageuploadid="0.601161934050189" src="goat.jpg" data-upload-token="fETc6elwJa6YPIJqhj8lTS4Ir" data-inline-attachment="true" data-upload-id="7000414807" data-original-height="751" data-original-width="639" style="width: 235px; height: 276.189px;">​<br></p></div>';
+      const div = document.createElement('div')
+      div.innerHTML = testEditorHtml
+      const images = div.querySelectorAll('img');
 
-          const byteNumbers = new Array(slice.length);
-          for (let i = 0; i < slice.length; i++) {
-            byteNumbers[i] = slice.charCodeAt(i);
-          }
-
-          const byteArray = new Uint8Array(byteNumbers);
-
-          byteArrays.push(byteArray);
+      function toImageObject(image) {
+        const width = parseFloat(image.style.width.replace('px', ''));
+        const height = parseFloat(image.style.height.replace('px', ''));
+        return {
+          url: image.src,
+          originalWidth: parseFloat(image.getAttribute('data-original-width')),
+          originalHeight: parseFloat(image.getAttribute('data-original-height')),
+          width: width,
+          height: height
         }
-
-        const blob = new Blob(byteArrays, {type: contentType});
-        return blob;
       }
+      const imageObjects = Array.prototype.map.call(images, toImageObject);
+      app.ports.setImages.send(imageObjects)
+
     </script>
   </body>
