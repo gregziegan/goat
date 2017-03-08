@@ -6,6 +6,11 @@
   padding: 10px;
 }
 
+.image-edit > div {
+  /*border: 0.5px solid #d8d8d8;*/
+  /*border-radius: 4px;*/
+}
+
 .dropdown-things {
   display: flex;
   flex-direction: column;
@@ -93,4 +98,17 @@
   background-color: white;
   color: grey;
   cursor: pointer;
+}
+
+.image-selector {
+  display: flex;
+}
+
+.image-option {
+  padding: 10px;
+  border: 2px solid rgb(67, 187, 184);
+}
+
+.image-option:first-of-type {
+  border-right: none;
 }

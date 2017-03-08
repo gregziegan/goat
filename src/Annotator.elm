@@ -6,7 +6,7 @@ import Color exposing (Color)
 import Dom
 import Element exposing (toHtml)
 import Html exposing (Attribute, Html, button, div, p, text)
-import Html.Attributes exposing (class, classList, id, start, style, type_)
+import Html.Attributes exposing (class, classList, height, id, src, start, style, type_, width)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra exposing (Key, KeyChange(..))
@@ -194,6 +194,7 @@ type alias Model =
     , mouse : Mouse.Position
     , keyboardState : Keyboard.Extra.State
     , images : Maybe (Zipper Image)
+    , imageSelected : Bool
     }
 
 
@@ -273,6 +274,7 @@ init =
     , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.Extra.initialState
     , images = List.Zipper.fromList []
+    , imageSelected = False
     }
         => []
 
@@ -301,6 +303,7 @@ type Msg
     | SetMouse Image Mouse.Position
     | SetImages (List Image)
     | KeyboardMsg Keyboard.Extra.Msg
+    | SelectImage Image
     | ChangeDrawing Drawing
     | SelectFill Color
     | SelectLineStroke LineStroke
@@ -461,6 +464,15 @@ update msg ({ edits, mouse, images } as model) =
                     { model | keyboardState = keyboardState }
                         |> alterDrawingsWithKeyboard maybeKeyChange
                         => []
+
+            SelectImage image ->
+                case model.images of
+                    Just images ->
+                        { model | images = List.Zipper.find ((==) image.url << .url) images, imageSelected = True }
+                            => []
+
+                    Nothing ->
+                        model => []
 
             ChangeDrawing drawing ->
                 { editState | drawing = drawing }
@@ -704,7 +716,30 @@ view model =
             viewInfoScreen
 
         Just images ->
-            viewImageAnnotator model <| List.Zipper.current images
+            if model.imageSelected then
+                viewImageAnnotator model <| List.Zipper.current images
+            else
+                viewImageSelector model images
+
+
+viewImageSelector : Model -> Zipper Image -> Html Msg
+viewImageSelector model images =
+    images
+        |> List.Zipper.toList
+        |> List.map (viewImageOption images (List.Zipper.current images))
+        |> div [ class "image-selector" ]
+
+
+viewImageOption : Zipper Image -> Image -> Image -> Html Msg
+viewImageOption zipper highlightedImage image =
+    div
+        [ class "image-option"
+        , width <| round image.width
+        , height <| round image.height
+        , onClick <| SelectImage image
+        ]
+        [ Html.img [ src image.url, height <| round image.height, width <| round image.width ] []
+        ]
 
 
 viewInfoScreen : Html Msg
@@ -1033,7 +1068,7 @@ canvasEvents toPos drawing curMouse =
                     [ onMouseUp <| Json.map (AddRoundedRect startPos << toPos) Mouse.position ]
 
                 DrawingRoundedSquare startPos ->
-                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRoundedRect startPos << circleMouse startPos << toPos) Mouse.position ]
 
         DrawArrow arrowMode ->
             case arrowMode of
@@ -1395,12 +1430,12 @@ decodeTextInputKey submitMsg =
 
 toPosition : Float -> Float -> Mouse.Position -> Position
 toPosition width height { x, y } =
-    ( toFloat x - ((width + 10) / 2), ((height + 10) / 2) - toFloat y )
+    ( toFloat x - ((width + 30) / 2), ((height + 30) / 2) - toFloat y )
 
 
 fromPosition : Float -> Float -> Position -> Mouse.Position
 fromPosition width height ( x, y ) =
-    Mouse.Position (round (x + ((width + 10) / 2))) (round ((y * -1) + ((height + 10) / 2)))
+    Mouse.Position (round (x + ((width + 30) / 2))) (round ((y * -1) + ((height + 30) / 2)))
 
 
 arrowAngle : StartPosition -> EndPosition -> Float
