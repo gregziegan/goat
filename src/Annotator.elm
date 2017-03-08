@@ -185,7 +185,6 @@ type alias EditState =
     , stroke : LineStroke
     , strokeStyle : StrokeStyle
     , fontSize : Float
-    , currentDropdown : Maybe EditOption
     }
 
 
@@ -195,6 +194,7 @@ type alias Model =
     , keyboardState : Keyboard.Extra.State
     , images : Maybe (Zipper Image)
     , imageSelected : Bool
+    , currentDropdown : Maybe EditOption
     }
 
 
@@ -264,7 +264,6 @@ initialEditState =
     , stroke = Medium
     , strokeStyle = Solid
     , fontSize = 14
-    , currentDropdown = Nothing
     }
 
 
@@ -275,6 +274,7 @@ init =
     , keyboardState = Keyboard.Extra.initialState
     , images = List.Zipper.fromList []
     , imageSelected = False
+    , currentDropdown = Nothing
     }
         => []
 
@@ -477,41 +477,36 @@ update msg ({ edits, mouse, images } as model) =
             ChangeDrawing drawing ->
                 { editState | drawing = drawing }
                     |> skipChange model
+                    |> closeDropdown
                     => []
 
             SelectFill fill ->
                 { editState | fill = fill }
                     |> skipChange model
+                    |> closeDropdown
                     => []
 
             SelectLineStroke lineStroke ->
                 { editState | stroke = lineStroke }
                     |> skipChange model
+                    |> closeDropdown
                     => []
 
             SelectStrokeStyle strokeStyle ->
                 { editState | strokeStyle = strokeStyle }
                     |> skipChange model
+                    |> closeDropdown
                     => []
 
             SelectFontSize fontSize ->
                 { editState | fontSize = fontSize }
                     |> skipChange model
+                    |> closeDropdown
                     => []
 
             ToggleDropdown editOption ->
                 { editState
-                    | currentDropdown =
-                        case editState.currentDropdown of
-                            Just dropdown ->
-                                if dropdown == editOption then
-                                    Nothing
-                                else
-                                    Just editOption
-
-                            Nothing ->
-                                Just editOption
-                    , drawing =
+                    | drawing =
                         if editOption == Fonts then
                             case editState.drawing of
                                 DrawTextBox textMode ->
@@ -523,11 +518,12 @@ update msg ({ edits, mouse, images } as model) =
                             editState.drawing
                 }
                     |> skipChange model
+                    |> toggleDropdown editOption
                     => []
 
             CloseDropdown ->
-                { editState | currentDropdown = Nothing }
-                    |> skipChange model
+                model
+                    |> closeDropdown
                     => []
 
             Undo ->
@@ -565,6 +561,27 @@ logChange model editState =
 skipChange : Model -> EditState -> Model
 skipChange model editState =
     { model | edits = UndoList.mapPresent (\_ -> editState) model.edits }
+
+
+closeDropdown : Model -> Model
+closeDropdown model =
+    { model | currentDropdown = Nothing }
+
+
+toggleDropdown : EditOption -> Model -> Model
+toggleDropdown editOption model =
+    { model
+        | currentDropdown =
+            case model.currentDropdown of
+                Just dropdown ->
+                    if dropdown == editOption then
+                        Nothing
+                    else
+                        Just editOption
+
+                Nothing ->
+                    Just editOption
+    }
 
 
 updateMouse : Maybe (Zipper Image) -> Position -> Model -> Model
@@ -749,14 +766,17 @@ viewInfoScreen =
 
 
 viewImageAnnotator : Model -> Image -> Html Msg
-viewImageAnnotator ({ edits, mouse, keyboardState } as model) selectedImage =
+viewImageAnnotator ({ edits, mouse, keyboardState, currentDropdown } as model) selectedImage =
     let
         editState =
             edits.present
+
+        toDropdownMenu =
+            viewDropdownMenu currentDropdown editState
     in
         div [ id "annotation-app" ]
             [ viewCanvas editState mouse keyboardState selectedImage
-            , viewControls editState
+            , viewControls toDropdownMenu editState.fill
             , viewOffscreenInput editState.drawing
             ]
 
@@ -786,11 +806,11 @@ viewOffscreenInput drawing =
                 text ""
 
 
-viewControls : EditState -> Html Msg
-viewControls editState =
+viewControls : (EditOption -> Html Msg) -> Color -> Html Msg
+viewControls toDropdownMenu fill =
     div [ class "controls" ]
-        [ viewButtonGroup [ viewShapeDropdown editState, viewLineDropdown editState, viewTextSizeDropdown editState ]
-        , viewButtonGroup [ viewFillDropdown editState, viewLineStrokeDropdown editState ]
+        [ viewButtonGroup [ viewShapeDropdown toDropdownMenu, viewLineDropdown toDropdownMenu, viewTextSizeDropdown toDropdownMenu ]
+        , viewButtonGroup [ viewFillDropdown toDropdownMenu fill, viewLineStrokeDropdown toDropdownMenu ]
         , viewHistoryControls
         , button [ onClick Export, class "export-button" ] [ text "Export" ]
         ]
@@ -810,8 +830,8 @@ viewHistoryControls =
         ]
 
 
-viewTextSizeDropdown : EditState -> Html Msg
-viewTextSizeDropdown editState =
+viewTextSizeDropdown : (EditOption -> Html Msg) -> Html Msg
+viewTextSizeDropdown toDropdownMenu =
     div
         [ class "dropdown-things"
         ]
@@ -822,7 +842,7 @@ viewTextSizeDropdown editState =
             [ Svgs.viewTextIcon
             , Svgs.viewDownArrow
             ]
-        , viewDropdownMenu editState Fonts
+        , toDropdownMenu Fonts
         ]
 
 
@@ -864,8 +884,8 @@ viewFontSizeOption selectedFontSize fontSize =
         [ text <| toString <| fontSize ]
 
 
-viewLineStrokeDropdown : EditState -> Html Msg
-viewLineStrokeDropdown editState =
+viewLineStrokeDropdown : (EditOption -> Html Msg) -> Html Msg
+viewLineStrokeDropdown toDropdownMenu =
     div
         [ class "dropdown-things" ]
         [ button
@@ -875,28 +895,28 @@ viewLineStrokeDropdown editState =
             [ Svgs.viewLineStrokeDropdownIcon
             , Svgs.viewDownArrow
             ]
-        , viewDropdownMenu editState Strokes
+        , toDropdownMenu Strokes
         ]
 
 
-viewFillDropdown : EditState -> Html Msg
-viewFillDropdown editState =
+viewFillDropdown : (EditOption -> Html Msg) -> Color -> Html Msg
+viewFillDropdown toDropdownMenu fill =
     div
         [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fills
             , class "dropdown-button"
             ]
-            [ Svgs.viewFillIcon editState.fill
+            [ Svgs.viewFillIcon fill
             , viewDownArrow
             ]
-        , viewDropdownMenu editState Fills
+        , toDropdownMenu Fills
         ]
 
 
-viewDropdownMenu : EditState -> EditOption -> Html Msg
-viewDropdownMenu editState selectedOption =
-    Maybe.map (viewDropdownOptions editState selectedOption) editState.currentDropdown
+viewDropdownMenu : Maybe EditOption -> EditState -> EditOption -> Html Msg
+viewDropdownMenu maybeDropdown editState selectedOption =
+    Maybe.map (viewDropdownOptions editState selectedOption) maybeDropdown
         |> Maybe.withDefault (text "")
 
 
@@ -922,8 +942,8 @@ viewDropdownOptions editState selectedOption editOption =
                 viewLineStrokeOptions editState
 
 
-viewShapeDropdown : EditState -> Html Msg
-viewShapeDropdown editState =
+viewShapeDropdown : (EditOption -> Html Msg) -> Html Msg
+viewShapeDropdown toDropdownMenu =
     div
         [ class "dropdown-things" ]
         [ button
@@ -933,12 +953,12 @@ viewShapeDropdown editState =
             [ viewShapeSvg EditOval
             , viewDownArrow
             ]
-        , viewDropdownMenu editState Shapes
+        , toDropdownMenu Shapes
         ]
 
 
-viewLineDropdown : EditState -> Html Msg
-viewLineDropdown editState =
+viewLineDropdown : (EditOption -> Html Msg) -> Html Msg
+viewLineDropdown toDropdownMenu =
     div
         [ class "dropdown-things" ]
         [ button
@@ -948,7 +968,7 @@ viewLineDropdown editState =
             [ viewShapeSvg EditArrow
             , viewDownArrow
             ]
-        , viewDropdownMenu editState Lines
+        , toDropdownMenu Lines
         ]
 
 
