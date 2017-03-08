@@ -560,7 +560,7 @@ logChange model editState =
 -}
 skipChange : Model -> EditState -> Model
 skipChange model editState =
-    { model | edits = UndoList.mapPresent (\_ -> editState) model.edits }
+    { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
 closeDropdown : Model -> Model
