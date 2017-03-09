@@ -78,6 +78,7 @@ type Drawing
     | DrawEllipse EllipseMode
     | DrawTextBox TextMode
     | DrawLine LineMode
+    | DrawSpotlightRect RoundedRectMode
     | Selection
 
 
@@ -88,6 +89,7 @@ type EditMode
     | EditArrow
     | EditLine
     | EditTextBox
+    | EditSpotlightRect
     | Select
 
 
@@ -103,11 +105,18 @@ type alias Arrow =
 type alias Rect =
     { start : Position
     , end : Position
-    , fill : Color
+    , fill : Fill
+    , strokeColor : Color
     , stroke : LineStroke
     , strokeStyle : StrokeStyle
     , rounded : Bool
     }
+
+
+type Fill
+    = SolidFill Color
+    | EmptyFill
+    | SpotlightFill
 
 
 type alias Ellipse =
@@ -168,6 +177,7 @@ type EditOption
     | Fonts
     | Fills
     | Strokes
+    | SpotlightShapes
 
 
 type Annotation
@@ -176,15 +186,18 @@ type Annotation
     | Ellipse_ Ellipse
     | TextBox_ TextBox
     | Line_ Line
+    | Mask_
 
 
 type alias EditState =
     { annotations : List Annotation
     , drawing : Drawing
-    , fill : Color
+    , fill : Fill
+    , strokeColor : Color
     , stroke : LineStroke
     , strokeStyle : StrokeStyle
     , fontSize : Float
+    , showMask : Bool
     }
 
 
@@ -256,14 +269,21 @@ fontSizes =
     ]
 
 
+spotlightShapeOptions : List EditMode
+spotlightShapeOptions =
+    [ EditSpotlightRect ]
+
+
 initialEditState : EditState
 initialEditState =
     { annotations = []
     , drawing = Selection
-    , fill = Color.red
+    , fill = EmptyFill
+    , strokeColor = Color.red
     , stroke = Medium
     , strokeStyle = Solid
     , fontSize = 14
+    , showMask = False
     }
 
 
@@ -300,12 +320,15 @@ type Msg
     | AddTextBox TextBox
     | StartLine StartPosition
     | AddLine StartPosition EndPosition
+    | StartSpotlightRect StartPosition
+    | AddSpotlightRect StartPosition EndPosition
     | SetMouse Image Mouse.Position
     | SetImages (List Image)
     | KeyboardMsg Keyboard.Extra.Msg
     | SelectImage Image
     | ChangeDrawing Drawing
-    | SelectFill Color
+    | SelectFill Fill
+    | SelectStrokeColor Color
     | SelectLineStroke LineStroke
     | SelectStrokeStyle StrokeStyle
     | SelectFontSize Float
@@ -313,7 +336,6 @@ type Msg
     | CloseDropdown
     | Undo
     | Redo
-    | Reset
     | Export
 
 
@@ -323,7 +345,7 @@ update msg ({ edits, mouse, images } as model) =
         editState =
             edits.present
 
-        { fill, fontSize, stroke, strokeStyle } =
+        { fill, fontSize, stroke, strokeColor, strokeStyle } =
             editState
     in
         case msg of
@@ -335,7 +357,7 @@ update msg ({ edits, mouse, images } as model) =
 
             AddRect start end ->
                 { editState
-                    | annotations = Rect_ (Rect start end fill stroke strokeStyle False) :: editState.annotations
+                    | annotations = Rect_ (Rect start end fill strokeColor stroke strokeStyle False) :: editState.annotations
                     , drawing = DrawRect <| NoRect
                 }
                     |> logChange model
@@ -349,7 +371,7 @@ update msg ({ edits, mouse, images } as model) =
 
             AddRoundedRect start end ->
                 { editState
-                    | annotations = Rect_ (Rect start end fill stroke strokeStyle True) :: editState.annotations
+                    | annotations = Rect_ (Rect start end fill strokeColor stroke strokeStyle True) :: editState.annotations
                     , drawing = DrawRoundedRect <| NoRoundedRect
                 }
                     |> logChange model
@@ -363,7 +385,7 @@ update msg ({ edits, mouse, images } as model) =
 
             AddArrow startPos endPos ->
                 { editState
-                    | annotations = Arrow_ (Arrow startPos endPos fill stroke strokeStyle) :: editState.annotations
+                    | annotations = Arrow_ (Arrow startPos endPos strokeColor stroke strokeStyle) :: editState.annotations
                     , drawing = DrawArrow NoArrow
                 }
                     |> skipChange model
@@ -377,7 +399,7 @@ update msg ({ edits, mouse, images } as model) =
 
             AddEllipse startPos endPos ->
                 { editState
-                    | annotations = Ellipse_ (Ellipse startPos endPos fill stroke strokeStyle) :: editState.annotations
+                    | annotations = Ellipse_ (Ellipse startPos endPos strokeColor stroke strokeStyle) :: editState.annotations
                     , drawing = DrawEllipse NoEllipse
                 }
                     |> skipChange model
@@ -392,7 +414,7 @@ update msg ({ edits, mouse, images } as model) =
             PlaceTextBox startPos endPos ->
                 let
                     initialEditState =
-                        TextBox startPos endPos "" editState.fill editState.stroke editState.fontSize 0
+                        TextBox startPos endPos "" strokeColor stroke fontSize 0
 
                     tryToEdit result =
                         case result of
@@ -409,23 +431,23 @@ update msg ({ edits, mouse, images } as model) =
                            ]
 
             TextBoxInput { start, end, angle } text ->
-                { editState | drawing = DrawTextBox <| EditingText <| TextBox start end text fill stroke fontSize angle }
+                { editState | drawing = DrawTextBox <| EditingText <| TextBox start end text strokeColor stroke fontSize angle }
                     |> skipChange model
                     => []
 
             BeginRotatingTextBox angle { start, end, text } ->
-                { editState | drawing = DrawTextBox <| RotatingText <| TextBox start end text fill stroke fontSize angle }
+                { editState | drawing = DrawTextBox <| RotatingText <| TextBox start end text strokeColor stroke fontSize angle }
                     |> skipChange model
                     => []
 
             FinishRotatingTextBox { start, end, text } angle ->
-                { editState | drawing = DrawTextBox <| EditingText <| TextBox start end text fill stroke fontSize angle }
+                { editState | drawing = DrawTextBox <| EditingText <| TextBox start end text strokeColor stroke fontSize angle }
                     |> skipChange model
                     => []
 
             AddTextBox { start, end, text, angle } ->
                 { editState
-                    | annotations = TextBox_ (TextBox start end text fill stroke fontSize angle) :: editState.annotations
+                    | annotations = TextBox_ (TextBox start end text strokeColor stroke fontSize angle) :: editState.annotations
                     , drawing = DrawTextBox NoText
                 }
                     |> skipChange model
@@ -439,11 +461,29 @@ update msg ({ edits, mouse, images } as model) =
 
             AddLine startPos endPos ->
                 { editState
-                    | annotations = Line_ (Line startPos endPos fill stroke strokeStyle) :: editState.annotations
+                    | annotations = Line_ (Line startPos endPos strokeColor stroke strokeStyle) :: editState.annotations
                     , drawing = DrawLine NoLine
                 }
                     |> skipChange model
                     => []
+
+            StartSpotlightRect pos ->
+                { editState | drawing = DrawSpotlightRect <| DrawingRoundedRect pos }
+                    |> logChange model
+                    |> updateMouse images pos
+                    => []
+
+            AddSpotlightRect startPos endPos ->
+                let
+                    newEditState =
+                        if editState.showMask then
+                            { editState | annotations = Rect_ (Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True) :: editState.annotations, drawing = DrawSpotlightRect NoRoundedRect }
+                        else
+                            { editState | annotations = Rect_ (Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True) :: Mask_ :: editState.annotations, showMask = True, drawing = DrawSpotlightRect NoRoundedRect }
+                in
+                    newEditState
+                        |> skipChange model
+                        => []
 
             SetMouse { width, height } pos ->
                 editState
@@ -482,6 +522,12 @@ update msg ({ edits, mouse, images } as model) =
 
             SelectFill fill ->
                 { editState | fill = fill }
+                    |> skipChange model
+                    |> closeDropdown
+                    => []
+
+            SelectStrokeColor strokeColor ->
+                { editState | strokeColor = strokeColor }
                     |> skipChange model
                     |> closeDropdown
                     => []
@@ -532,10 +578,6 @@ update msg ({ edits, mouse, images } as model) =
 
             Redo ->
                 { model | edits = UndoList.redo model.edits }
-                    => []
-
-            Reset ->
-                { model | edits = UndoList.reset model.edits }
                     => []
 
             Export ->
@@ -776,7 +818,7 @@ viewImageAnnotator ({ edits, mouse, keyboardState, currentDropdown } as model) s
     in
         div [ id "annotation-app" ]
             [ viewCanvas editState mouse keyboardState selectedImage
-            , viewControls toDropdownMenu editState.fill
+            , viewControls toDropdownMenu editState.strokeColor
             , viewOffscreenInput editState.drawing
             ]
 
@@ -807,12 +849,26 @@ viewOffscreenInput drawing =
 
 
 viewControls : (EditOption -> Html Msg) -> Color -> Html Msg
-viewControls toDropdownMenu fill =
+viewControls toDropdownMenu strokeColor =
     div [ class "controls" ]
-        [ viewButtonGroup [ viewShapeDropdown toDropdownMenu, viewLineDropdown toDropdownMenu, viewTextSizeDropdown toDropdownMenu ]
-        , viewButtonGroup [ viewFillDropdown toDropdownMenu fill, viewLineStrokeDropdown toDropdownMenu ]
+        [ viewButtonGroup [ viewLineDropdown toDropdownMenu, viewShapeDropdown toDropdownMenu, viewTextSizeDropdown toDropdownMenu, viewSpotlightDropdown toDropdownMenu ]
+        , viewButtonGroup [ viewFillDropdown toDropdownMenu strokeColor, viewLineStrokeDropdown toDropdownMenu ]
         , viewHistoryControls
         , button [ onClick Export, class "export-button" ] [ text "Export" ]
+        ]
+
+
+viewSpotlightDropdown : (EditOption -> Html Msg) -> Html Msg
+viewSpotlightDropdown toDropdownMenu =
+    div [ class "dropdown-things" ]
+        [ button
+            [ onClick <| ToggleDropdown SpotlightShapes
+            , class "dropdown-button"
+            ]
+            [ Svgs.viewRoundedRectangleIcon
+            , Svgs.viewDownArrow
+            ]
+        , toDropdownMenu SpotlightShapes
         ]
 
 
@@ -824,8 +880,7 @@ viewButtonGroup buttons =
 viewHistoryControls : Html Msg
 viewHistoryControls =
     div [ class "history-controls" ]
-        [ button [ onClick Reset, class "history-button" ] [ Svgs.viewResetArrow ]
-        , button [ onClick Undo, class "history-button" ] [ Svgs.viewUndoArrow ]
+        [ button [ onClick Undo, class "history-button" ] [ Svgs.viewUndoArrow ]
         , button [ onClick Redo, class "history-button flip" ] [ Svgs.viewUndoArrow ]
         ]
 
@@ -856,7 +911,7 @@ viewFontSizeOptions editState =
 viewFillOptions : EditState -> Html Msg
 viewFillOptions editState =
     fillOptions
-        |> List.map (viewFillOption editState.fill)
+        |> List.map (viewFillOption editState.strokeColor)
         |> div [ class "dropdown-option" ]
 
 
@@ -867,7 +922,7 @@ viewFillOption selectedFill fill =
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedFill == fill
             ]
-        , onClick (SelectFill fill)
+        , onClick (SelectStrokeColor fill)
         ]
         [ Svgs.viewFillIcon fill ]
 
@@ -941,6 +996,28 @@ viewDropdownOptions editState selectedOption editOption =
             Strokes ->
                 viewLineStrokeOptions editState
 
+            SpotlightShapes ->
+                viewSpotlightShapeOptions editState
+
+
+viewSpotlightShapeOptions : EditState -> Html Msg
+viewSpotlightShapeOptions editState =
+    spotlightShapeOptions
+        |> List.map (viewSpotlightShapeOption editState.drawing)
+        |> div [ class "dropdown-option" ]
+
+
+viewSpotlightShapeOption : Drawing -> EditMode -> Html Msg
+viewSpotlightShapeOption drawing editMode =
+    button
+        [ classList
+            [ "dropdown-button" => True
+            , "dropdown-button--selected" => drawingToEditMode drawing == editMode
+            ]
+        , onClick <| ChangeDrawing <| editToDrawing editMode
+        ]
+        [ viewShapeSvg editMode ]
+
 
 viewShapeDropdown : (EditOption -> Html Msg) -> Html Msg
 viewShapeDropdown toDropdownMenu =
@@ -1011,6 +1088,9 @@ viewShapeSvg editMode =
 
         EditTextBox ->
             Svgs.viewTextIcon
+
+        EditSpotlightRect ->
+            Svgs.viewRoundedRectangleIcon
 
         Select ->
             text "Select"
@@ -1143,6 +1223,17 @@ canvasEvents toPos drawing curMouse =
                 DrawingDiscreteLine startPos ->
                     [ onMouseUp <| Json.map (AddLine startPos << stepMouse startPos << toPos) Mouse.position ]
 
+        DrawSpotlightRect roundedRectMode ->
+            case roundedRectMode of
+                NoRoundedRect ->
+                    [ onMouseDown (Json.map (StartSpotlightRect << toPos) Mouse.position) ]
+
+                DrawingRoundedRect startPos ->
+                    [ onMouseUp (Json.map (AddSpotlightRect startPos << toPos) Mouse.position) ]
+
+                DrawingRoundedSquare startPos ->
+                    [ onMouseUp (Json.map (AddSpotlightRect startPos << circleMouse startPos << toPos) Mouse.position) ]
+
         Selection ->
             []
 
@@ -1162,7 +1253,7 @@ viewCanvas editState curMouse keyboardState image =
         annotations =
             editState.annotations
                 |> List.reverse
-                |> List.map (viewAnnotation editState)
+                |> List.map (viewAnnotation image.width image.height editState)
 
         forms =
             viewImage image :: (annotations ++ [ currentDrawing ])
@@ -1174,8 +1265,8 @@ viewCanvas editState curMouse keyboardState image =
             |> div attrs
 
 
-viewAnnotation : EditState -> Annotation -> Collage.Form
-viewAnnotation editState annotation =
+viewAnnotation : Float -> Float -> EditState -> Annotation -> Collage.Form
+viewAnnotation width height editState annotation =
     case annotation of
         Arrow_ arrow ->
             viewArrow arrow
@@ -1192,9 +1283,18 @@ viewAnnotation editState annotation =
         TextBox_ textBox ->
             viewTextBox textBox
 
+        Mask_ ->
+            viewMask width height
+
+
+viewMask : Float -> Float -> Collage.Form
+viewMask width height =
+    Collage.rect width height
+        |> Collage.filled (Color.rgba 100 100 100 0.7)
+
 
 viewDrawing : EditState -> Position -> Keyboard.Extra.State -> Collage.Form
-viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState =
+viewDrawing { drawing, fill, strokeColor, stroke, strokeStyle, fontSize } mouse keyboardState =
     case drawing of
         DrawRect rectMode ->
             case rectMode of
@@ -1202,11 +1302,11 @@ viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState
                     toForm Element.empty
 
                 DrawingRect startPos ->
-                    Rect startPos mouse fill stroke strokeStyle False
+                    Rect startPos mouse fill strokeColor stroke strokeStyle False
                         |> viewRect
 
                 DrawingSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) fill stroke strokeStyle False
+                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle False
                         |> viewRect
 
         DrawRoundedRect rectMode ->
@@ -1215,11 +1315,11 @@ viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState
                     toForm Element.empty
 
                 DrawingRoundedRect startPos ->
-                    Rect startPos mouse fill stroke strokeStyle True
+                    Rect startPos mouse fill strokeColor stroke strokeStyle True
                         |> viewRect
 
                 DrawingRoundedSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) fill stroke strokeStyle True
+                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True
                         |> viewRect
 
         DrawArrow arrowDrawing ->
@@ -1228,11 +1328,11 @@ viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState
                     toForm Element.empty
 
                 DrawingArrow pos ->
-                    Arrow pos mouse fill stroke strokeStyle
+                    Arrow pos mouse strokeColor stroke strokeStyle
                         |> viewArrow
 
                 DrawingDiscreteArrow pos ->
-                    Arrow pos (stepMouse pos mouse) fill stroke strokeStyle
+                    Arrow pos (stepMouse pos mouse) strokeColor stroke strokeStyle
                         |> viewArrow
 
         DrawEllipse ellipseDrawing ->
@@ -1241,11 +1341,11 @@ viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState
                     toForm Element.empty
 
                 DrawingOval pos ->
-                    Ellipse pos mouse fill stroke strokeStyle
+                    Ellipse pos mouse strokeColor stroke strokeStyle
                         |> viewEllipse
 
                 DrawingCircle pos ->
-                    Ellipse pos (circleMouse pos mouse) fill stroke strokeStyle
+                    Ellipse pos (circleMouse pos mouse) strokeColor stroke strokeStyle
                         |> viewEllipse
 
         DrawTextBox textBoxDrawing ->
@@ -1254,15 +1354,15 @@ viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState
                     toForm Element.empty
 
                 DrawingTextBox pos ->
-                    TextBox pos mouse "" fill stroke fontSize 0
+                    TextBox pos mouse "" strokeColor stroke fontSize 0
                         |> viewTextBoxWithBorder
 
                 EditingText { start, end, text, angle } ->
-                    TextBox start end text fill stroke fontSize angle
+                    TextBox start end text strokeColor stroke fontSize angle
                         |> viewTextBoxWithRotateButton
 
                 RotatingText { start, end, text, angle } ->
-                    TextBox start end text fill stroke fontSize angle
+                    TextBox start end text strokeColor stroke fontSize angle
                         |> viewRotatingTextBox
 
         DrawLine lineMode ->
@@ -1271,22 +1371,35 @@ viewDrawing { drawing, fill, stroke, strokeStyle, fontSize } mouse keyboardState
                     toForm Element.empty
 
                 DrawingLine pos ->
-                    Line pos mouse fill stroke strokeStyle
+                    Line pos mouse strokeColor stroke strokeStyle
                         |> viewLine
 
                 DrawingDiscreteLine pos ->
-                    Line pos (stepMouse pos mouse) fill stroke strokeStyle
+                    Line pos (stepMouse pos mouse) strokeColor stroke strokeStyle
                         |> viewLine
+
+        DrawSpotlightRect rectMode ->
+            case rectMode of
+                NoRoundedRect ->
+                    toForm Element.empty
+
+                DrawingRoundedRect startPos ->
+                    Rect startPos mouse SpotlightFill strokeColor stroke strokeStyle True
+                        |> viewRect
+
+                DrawingRoundedSquare startPos ->
+                    Rect startPos (circleMouse startPos mouse) SpotlightFill strokeColor stroke strokeStyle True
+                        |> viewRect
 
         Selection ->
             toForm Element.empty
 
 
 viewRect : Rect -> Collage.Form
-viewRect ({ start, end, fill, stroke, strokeStyle, rounded } as rect) =
+viewRect ({ start, end, fill, strokeColor, stroke, strokeStyle, rounded } as rect) =
     let
         styledLine =
-            styleLine fill stroke strokeStyle
+            styleLine strokeColor stroke strokeStyle
 
         lineStyle =
             { styledLine
@@ -1494,6 +1607,9 @@ editToDrawing editMode =
         EditLine ->
             DrawLine NoLine
 
+        EditSpotlightRect ->
+            DrawSpotlightRect NoRoundedRect
+
         Select ->
             Selection
 
@@ -1518,6 +1634,9 @@ drawingToEditMode drawing =
 
         DrawLine _ ->
             EditLine
+
+        DrawSpotlightRect roundedRectMode ->
+            EditSpotlightRect
 
         Selection ->
             Select
@@ -1590,6 +1709,14 @@ trackMouse drawing =
                     True
 
                 DrawingDiscreteLine _ ->
+                    True
+
+                _ ->
+                    False
+
+        DrawSpotlightRect roundedRectMode ->
+            case roundedRectMode of
+                DrawingRoundedRect _ ->
                     True
 
                 _ ->
