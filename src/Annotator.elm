@@ -1,6 +1,5 @@
 port module Annotator exposing (..)
 
-import AnimationFrame
 import Char exposing (KeyCode)
 import Collage exposing (collage, filled, move, rotate, toForm)
 import Color exposing (Color)
@@ -198,9 +197,13 @@ type alias EditState =
     , stroke : LineStroke
     , strokeStyle : StrokeStyle
     , fontSize : Float
-    , showMask : Bool
-    , lastSpotlightDrawing : Maybe Annotation
     }
+
+
+type MaskState
+    = HideMask
+    | FirstAnnotation
+    | NewAnnotation
 
 
 type alias Model =
@@ -210,7 +213,7 @@ type alias Model =
     , images : Maybe (Zipper Image)
     , imageSelected : Bool
     , currentDropdown : Maybe EditOption
-    , updateMask : Bool
+    , maskState : Maybe MaskState
     }
 
 
@@ -286,8 +289,6 @@ initialEditState =
     , stroke = Medium
     , strokeStyle = Solid
     , fontSize = 14
-    , showMask = False
-    , lastSpotlightDrawing = Nothing
     }
 
 
@@ -299,7 +300,7 @@ init =
     , images = List.Zipper.fromList []
     , imageSelected = False
     , currentDropdown = Nothing
-    , updateMask = False
+    , maskState = Nothing
     }
         => []
 
@@ -329,7 +330,6 @@ type Msg
     | AddSpotlightRect StartPosition EndPosition
     | SetMouse Image Mouse.Position
     | SetImages (List Image)
-    | DrawMask
     | SetMask String
     | KeyboardMsg Keyboard.Extra.Msg
     | SelectImage Image
@@ -347,7 +347,7 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, mouse, images } as model) =
+update msg ({ edits, mouse, images, keyboardState } as model) =
     let
         editState =
             edits.present
@@ -486,24 +486,17 @@ update msg ({ edits, mouse, images } as model) =
                     => []
 
             StartSpotlightRect pos ->
-                { editState | drawing = DrawSpotlightRect <| DrawingRoundedRect pos, lastSpotlightDrawing = Just <| Rect_ <| Rect pos pos fill strokeColor stroke strokeStyle True }
+                { editState | drawing = DrawSpotlightRect <| DrawingRoundedRect pos }
+                    |> emptyMask
                     |> logChange model
-                    |> enableMaskSubscription
                     |> updateMouse images pos
+                    |> hideMask
                     => []
 
             AddSpotlightRect startPos endPos ->
-                let
-                    rect =
-                        Rect_ <| Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True
-
-                    newEditState =
-                        { editState | drawing = DrawSpotlightRect NoRoundedRect, lastSpotlightDrawing = Just rect }
-                in
-                    newEditState
-                        |> skipChange model
-                        |> enableMaskSubscription
-                        => []
+                { model | mouse = fromPosition width height endPos }
+                    |> addSpotlightAnnotation (maskExists editState.annotations)
+                    => [ drawMask "offscreen-canvas" ]
 
             SetMouse { width, height } pos ->
                 editState
@@ -516,22 +509,31 @@ update msg ({ edits, mouse, images } as model) =
                 { model | images = List.Zipper.fromList images }
                     => []
 
-            DrawMask ->
-                model
-                    |> disableMaskSubscription
-                    => [ drawMask "offscreen-canvas" ]
-
             SetMask url ->
-                case editState.lastSpotlightDrawing of
-                    Just lastSpotlightDrawing ->
-                        if editState.showMask then
-                            { editState | annotations = lastSpotlightDrawing :: replaceMask url editState.annotations }
-                                |> logChange model
-                                => []
-                        else
-                            { editState | showMask = True, annotations = lastSpotlightDrawing :: Mask_ url :: editState.annotations }
-                                |> logChange model
-                                => []
+                case drawingToAnnotation editState (toPos mouse) keyboardState of
+                    Just newAnnotation ->
+                        case model.maskState of
+                            Just maskState ->
+                                case Debug.log "maskState" maskState of
+                                    HideMask ->
+                                        { editState | annotations = replaceMask url editState.annotations }
+                                            |> skipChange model
+                                            => []
+
+                                    FirstAnnotation ->
+                                        { editState | annotations = newAnnotation :: Mask_ url :: editState.annotations, drawing = DrawSpotlightRect NoRoundedRect }
+                                            |> skipChange model
+                                            |> addSpotlightAnnotation True
+                                            => []
+
+                                    NewAnnotation ->
+                                        { editState | annotations = newAnnotation :: replaceMask url editState.annotations, drawing = DrawSpotlightRect NoRoundedRect }
+                                            |> logChange model
+                                            |> stopTrackingMask
+                                            => []
+
+                            Nothing ->
+                                model => []
 
                     Nothing ->
                         model => []
@@ -645,14 +647,32 @@ skipChange model editState =
     { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
-enableMaskSubscription : Model -> Model
-enableMaskSubscription model =
-    { model | updateMask = True }
+emptyMask : EditState -> EditState
+emptyMask editState =
+    { editState | annotations = replaceMask "" editState.annotations }
 
 
-disableMaskSubscription : Model -> Model
-disableMaskSubscription model =
-    { model | updateMask = False }
+hideMask : Model -> Model
+hideMask model =
+    { model | maskState = Just HideMask }
+
+
+addSpotlightAnnotation : Bool -> Model -> Model
+addSpotlightAnnotation hasMask model =
+    if hasMask then
+        { model | maskState = Just NewAnnotation }
+    else
+        { model | maskState = Just FirstAnnotation }
+
+
+finishDrawingOnMask : Model -> Model
+finishDrawingOnMask model =
+    { model | maskState = Just NewAnnotation }
+
+
+stopTrackingMask : Model -> Model
+stopTrackingMask model =
+    { model | maskState = Nothing }
 
 
 closeDropdown : Model -> Model
@@ -674,6 +694,22 @@ toggleDropdown editOption model =
                 Nothing ->
                     Just editOption
     }
+
+
+maskExists : List Annotation -> Bool
+maskExists annotations =
+    List.filter
+        (\annotation ->
+            case annotation of
+                Mask_ _ ->
+                    True
+
+                _ ->
+                    False
+        )
+        annotations
+        |> List.isEmpty
+        |> not
 
 
 updateMouse : Maybe (Zipper Image) -> Position -> Model -> Model
@@ -880,12 +916,11 @@ viewImageAnnotator ({ edits, mouse, keyboardState, currentDropdown } as model) s
         toDropdownMenu =
             viewDropdownMenu currentDropdown editState
 
+        currentAnnotation =
+            drawingToAnnotation editState curPos keyboardState
+
         spotlightShapes =
-            [ List.filter isSpotlightShape editState.annotations
-            , Maybe.map List.singleton editState.lastSpotlightDrawing
-                |> Maybe.withDefault []
-            ]
-                |> List.concat
+            List.filter isSpotlightShape editState.annotations
                 |> List.map viewOpaqueAnnotation
 
         curPos =
@@ -895,7 +930,7 @@ viewImageAnnotator ({ edits, mouse, keyboardState, currentDropdown } as model) s
             [ viewCanvas editState mouse keyboardState selectedImage
             , viewControls toDropdownMenu editState.strokeColor
             , viewOffscreenInput editState.drawing
-            , viewOffscreenCanvas selectedImage.width selectedImage.height spotlightShapes (getSpotlightDrawing editState curPos)
+            , viewOffscreenCanvas selectedImage.width selectedImage.height spotlightShapes (Maybe.map viewOpaqueAnnotation currentAnnotation)
             ]
 
 
@@ -1324,7 +1359,9 @@ viewCanvas editState curMouse keyboardState image =
             canvasEvents toPos editState.drawing curMouse ++ [ id "canvas", class "image-edit" ]
 
         currentDrawing =
-            viewDrawing editState (toPos curMouse) keyboardState
+            drawingToAnnotation editState (toPos curMouse) keyboardState
+                |> Maybe.map (viewAnnotation image.width image.height)
+                |> Maybe.withDefault (toForm Element.empty)
 
         annotations =
             editState.annotations
@@ -1339,22 +1376,6 @@ viewCanvas editState curMouse keyboardState image =
             |> toHtml
             |> List.singleton
             |> div attrs
-
-
-getSpotlightDrawing { fill, strokeColor, stroke, strokeStyle, drawing } pos =
-    case drawing of
-        DrawSpotlightRect roundedRectMode ->
-            case roundedRectMode of
-                DrawingRoundedRect startPos ->
-                    Rect startPos pos fill strokeColor stroke strokeStyle True
-                        |> viewRect
-                        |> Just
-
-                _ ->
-                    Nothing
-
-        _ ->
-            Nothing
 
 
 isSpotlightShape : Annotation -> Bool
@@ -1397,19 +1418,13 @@ viewAnnotation width height annotation =
 viewOpaqueAnnotation : Annotation -> Collage.Form
 viewOpaqueAnnotation annotation =
     case annotation of
-        Arrow_ arrow ->
-            viewArrow arrow
-
         Rect_ rect ->
-            viewRect { rect | fill = SolidFill Color.black }
+            case rect.fill of
+                SpotlightFill ->
+                    viewRect { rect | fill = SolidFill Color.black }
 
-        Ellipse_ ellipse ->
-            -- viewEllipse { ellipse | fill = SolidFill Color.white }
-            viewEllipse ellipse
-
-        Line_ line ->
-            -- viewLine { line | fill = SolidFill Color.white }
-            viewLine line
+                _ ->
+                    viewRect rect
 
         _ ->
             toForm Element.empty
@@ -1420,6 +1435,7 @@ viewMask width height url =
     toForm <| Element.image (round width) (round height) url
 
 
+viewBlankRectangle : Collage.Form
 viewBlankRectangle =
     Collage.rect 5 5
         |> Collage.filled Color.white
@@ -1431,113 +1447,101 @@ viewOffscreenCanvas width height opaqueShapes maybeViewDrawing =
     maybeViewDrawing
         |> Maybe.withDefault viewBlankRectangle
         |> List.singleton
-        |> flip List.append opaqueShapes
+        |> List.append opaqueShapes
         |> Collage.collage (round width) (round height)
         |> toHtml
         |> List.singleton
         |> div [ class "offscreen-canvas" ]
 
 
-viewDrawing : EditState -> Position -> Keyboard.Extra.State -> Collage.Form
-viewDrawing { drawing, fill, strokeColor, stroke, strokeStyle, fontSize } mouse keyboardState =
+drawingToAnnotation : EditState -> Position -> Keyboard.Extra.State -> Maybe Annotation
+drawingToAnnotation { drawing, fill, strokeColor, stroke, strokeStyle, fontSize } mouse keyboardState =
     case drawing of
         DrawRect rectMode ->
             case rectMode of
                 NoRect ->
-                    toForm Element.empty
+                    Nothing
 
                 DrawingRect startPos ->
-                    Rect startPos mouse fill strokeColor stroke strokeStyle False
-                        |> viewRect
+                    Just <| Rect_ <| Rect startPos mouse fill strokeColor stroke strokeStyle False
 
                 DrawingSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle False
-                        |> viewRect
+                    Just <| Rect_ <| Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle False
 
         DrawRoundedRect rectMode ->
             case rectMode of
                 NoRoundedRect ->
-                    toForm Element.empty
+                    Nothing
 
                 DrawingRoundedRect startPos ->
-                    Rect startPos mouse fill strokeColor stroke strokeStyle True
-                        |> viewRect
+                    Just <| Rect_ <| Rect startPos mouse fill strokeColor stroke strokeStyle True
 
                 DrawingRoundedSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True
-                        |> viewRect
+                    Just <| Rect_ <| Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True
 
         DrawArrow arrowDrawing ->
             case arrowDrawing of
                 NoArrow ->
-                    toForm Element.empty
+                    Nothing
 
                 DrawingArrow pos ->
-                    Arrow pos mouse strokeColor stroke strokeStyle
-                        |> viewArrow
+                    Just <| Arrow_ <| Arrow pos mouse strokeColor stroke strokeStyle
 
                 DrawingDiscreteArrow pos ->
-                    Arrow pos (stepMouse pos mouse) strokeColor stroke strokeStyle
-                        |> viewArrow
+                    Just <| Arrow_ <| Arrow pos (stepMouse pos mouse) strokeColor stroke strokeStyle
 
         DrawEllipse ellipseDrawing ->
             case ellipseDrawing of
                 NoEllipse ->
-                    toForm Element.empty
+                    Nothing
 
                 DrawingOval pos ->
-                    Ellipse pos mouse strokeColor stroke strokeStyle
-                        |> viewEllipse
+                    Just <| Ellipse_ <| Ellipse pos mouse strokeColor stroke strokeStyle
 
                 DrawingCircle pos ->
-                    Ellipse pos (circleMouse pos mouse) strokeColor stroke strokeStyle
-                        |> viewEllipse
+                    Just <| Ellipse_ <| Ellipse pos (circleMouse pos mouse) strokeColor stroke strokeStyle
 
         DrawTextBox textBoxDrawing ->
             case textBoxDrawing of
                 NoText ->
-                    toForm Element.empty
+                    Nothing
 
                 DrawingTextBox pos ->
-                    TextBox pos mouse "" strokeColor stroke fontSize 0
-                        |> viewTextBoxWithBorder
+                    Just <| TextBox_ <| TextBox pos mouse "" strokeColor stroke fontSize 0
 
+                -- |> viewTextBoxWithBorder
                 EditingText { start, end, text, angle } ->
-                    TextBox start end text strokeColor stroke fontSize angle
-                        |> viewTextBoxWithRotateButton
+                    Just <| TextBox_ <| TextBox start end text strokeColor stroke fontSize angle
 
+                -- |> viewTextBoxWithRotateButton
                 RotatingText { start, end, text, angle } ->
-                    TextBox start end text strokeColor stroke fontSize angle
-                        |> viewRotatingTextBox
+                    Just <| TextBox_ <| TextBox start end text strokeColor stroke fontSize angle
 
+        -- |> viewRotatingTextBox
         DrawLine lineMode ->
             case lineMode of
                 NoLine ->
-                    toForm Element.empty
+                    Nothing
 
                 DrawingLine pos ->
-                    Line pos mouse strokeColor stroke strokeStyle
-                        |> viewLine
+                    Just <| Line_ <| Line pos mouse strokeColor stroke strokeStyle
 
                 DrawingDiscreteLine pos ->
-                    Line pos (stepMouse pos mouse) strokeColor stroke strokeStyle
-                        |> viewLine
+                    Just <| Line_ <| Line pos (stepMouse pos mouse) strokeColor stroke strokeStyle
 
         DrawSpotlightRect rectMode ->
             case rectMode of
                 NoRoundedRect ->
-                    toForm Element.empty
+                    Nothing
 
                 DrawingRoundedRect startPos ->
-                    Rect startPos mouse SpotlightFill strokeColor stroke strokeStyle True
-                        |> viewRect
+                    Just <| Rect_ <| Rect startPos mouse SpotlightFill strokeColor stroke strokeStyle True
 
                 DrawingRoundedSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) SpotlightFill strokeColor stroke strokeStyle True
-                        |> viewRect
+                    Just <| Rect_ <| Rect startPos (circleMouse startPos mouse) SpotlightFill strokeColor stroke strokeStyle True
 
         Selection ->
-            toForm Element.empty
+            Nothing
 
 
 viewRect : Rect -> Collage.Form
@@ -2005,6 +2009,9 @@ port exportToImage : Image -> Cmd msg
 port drawMask : String -> Cmd msg
 
 
+port cleanUpOldMask : String -> Cmd msg
+
+
 port setImages : (List Image -> msg) -> Sub msg
 
 
@@ -2030,10 +2037,6 @@ subscriptions model =
         , Sub.map KeyboardMsg Keyboard.Extra.subscriptions
         , setImages SetImages
         , updateMask SetMask
-        , if model.updateMask then
-            AnimationFrame.times (\_ -> DrawMask)
-          else
-            Sub.none
         ]
 
 

@@ -30,9 +30,17 @@
         img.src = image.url
       });
 
+      app.ports.cleanUpOldMask.subscribe(function(blobUrl) {
+        var img = new Image()
+        var url = window.URL || window.webkitURL
+        img.onload = function() {
+          url.revokeObjectURL(blobUrl);
+        }
+        img.src = blobUrl
+      })
+
       app.ports.drawMask.subscribe(function(className) {
         var canvas = document.querySelector('.' + className + ' canvas')
-        // if (!canvas) return;
         var ctx = canvas.getContext('2d');
         var offscreenCanvas = document.createElement('canvas');
         offscreenCanvas.width = canvas.width
@@ -42,8 +50,11 @@
         octx.fillRect(0, 0, canvas.width, canvas.height)
         octx.globalCompositeOperation = "destination-out";
         octx.drawImage(canvas, 0, 0, canvas.width, canvas.height)
+        console.log('erasing')
         offscreenCanvas.toBlob(blob => {
-          app.ports.updateMask.send(URL.createObjectURL(blob))
+          const blobUrl = URL.createObjectURL(blob)
+          console.log(blobUrl)
+          app.ports.updateMask.send(blobUrl)
         })
       })
 
