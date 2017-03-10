@@ -1356,7 +1356,14 @@ viewCanvas editState curMouse keyboardState image =
             toPosition image.width image.height
 
         attrs =
-            canvasEvents toPos editState.drawing curMouse ++ [ id "canvas", class "image-edit" ]
+            canvasEvents toPos editState.drawing curMouse
+                ++ [ id "canvas"
+                   , class "image-edit"
+                   , style
+                        [ "width" => toString (round image.width) ++ "px"
+                        , "height" => toString (round image.height) ++ "px"
+                        ]
+                   ]
 
         currentDrawing =
             drawingToAnnotation editState (toPos curMouse) keyboardState
