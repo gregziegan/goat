@@ -30,6 +30,23 @@
         img.src = image.url
       });
 
+      app.ports.drawMask.subscribe(function(className) {
+        var canvas = document.querySelector('.' + className + ' canvas')
+        // if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        var offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = canvas.width
+        offscreenCanvas.height = canvas.height
+        var octx = offscreenCanvas.getContext('2d')
+        octx.fillStyle = 'rgba(100, 100, 100, 0.5)'
+        octx.fillRect(0, 0, canvas.width, canvas.height)
+        octx.globalCompositeOperation = "destination-out";
+        octx.drawImage(canvas, 0, 0, canvas.width, canvas.height)
+        offscreenCanvas.toBlob(blob => {
+          app.ports.updateMask.send(URL.createObjectURL(blob))
+        })
+      })
+
       const testEditorHtml = '<div><p>​<img data-imageuploadid="0.601161934050189" src="goat.jpg" data-upload-token="fETc6elwJa6YPIJqhj8lTS4Ir" data-inline-attachment="true" data-upload-id="7000414807" data-original-height="751" data-original-width="639" style="width: 235px; height: 276.189px;">​<br></p><p>goat pics</p><p><img data-imageuploadid="0.641161934050189" src="goat2.jpg" data-upload-token="fETc6elwJaasPIJqhj8lTS4Ir" data-inline-attachment="true" data-upload-id="7020414807" data-original-height="751" data-original-width="639" style="width: 235px; height: 276.189px;">​<br></p></div>';
       const div = document.createElement('div')
       div.innerHTML = testEditorHtml
