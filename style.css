@@ -1,7 +1,6 @@
-#annotation-app {
-  width: 450px;
+.annotation-app {
+  width: 520px;
 }
-
 
 .offscreen-canvas {
   display: none;
@@ -9,16 +8,21 @@
 
 .image-edit {
   padding: 10px;
+  position: relative;
 }
 
-.image-edit > div {
-  /*border: 0.5px solid #d8d8d8;*/
-  /*border-radius: 4px;*/
+.image-to-annotate {
+  user-drag: none;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
 }
 
 .dropdown-things {
   display: flex;
-  flex-direction: column;
+  border-left: 1px solid rgb(67, 187, 184);
 }
 
 .dropdown-option {
@@ -31,6 +35,7 @@
   width: 50px;
   display: flex;
   flex-direction: column;
+  z-index: 2;
 }
 
 .dropdown-button {
@@ -40,7 +45,16 @@
   padding: 5px;
   border: none;
   background-color: white;
-  border-left: 1px solid rgb(67, 187, 184);
+}
+
+.dropdown-arrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background-color: white;
+  width: 20px;
 }
 
 .dropdown-button--selected {
@@ -78,7 +92,7 @@
   overflow: hidden;
 }
 
-.dropdown-things:first-of-type > .dropdown-button {
+.dropdown-things:first-of-type {
   border-left: none;
 }
 
@@ -86,7 +100,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid #f8f8f8;
+  border-bottom: 1px solid #f8f8f8;
   padding: 10px;
 }
 
@@ -116,4 +130,14 @@
 
 .image-option:first-of-type {
   border-right: none;
+}
+
+.drawing {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.text-box--edit {
+  position: absolute;
 }

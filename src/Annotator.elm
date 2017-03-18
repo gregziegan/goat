@@ -1,29 +1,27 @@
 port module Annotator exposing (..)
 
+import Array exposing (Array)
 import Char exposing (KeyCode)
-import Collage exposing (collage, filled, move, rotate, toForm)
 import Color exposing (Color)
+import Color.Convert
 import Dom
-import Element exposing (toHtml)
 import Html exposing (Attribute, Html, button, div, p, text)
-import Html.Attributes exposing (class, classList, height, id, src, start, style, type_, width)
-import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onWithOptions)
+import Html.Attributes as Html exposing (class, classList, height, id, src, start, style, type_, width)
+import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onMouseEnter, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra exposing (Key, KeyChange(..))
+import List.Extra
 import List.Zipper exposing (Zipper)
-import Mouse
+import Mouse exposing (Position)
 import Rocket exposing ((=>))
-import Svgs exposing (viewDownArrow, viewRectangleIcon)
+import Svg exposing (..)
+import Svg.Attributes as Attr exposing (..)
+import Svg.Events as SE
 import Task exposing (succeed)
-import Text
 import UndoList exposing (UndoList)
 
 
 -- MODEL
-
-
-type alias Position =
-    ( Float, Float )
 
 
 type alias StartPosition =
@@ -110,19 +108,22 @@ type alias Rect =
     , stroke : LineStroke
     , strokeStyle : StrokeStyle
     , rounded : Bool
+    , showVertices : Bool
     }
 
 
 type Fill
     = SolidFill Color
     | EmptyFill
+    | MaskFill
     | SpotlightFill
 
 
 type alias Ellipse =
     { start : Position
     , end : Position
-    , fill : Color
+    , fill : Fill
+    , strokeColor : Color
     , stroke : LineStroke
     , strokeStyle : StrokeStyle
     }
@@ -176,6 +177,7 @@ type EditOption
     | Lines
     | Fonts
     | Fills
+    | StrokeColors
     | Strokes
     | SpotlightShapes
 
@@ -186,39 +188,43 @@ type Annotation
     | Ellipse_ Ellipse
     | TextBox_ TextBox
     | Line_ Line
-    | Mask_ String
 
 
 type alias EditState =
-    { annotations : List Annotation
+    { annotations : Array Annotation
     , drawing : Drawing
+    }
+
+
+type MovementState
+    = DrawingAnnotation
+    | HoveringOverAnnotation
+    | HoveringOverShownVertices
+    | OutsideShownVertices
+    | MovingAnnotation Int Annotation StartPosition
+
+
+type alias Model =
+    { edits : UndoList EditState
     , fill : Fill
     , strokeColor : Color
     , stroke : LineStroke
     , strokeStyle : StrokeStyle
     , fontSize : Float
-    }
-
-
-type MaskState
-    = HideMask
-    | FirstAnnotation
-    | NewAnnotation
-
-
-type alias Model =
-    { edits : UndoList EditState
+    , lastShapeOption : EditMode
+    , lastLineOption : EditMode
+    , lastSpotlightOption : EditMode
     , mouse : Mouse.Position
     , keyboardState : Keyboard.Extra.State
     , images : Maybe (Zipper Image)
     , imageSelected : Bool
     , currentDropdown : Maybe EditOption
-    , maskState : Maybe MaskState
+    , movementState : MovementState
     }
 
 
-fillOptions : List Color
-fillOptions =
+strokeColorOptions : List Color
+strokeColorOptions =
     [ Color.red
     , Color.orange
     , Color.yellow
@@ -228,6 +234,21 @@ fillOptions =
     , Color.brown
     , Color.black
     , Color.white
+    ]
+
+
+fillOptions : List Fill
+fillOptions =
+    [ EmptyFill
+    , SolidFill Color.red
+    , SolidFill Color.orange
+    , SolidFill Color.yellow
+    , SolidFill Color.green
+    , SolidFill Color.blue
+    , SolidFill Color.purple
+    , SolidFill Color.brown
+    , SolidFill Color.black
+    , SolidFill Color.white
     ]
 
 
@@ -282,25 +303,28 @@ spotlightShapeOptions =
 
 initialEditState : EditState
 initialEditState =
-    { annotations = []
-    , drawing = Selection
-    , fill = EmptyFill
-    , strokeColor = Color.red
-    , stroke = Medium
-    , strokeStyle = Solid
-    , fontSize = 14
+    { annotations = Array.empty
+    , drawing = DrawArrow NoArrow
     }
 
 
 init : ( Model, List (Cmd Msg) )
 init =
     { edits = UndoList.fresh initialEditState
+    , fill = EmptyFill
+    , strokeColor = Color.red
+    , stroke = Medium
+    , strokeStyle = Solid
+    , fontSize = 14
+    , lastShapeOption = EditRect
+    , lastLineOption = EditArrow
+    , lastSpotlightOption = EditSpotlightRect
     , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.Extra.initialState
     , images = List.Zipper.fromList []
     , imageSelected = False
     , currentDropdown = Nothing
-    , maskState = Nothing
+    , movementState = DrawingAnnotation
     }
         => []
 
@@ -330,7 +354,6 @@ type Msg
     | AddSpotlightRect StartPosition EndPosition
     | SetMouse Image Mouse.Position
     | SetImages (List Image)
-    | SetMask String
     | KeyboardMsg Keyboard.Extra.Msg
     | SelectImage Image
     | ChangeDrawing Drawing
@@ -341,19 +364,22 @@ type Msg
     | SelectFontSize Float
     | ToggleDropdown EditOption
     | CloseDropdown
+    | RemoveVertices
+    | ShowGrabHand
+    | HideGrabHand
+    | StartMovingAnnotation Int Annotation StartPosition
+    | MoveAnnotation Int Annotation StartPosition EndPosition
+    | FinishMovingAnnotation Int Annotation StartPosition EndPosition
     | Undo
     | Redo
     | Export
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, mouse, images, keyboardState } as model) =
+update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, images, keyboardState } as model) =
     let
         editState =
             edits.present
-
-        { fill, fontSize, stroke, strokeColor, strokeStyle } =
-            editState
 
         ( width, height ) =
             case images of
@@ -362,9 +388,6 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
 
                 Nothing ->
                     ( 0, 0 )
-
-        toPos =
-            toPosition width height
     in
         case msg of
             StartRect pos ->
@@ -375,10 +398,11 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
 
             AddRect start end ->
                 { editState
-                    | annotations = Rect_ (Rect start end fill strokeColor stroke strokeStyle False) :: editState.annotations
+                    | annotations = Array.push (Rect_ <| Rect start end fill strokeColor stroke strokeStyle False False) editState.annotations
                     , drawing = DrawRect <| NoRect
                 }
-                    |> logChange model
+                    |> skipChange model
+                    |> hoverOverAnnotation
                     => []
 
             StartRoundedRect pos ->
@@ -389,21 +413,22 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
 
             AddRoundedRect start end ->
                 { editState
-                    | annotations = Rect_ (Rect start end fill strokeColor stroke strokeStyle True) :: editState.annotations
+                    | annotations = Array.push (Rect_ <| Rect start end fill strokeColor stroke strokeStyle True False) editState.annotations
                     , drawing = DrawRoundedRect <| NoRoundedRect
                 }
-                    |> logChange model
+                    |> skipChange model
+                    |> hoverOverAnnotation
                     => []
 
             StartArrow pos ->
-                { editState | drawing = DrawArrow (DrawingArrow pos) }
+                { editState | drawing = DrawArrow <| DrawingArrow pos }
                     |> logChange model
                     |> updateMouse images pos
                     => []
 
             AddArrow startPos endPos ->
                 { editState
-                    | annotations = Arrow_ (Arrow startPos endPos strokeColor stroke strokeStyle) :: editState.annotations
+                    | annotations = Array.push (Arrow_ <| Arrow startPos endPos strokeColor stroke strokeStyle) editState.annotations
                     , drawing = DrawArrow NoArrow
                 }
                     |> skipChange model
@@ -417,14 +442,14 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
 
             AddEllipse startPos endPos ->
                 { editState
-                    | annotations = Ellipse_ (Ellipse startPos endPos strokeColor stroke strokeStyle) :: editState.annotations
+                    | annotations = Array.push (Ellipse_ <| Ellipse startPos endPos fill strokeColor stroke strokeStyle) editState.annotations
                     , drawing = DrawEllipse NoEllipse
                 }
                     |> skipChange model
                     => []
 
             StartTextBox pos ->
-                { editState | drawing = DrawTextBox (DrawingTextBox pos) }
+                { editState | drawing = DrawTextBox <| DrawingTextBox pos }
                     |> logChange model
                     |> updateMouse images pos
                     => []
@@ -465,7 +490,7 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
 
             AddTextBox { start, end, text, angle } ->
                 { editState
-                    | annotations = TextBox_ (TextBox start end text strokeColor stroke fontSize angle) :: editState.annotations
+                    | annotations = Array.push (TextBox_ <| TextBox start end text strokeColor stroke fontSize angle) editState.annotations
                     , drawing = DrawTextBox NoText
                 }
                     |> skipChange model
@@ -479,7 +504,7 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
 
             AddLine startPos endPos ->
                 { editState
-                    | annotations = Line_ (Line startPos endPos strokeColor stroke strokeStyle) :: editState.annotations
+                    | annotations = Array.push (Line_ <| Line startPos endPos strokeColor stroke strokeStyle) editState.annotations
                     , drawing = DrawLine NoLine
                 }
                     |> skipChange model
@@ -487,20 +512,21 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
 
             StartSpotlightRect pos ->
                 { editState | drawing = DrawSpotlightRect <| DrawingRoundedRect pos }
-                    |> emptyMask
                     |> logChange model
                     |> updateMouse images pos
-                    |> hideMask
                     => []
 
             AddSpotlightRect startPos endPos ->
-                { model | mouse = fromPosition width height endPos }
-                    |> addSpotlightAnnotation (maskExists editState.annotations)
-                    => [ drawMask "offscreen-canvas" ]
+                { editState
+                    | annotations = Array.push (Rect_ <| Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True False) editState.annotations
+                    , drawing = DrawSpotlightRect NoRoundedRect
+                }
+                    |> skipChange model
+                    => []
 
             SetMouse { width, height } pos ->
                 editState
-                    |> updateDrawingIfRotating (toPosition width height pos)
+                    |> updateDrawingIfRotating pos
                     |> skipChange model
                     |> setMouse pos
                     => []
@@ -508,35 +534,6 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
             SetImages images ->
                 { model | images = List.Zipper.fromList images }
                     => []
-
-            SetMask url ->
-                case drawingToAnnotation editState (toPos mouse) keyboardState of
-                    Just newAnnotation ->
-                        case model.maskState of
-                            Just maskState ->
-                                case Debug.log "maskState" maskState of
-                                    HideMask ->
-                                        { editState | annotations = replaceMask url editState.annotations }
-                                            |> skipChange model
-                                            => []
-
-                                    FirstAnnotation ->
-                                        { editState | annotations = newAnnotation :: Mask_ url :: editState.annotations, drawing = DrawSpotlightRect NoRoundedRect }
-                                            |> skipChange model
-                                            |> addSpotlightAnnotation True
-                                            => []
-
-                                    NewAnnotation ->
-                                        { editState | annotations = newAnnotation :: replaceMask url editState.annotations, drawing = DrawSpotlightRect NoRoundedRect }
-                                            |> logChange model
-                                            |> stopTrackingMask
-                                            => []
-
-                            Nothing ->
-                                model => []
-
-                    Nothing ->
-                        model => []
 
             KeyboardMsg keyMsg ->
                 let
@@ -559,36 +556,32 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
             ChangeDrawing drawing ->
                 { editState | drawing = drawing }
                     |> skipChange model
+                    |> updateLastDrawOption (drawingToEditMode drawing)
                     |> closeDropdown
                     => []
 
             SelectFill fill ->
-                { editState | fill = fill }
-                    |> skipChange model
+                { model | fill = fill }
                     |> closeDropdown
                     => []
 
             SelectStrokeColor strokeColor ->
-                { editState | strokeColor = strokeColor }
-                    |> skipChange model
+                { model | strokeColor = strokeColor }
                     |> closeDropdown
                     => []
 
             SelectLineStroke lineStroke ->
-                { editState | stroke = lineStroke }
-                    |> skipChange model
+                { model | stroke = lineStroke }
                     |> closeDropdown
                     => []
 
             SelectStrokeStyle strokeStyle ->
-                { editState | strokeStyle = strokeStyle }
-                    |> skipChange model
+                { model | strokeStyle = strokeStyle }
                     |> closeDropdown
                     => []
 
             SelectFontSize fontSize ->
-                { editState | fontSize = fontSize }
-                    |> skipChange model
+                { model | fontSize = fontSize }
                     |> closeDropdown
                     => []
 
@@ -612,6 +605,73 @@ update msg ({ edits, mouse, images, keyboardState } as model) =
             CloseDropdown ->
                 model
                     |> closeDropdown
+                    => []
+
+            ShowGrabHand ->
+                { model
+                    | movementState =
+                        case model.movementState of
+                            DrawingAnnotation ->
+                                HoveringOverAnnotation
+
+                            HoveringOverAnnotation ->
+                                HoveringOverAnnotation
+
+                            HoveringOverShownVertices ->
+                                HoveringOverShownVertices
+
+                            OutsideShownVertices ->
+                                HoveringOverShownVertices
+
+                            MovingAnnotation _ _ _ ->
+                                model.movementState
+                }
+                    => []
+
+            HideGrabHand ->
+                { model
+                    | movementState =
+                        case model.movementState of
+                            DrawingAnnotation ->
+                                DrawingAnnotation
+
+                            HoveringOverAnnotation ->
+                                DrawingAnnotation
+
+                            HoveringOverShownVertices ->
+                                OutsideShownVertices
+
+                            OutsideShownVertices ->
+                                OutsideShownVertices
+
+                            MovingAnnotation _ _ _ ->
+                                model.movementState
+                }
+                    => []
+
+            StartMovingAnnotation index annotation startPos ->
+                { editState | annotations = removeAllVertices editState.annotations }
+                    |> showVertices index annotation
+                    |> skipChange model
+                    |> startMovingAnnotation index annotation startPos
+                    => []
+
+            MoveAnnotation index annotation oldPos newPos ->
+                editState
+                    |> moveAnnotation index annotation oldPos newPos
+                    |> skipChange model
+                    => []
+
+            FinishMovingAnnotation index annotation startPos endPos ->
+                editState
+                    |> moveAnnotation index annotation startPos endPos
+                    |> skipChange model
+                    |> hoverOverShownVertices
+                    => []
+
+            RemoveVertices ->
+                { editState | annotations = Array.map removeVertices editState.annotations }
+                    |> skipChange model
                     => []
 
             Undo ->
@@ -647,32 +707,101 @@ skipChange model editState =
     { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
-emptyMask : EditState -> EditState
-emptyMask editState =
-    { editState | annotations = replaceMask "" editState.annotations }
-
-
-hideMask : Model -> Model
-hideMask model =
-    { model | maskState = Just HideMask }
-
-
-addSpotlightAnnotation : Bool -> Model -> Model
-addSpotlightAnnotation hasMask model =
-    if hasMask then
-        { model | maskState = Just NewAnnotation }
+updateLastDrawOption : EditMode -> Model -> Model
+updateLastDrawOption editMode model =
+    if List.member editMode shapeOptions then
+        { model | lastShapeOption = editMode }
+    else if List.member editMode lineOptions then
+        { model | lastLineOption = editMode }
+    else if List.member editMode spotlightShapeOptions then
+        { model | lastSpotlightOption = editMode }
     else
-        { model | maskState = Just FirstAnnotation }
+        model
 
 
-finishDrawingOnMask : Model -> Model
-finishDrawingOnMask model =
-    { model | maskState = Just NewAnnotation }
+verticesAreShown : Model -> Model
+verticesAreShown model =
+    { model | movementState = HoveringOverShownVertices }
 
 
-stopTrackingMask : Model -> Model
-stopTrackingMask model =
-    { model | maskState = Nothing }
+showVertices : Int -> Annotation -> EditState -> EditState
+showVertices index newAnnotation editState =
+    { editState | annotations = Array.set index newAnnotation editState.annotations }
+
+
+removeAllVertices : Array Annotation -> Array Annotation
+removeAllVertices annotations =
+    Array.map removeVertices annotations
+
+
+removeVertices : Annotation -> Annotation
+removeVertices annotation =
+    case annotation of
+        Arrow_ arrow ->
+            Arrow_ arrow
+
+        Rect_ rect ->
+            Rect_ { rect | showVertices = False }
+
+        Ellipse_ ellipse ->
+            Ellipse_ ellipse
+
+        TextBox_ textBox ->
+            TextBox_ textBox
+
+        Line_ line ->
+            Line_ line
+
+
+startMovingAnnotation : Int -> Annotation -> StartPosition -> Model -> Model
+startMovingAnnotation index annotation startPos model =
+    { model | movementState = MovingAnnotation index annotation startPos }
+
+
+moveAnnotation : Int -> Annotation -> StartPosition -> EndPosition -> EditState -> EditState
+moveAnnotation index annotation oldPos newPos editState =
+    { editState | annotations = Array.set index (move oldPos newPos annotation) editState.annotations }
+
+
+move : Mouse.Position -> Mouse.Position -> Annotation -> Annotation
+move oldPos newPos annotation =
+    let
+        dX =
+            newPos.x - oldPos.x
+
+        dY =
+            newPos.y - oldPos.y
+    in
+        case annotation of
+            Arrow_ arrow ->
+                Arrow_ arrow
+
+            Rect_ rect ->
+                Rect_ { rect | start = shiftPosition dX dY rect.start, end = shiftPosition dX dY rect.end }
+
+            Ellipse_ ellipse ->
+                Ellipse_ ellipse
+
+            TextBox_ textBox ->
+                TextBox_ textBox
+
+            Line_ line ->
+                Line_ line
+
+
+shiftPosition : Int -> Int -> Mouse.Position -> Mouse.Position
+shiftPosition dx dy pos =
+    { pos | x = pos.x + dx, y = pos.y + dy }
+
+
+hoverOverAnnotation : Model -> Model
+hoverOverAnnotation model =
+    { model | movementState = HoveringOverAnnotation }
+
+
+hoverOverShownVertices : Model -> Model
+hoverOverShownVertices model =
+    { model | movementState = HoveringOverShownVertices }
 
 
 closeDropdown : Model -> Model
@@ -696,22 +825,6 @@ toggleDropdown editOption model =
     }
 
 
-maskExists : List Annotation -> Bool
-maskExists annotations =
-    List.filter
-        (\annotation ->
-            case annotation of
-                Mask_ _ ->
-                    True
-
-                _ ->
-                    False
-        )
-        annotations
-        |> List.isEmpty
-        |> not
-
-
 updateMouse : Maybe (Zipper Image) -> Position -> Model -> Model
 updateMouse maybeImages mouse model =
     case maybeImages of
@@ -722,11 +835,8 @@ updateMouse maybeImages mouse model =
             let
                 { width, height } =
                     List.Zipper.current images
-
-                pos =
-                    fromPosition width height mouse
             in
-                { model | mouse = pos }
+                { model | mouse = mouse }
 
 
 setMouse : Mouse.Position -> Model -> Model
@@ -752,20 +862,6 @@ updateDrawingIfRotating position editState =
 
         _ ->
             editState
-
-
-replaceMask : String -> List Annotation -> List Annotation
-replaceMask url annotations =
-    let
-        setMask annotation =
-            case annotation of
-                Mask_ _ ->
-                    Mask_ url
-
-                _ ->
-                    annotation
-    in
-        List.map setMask annotations
 
 
 transitionOnShift : Drawing -> Drawing
@@ -886,242 +982,242 @@ viewImageSelector model images =
     images
         |> List.Zipper.toList
         |> List.map (viewImageOption images (List.Zipper.current images))
-        |> div [ class "image-selector" ]
+        |> div [ Html.class "image-selector" ]
 
 
 viewImageOption : Zipper Image -> Image -> Image -> Html Msg
 viewImageOption zipper highlightedImage image =
     div
-        [ class "image-option"
-        , width <| round image.width
-        , height <| round image.height
+        [ Html.class "image-option"
+        , Html.width <| round image.width
+        , Html.height <| round image.height
         , onClick <| SelectImage image
         ]
-        [ Html.img [ src image.url, height <| round image.height, width <| round image.width ] []
+        [ Html.img [ src image.url, Html.height <| round image.height, Html.width <| round image.width ] []
         ]
 
 
 viewInfoScreen : Html Msg
 viewInfoScreen =
     div []
-        [ text "please upload an image!" ]
+        [ Html.text "please upload an image!" ]
 
 
 viewImageAnnotator : Model -> Image -> Html Msg
-viewImageAnnotator ({ edits, mouse, keyboardState, currentDropdown } as model) selectedImage =
+viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDropdown, lastLineOption, lastShapeOption, lastSpotlightOption } as model) selectedImage =
     let
-        editState =
+        { drawing } =
             edits.present
 
         toDropdownMenu =
-            viewDropdownMenu currentDropdown editState
-
-        currentAnnotation =
-            drawingToAnnotation editState curPos keyboardState
-
-        spotlightShapes =
-            List.filter isSpotlightShape editState.annotations
-                |> List.map viewOpaqueAnnotation
-
-        curPos =
-            toPosition selectedImage.width selectedImage.height mouse
+            viewDropdownMenu currentDropdown drawing model
     in
-        div [ id "annotation-app" ]
-            [ viewCanvas editState mouse keyboardState selectedImage
-            , viewControls toDropdownMenu editState.strokeColor
-            , viewOffscreenInput editState.drawing
-            , viewOffscreenCanvas selectedImage.width selectedImage.height spotlightShapes (Maybe.map viewOpaqueAnnotation currentAnnotation)
+        div
+            [ Html.class "annotation-app" ]
+            [ div [ Html.class "controls" ]
+                [ viewButtonGroup [ viewLineDropdown drawing lastLineOption toDropdownMenu, viewShapeDropdown drawing lastShapeOption toDropdownMenu, viewTextSizeDropdown toDropdownMenu, viewSpotlightDropdown drawing lastSpotlightOption toDropdownMenu ]
+                , viewButtonGroup [ viewFillDropdown toDropdownMenu fill, viewStrokeColorDropdown toDropdownMenu strokeColor, viewLineStrokeDropdown toDropdownMenu ]
+                , viewHistoryControls
+                , button [ onClick Export, Html.class "export-button" ] [ Html.text "Export" ]
+                ]
+            , viewCanvas model selectedImage
             ]
 
 
-viewOffscreenInput : Drawing -> Html Msg
-viewOffscreenInput drawing =
-    let
-        options =
-            { preventDefault = True, stopPropagation = False }
-    in
-        case drawing of
-            DrawTextBox textBoxDrawing ->
-                case textBoxDrawing of
-                    EditingText textBox ->
-                        Html.input
-                            [ id "text-box-edit"
-                            , onInput <| TextBoxInput textBox
-                            , onWithOptions "keydown" options (decodeTextInputKey <| AddTextBox textBox)
-                            , class "hidden-input"
-                            ]
-                            [ Html.text textBox.text ]
-
-                    _ ->
-                        text ""
-
-            _ ->
-                text ""
-
-
-viewControls : (EditOption -> Html Msg) -> Color -> Html Msg
-viewControls toDropdownMenu strokeColor =
-    div [ class "controls" ]
-        [ viewButtonGroup [ viewLineDropdown toDropdownMenu, viewShapeDropdown toDropdownMenu, viewTextSizeDropdown toDropdownMenu, viewSpotlightDropdown toDropdownMenu ]
-        , viewButtonGroup [ viewFillDropdown toDropdownMenu strokeColor, viewLineStrokeDropdown toDropdownMenu ]
-        , viewHistoryControls
-        , button [ onClick Export, class "export-button" ] [ text "Export" ]
-        ]
-
-
-viewSpotlightDropdown : (EditOption -> Html Msg) -> Html Msg
-viewSpotlightDropdown toDropdownMenu =
-    div [ class "dropdown-things" ]
+viewSpotlightDropdown : Drawing -> EditMode -> (EditOption -> Html Msg) -> Html Msg
+viewSpotlightDropdown drawing lastSpotlightOption toDropdownMenu =
+    div [ Html.class "dropdown-things" ]
         [ button
+            [ onClick <| ChangeDrawing <| editToDrawing <| lastSpotlightOption
+            , Html.classList [ "dropdown-button" => True, "dropdown-button--selected" => lastSpotlightOption == drawingToEditMode drawing ]
+            ]
+            [ viewRoundedRectangleIcon
+            ]
+        , button
             [ onClick <| ToggleDropdown SpotlightShapes
-            , class "dropdown-button"
+            , Html.classList [ "dropdown-arrow" => True, "dropdown-button--selected" => lastSpotlightOption == drawingToEditMode drawing ]
             ]
-            [ Svgs.viewRoundedRectangleIcon
-            , Svgs.viewDownArrow
-            ]
+            [ viewDownArrow ]
         , toDropdownMenu SpotlightShapes
         ]
 
 
 viewButtonGroup : List (Html Msg) -> Html Msg
 viewButtonGroup buttons =
-    div [ class "button-group" ] buttons
+    div [ Html.class "button-group" ] buttons
 
 
 viewHistoryControls : Html Msg
 viewHistoryControls =
-    div [ class "history-controls" ]
-        [ button [ onClick Undo, class "history-button" ] [ Svgs.viewUndoArrow ]
-        , button [ onClick Redo, class "history-button flip" ] [ Svgs.viewUndoArrow ]
+    div [ Html.class "history-controls" ]
+        [ button [ onClick Undo, Html.class "history-button" ] [ viewUndoArrow ]
+        , button [ onClick Redo, Html.class "history-button flip" ] [ viewUndoArrow ]
         ]
 
 
 viewTextSizeDropdown : (EditOption -> Html Msg) -> Html Msg
 viewTextSizeDropdown toDropdownMenu =
     div
-        [ class "dropdown-things"
+        [ Html.class "dropdown-things"
         ]
         [ button
             [ onClick <| ToggleDropdown Fonts
-            , class "dropdown-button"
+            , Html.class "dropdown-button"
             ]
-            [ Svgs.viewTextIcon
-            , Svgs.viewDownArrow
+            [ viewTextIcon
+            , viewDownArrow
             ]
         , toDropdownMenu Fonts
         ]
 
 
-viewFontSizeOptions : EditState -> Html Msg
-viewFontSizeOptions editState =
+viewFontSizeOptions : Float -> Html Msg
+viewFontSizeOptions fontSize =
     fontSizes
-        |> List.map (viewFontSizeOption editState.fontSize)
-        |> div [ class "dropdown-option" ]
+        |> List.map (viewFontSizeOption fontSize)
+        |> div [ Html.class "dropdown-option" ]
 
 
-viewFillOptions : EditState -> Html Msg
-viewFillOptions editState =
+viewFillOptions : Fill -> Html Msg
+viewFillOptions fill =
     fillOptions
-        |> List.map (viewFillOption editState.strokeColor)
-        |> div [ class "dropdown-option" ]
+        |> List.map (viewFillOption fill)
+        |> div [ Html.class "dropdown-option" ]
 
 
-viewFillOption : Color -> Color -> Html Msg
+viewStrokeColorOptions : Color -> Html Msg
+viewStrokeColorOptions strokeColor =
+    strokeColorOptions
+        |> List.map (viewStrokeColorOption strokeColor)
+        |> div [ Html.class "dropdown-option" ]
+
+
+viewFillOption : Fill -> Fill -> Html Msg
 viewFillOption selectedFill fill =
     button
-        [ classList
+        [ Html.classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedFill == fill
             ]
-        , onClick (SelectStrokeColor fill)
+        , onClick (SelectFill fill)
         ]
-        [ Svgs.viewFillIcon fill ]
+        [ viewFillIcon fill ]
+
+
+viewStrokeColorOption : Color -> Color -> Html Msg
+viewStrokeColorOption selectedColor color =
+    button
+        [ Html.classList
+            [ "dropdown-button" => True
+            , "dropdown-button--selected" => selectedColor == color
+            ]
+        , onClick (SelectStrokeColor color)
+        ]
+        [ viewStrokeColorIcon color ]
 
 
 viewFontSizeOption : Float -> Float -> Html Msg
 viewFontSizeOption selectedFontSize fontSize =
     button
-        [ classList
+        [ Html.classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedFontSize == fontSize
             ]
         , onClick (SelectFontSize fontSize)
         ]
-        [ text <| toString <| fontSize ]
+        [ Html.text <| toString <| fontSize ]
 
 
 viewLineStrokeDropdown : (EditOption -> Html Msg) -> Html Msg
 viewLineStrokeDropdown toDropdownMenu =
     div
-        [ class "dropdown-things" ]
+        [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Strokes
-            , class "dropdown-button"
+            , Html.class "dropdown-button"
             ]
-            [ Svgs.viewLineStrokeDropdownIcon
-            , Svgs.viewDownArrow
+            [ viewLineStrokeDropdownIcon Color.grey
+            , viewDownArrow
             ]
         , toDropdownMenu Strokes
         ]
 
 
-viewFillDropdown : (EditOption -> Html Msg) -> Color -> Html Msg
+viewFillDropdown : (EditOption -> Html Msg) -> Fill -> Html Msg
 viewFillDropdown toDropdownMenu fill =
     div
-        [ class "dropdown-things" ]
+        [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fills
-            , class "dropdown-button"
+            , Html.class "dropdown-button"
             ]
-            [ Svgs.viewFillIcon fill
+            [ viewFillIcon fill
             , viewDownArrow
             ]
         , toDropdownMenu Fills
         ]
 
 
-viewDropdownMenu : Maybe EditOption -> EditState -> EditOption -> Html Msg
-viewDropdownMenu maybeDropdown editState selectedOption =
-    Maybe.map (viewDropdownOptions editState selectedOption) maybeDropdown
-        |> Maybe.withDefault (text "")
+viewStrokeColorDropdown : (EditOption -> Html Msg) -> Color -> Html Msg
+viewStrokeColorDropdown toDropdownMenu strokeColor =
+    div
+        [ Html.class "dropdown-things" ]
+        [ button
+            [ onClick <| ToggleDropdown StrokeColors
+            , Html.class "dropdown-button"
+            ]
+            [ viewStrokeColorIcon strokeColor
+            , viewDownArrow
+            ]
+        , toDropdownMenu StrokeColors
+        ]
 
 
-viewDropdownOptions : EditState -> EditOption -> EditOption -> Html Msg
-viewDropdownOptions editState selectedOption editOption =
+viewDropdownMenu : Maybe EditOption -> Drawing -> Model -> EditOption -> Html Msg
+viewDropdownMenu maybeDropdown drawing model selectedOption =
+    Maybe.map (viewDropdownOptions drawing model selectedOption) maybeDropdown
+        |> Maybe.withDefault (Html.text "")
+
+
+viewDropdownOptions : Drawing -> Model -> EditOption -> EditOption -> Html Msg
+viewDropdownOptions drawing model selectedOption editOption =
     if selectedOption /= editOption then
-        text ""
+        Html.text ""
     else
         case editOption of
             Shapes ->
-                viewShapeOptions editState
+                viewShapeOptions drawing
 
             Lines ->
-                viewLineOptions editState
+                viewLineOptions drawing
 
             Fonts ->
-                viewFontSizeOptions editState
+                viewFontSizeOptions model.fontSize
 
             Fills ->
-                viewFillOptions editState
+                viewFillOptions model.fill
+
+            StrokeColors ->
+                viewStrokeColorOptions model.strokeColor
 
             Strokes ->
-                viewLineStrokeOptions editState
+                viewLineStrokeOptions model.stroke model.strokeStyle
 
             SpotlightShapes ->
-                viewSpotlightShapeOptions editState
+                viewSpotlightShapeOptions drawing
 
 
-viewSpotlightShapeOptions : EditState -> Html Msg
-viewSpotlightShapeOptions editState =
+viewSpotlightShapeOptions : Drawing -> Html Msg
+viewSpotlightShapeOptions drawing =
     spotlightShapeOptions
-        |> List.map (viewSpotlightShapeOption editState.drawing)
-        |> div [ class "dropdown-option" ]
+        |> List.map (viewSpotlightShapeOption drawing)
+        |> div [ Html.class "dropdown-option" ]
 
 
 viewSpotlightShapeOption : Drawing -> EditMode -> Html Msg
 viewSpotlightShapeOption drawing editMode =
     button
-        [ classList
+        [ Html.classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => drawingToEditMode drawing == editMode
             ]
@@ -1130,47 +1226,57 @@ viewSpotlightShapeOption drawing editMode =
         [ viewShapeSvg editMode ]
 
 
-viewShapeDropdown : (EditOption -> Html Msg) -> Html Msg
-viewShapeDropdown toDropdownMenu =
+viewShapeDropdown : Drawing -> EditMode -> (EditOption -> Html Msg) -> Html Msg
+viewShapeDropdown drawing lastShapeOption toDropdownMenu =
     div
-        [ class "dropdown-things" ]
+        [ Html.class "dropdown-things" ]
         [ button
+            [ onClick <| ChangeDrawing <| editToDrawing lastShapeOption
+            , Html.classList [ "dropdown-button" => True, "dropdown-button--selected" => lastShapeOption == drawingToEditMode drawing ]
+            ]
+            [ viewShapeSvg lastShapeOption
+            ]
+        , button
             [ onClick <| ToggleDropdown Shapes
-            , class "dropdown-button"
+            , Html.classList [ "dropdown-arrow" => True, "dropdown-button--selected" => lastShapeOption == drawingToEditMode drawing ]
             ]
-            [ viewShapeSvg EditOval
-            , viewDownArrow
-            ]
+            [ viewDownArrow ]
         , toDropdownMenu Shapes
         ]
 
 
-viewLineDropdown : (EditOption -> Html Msg) -> Html Msg
-viewLineDropdown toDropdownMenu =
+viewLineDropdown : Drawing -> EditMode -> (EditOption -> Html Msg) -> Html Msg
+viewLineDropdown drawing lastLineOption toDropdownMenu =
     div
-        [ class "dropdown-things" ]
+        [ Html.class "dropdown-things" ]
         [ button
+            [ onClick <| ChangeDrawing <| editToDrawing lastLineOption
+            , Html.classList
+                [ "dropdown-button" => True
+                , "dropdown-button--selected" => lastLineOption == drawingToEditMode drawing
+                ]
+            ]
+            [ viewShapeSvg lastLineOption ]
+        , button
             [ onClick <| ToggleDropdown Lines
-            , class "dropdown-button"
+            , Html.classList [ "dropdown-arrow" => True, "dropdown-button--selected" => lastLineOption == drawingToEditMode drawing ]
             ]
-            [ viewShapeSvg EditArrow
-            , viewDownArrow
-            ]
+            [ viewDownArrow ]
         , toDropdownMenu Lines
         ]
 
 
-viewShapeOptions : EditState -> Html Msg
-viewShapeOptions editState =
+viewShapeOptions : Drawing -> Html Msg
+viewShapeOptions drawing =
     shapeOptions
-        |> List.map (viewShapeOption editState.drawing)
-        |> div [ class "dropdown-option" ]
+        |> List.map (viewShapeOption drawing)
+        |> div [ Html.class "dropdown-option" ]
 
 
 viewShapeOption : Drawing -> EditMode -> Html Msg
 viewShapeOption drawing editMode =
     button
-        [ classList
+        [ Html.classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => drawingToEditMode drawing == editMode
             ]
@@ -1183,50 +1289,50 @@ viewShapeSvg : EditMode -> Html Msg
 viewShapeSvg editMode =
     case editMode of
         EditRect ->
-            Svgs.viewRectangleIcon
+            viewRectangleIcon
 
         EditRoundedRect ->
-            Svgs.viewRoundedRectangleIcon
+            viewRoundedRectangleIcon
 
         EditOval ->
-            Svgs.viewEllipseIcon
+            viewEllipseIcon
 
         EditArrow ->
-            Svgs.viewArrowIcon
+            viewArrowIcon
 
         EditLine ->
-            Svgs.viewLineStroke 4 []
+            viewLineIcon Color.grey 2
 
         EditTextBox ->
-            Svgs.viewTextIcon
+            viewTextIcon
 
         EditSpotlightRect ->
-            Svgs.viewRoundedRectangleIcon
+            viewRoundedRectangleIcon
 
         Select ->
-            text "Select"
+            Html.text "Select"
 
 
-viewLineOptions : EditState -> Html Msg
-viewLineOptions editState =
+viewLineOptions : Drawing -> Html Msg
+viewLineOptions drawing =
     lineOptions
-        |> List.map (viewShapeOption editState.drawing)
-        |> div [ class "dropdown-option" ]
+        |> List.map (viewShapeOption drawing)
+        |> div [ Html.class "dropdown-option" ]
 
 
-viewLineStrokeOptions : EditState -> Html Msg
-viewLineStrokeOptions editState =
-    [ List.map (viewLineStrokeOption editState.stroke) lineStrokeOptions
-    , List.map (viewStrokeStyleOption editState.strokeStyle) strokeStyles
+viewLineStrokeOptions : LineStroke -> StrokeStyle -> Html Msg
+viewLineStrokeOptions strokeWidth strokeStyle =
+    [ List.map (viewLineStrokeOption strokeWidth) lineStrokeOptions
+    , List.map (viewStrokeStyleOption strokeStyle) strokeStyles
     ]
         |> List.concat
-        |> div [ class "dropdown-option" ]
+        |> div [ Html.class "dropdown-option" ]
 
 
 viewStrokeStyleOption : StrokeStyle -> StrokeStyle -> Html Msg
 viewStrokeStyleOption selectedStrokeStyle strokeStyle =
     button
-        [ classList
+        [ Html.classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedStrokeStyle == strokeStyle
             ]
@@ -1234,155 +1340,234 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         ]
         [ case strokeStyle of
             Solid ->
-                Svgs.viewSolidIcon
+                viewSolidIcon
 
             Dotted ->
-                Svgs.viewDottedIcon
+                viewDottedIcon
 
             Dashed ->
-                Svgs.viewDashedIcon
+                viewDashedIcon
         ]
 
 
 viewLineStrokeOption : LineStroke -> LineStroke -> Html Msg
 viewLineStrokeOption selectedStroke stroke =
     button
-        [ classList
+        [ Html.classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedStroke == stroke
             ]
         , onClick <| SelectLineStroke stroke
         ]
-        [ Svgs.viewLineStroke (strokeToWidth stroke) [] ]
+        [ viewLineStroke (strokeToWidth stroke) [] ]
 
 
-canvasEvents : (Mouse.Position -> Position) -> Drawing -> Mouse.Position -> List (Attribute Msg)
-canvasEvents toPos drawing curMouse =
+drawingEvents : Drawing -> Mouse.Position -> List (Html.Attribute Msg)
+drawingEvents drawing curMouse =
     case drawing of
         DrawRect rectMode ->
             case rectMode of
                 NoRect ->
-                    [ onMouseDown <| Json.map (StartRect << toPos) Mouse.position ]
+                    [ onMouseDown <| Json.map (StartRect << toDrawingPosition) Mouse.position ]
 
                 DrawingRect startPos ->
-                    [ onMouseUp <| Json.map (AddRect startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRect startPos << toDrawingPosition) Mouse.position ]
 
                 DrawingSquare startPos ->
-                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRect startPos << circleMouse startPos << toDrawingPosition) Mouse.position ]
 
         DrawRoundedRect rectMode ->
             case rectMode of
                 NoRoundedRect ->
-                    [ onMouseDown <| Json.map (StartRoundedRect << toPos) Mouse.position ]
+                    [ onMouseDown <| Json.map (StartRoundedRect << toDrawingPosition) Mouse.position ]
 
                 DrawingRoundedRect startPos ->
-                    [ onMouseUp <| Json.map (AddRoundedRect startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRoundedRect startPos << toDrawingPosition) Mouse.position ]
 
                 DrawingRoundedSquare startPos ->
-                    [ onMouseUp <| Json.map (AddRoundedRect startPos << circleMouse startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddRoundedRect startPos << circleMouse startPos << toDrawingPosition) Mouse.position ]
 
         DrawArrow arrowMode ->
             case arrowMode of
                 NoArrow ->
-                    [ onMouseDown (Json.map (StartArrow << toPos) Mouse.position) ]
+                    [ onMouseDown (Json.map (StartArrow << toDrawingPosition) Mouse.position) ]
 
                 DrawingArrow startPos ->
-                    [ onMouseUp <| Json.map (AddArrow startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddArrow startPos << toDrawingPosition) Mouse.position ]
 
                 DrawingDiscreteArrow startPos ->
-                    [ onMouseUp <| Json.map (AddArrow startPos << stepMouse startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddArrow startPos << stepMouse startPos << toDrawingPosition) Mouse.position ]
 
         DrawEllipse ellipseDrawing ->
             case ellipseDrawing of
                 NoEllipse ->
-                    [ onMouseDown (Json.map (StartEllipse << toPos) Mouse.position) ]
+                    [ onMouseDown <| Json.map (StartEllipse << toDrawingPosition) Mouse.position ]
 
                 DrawingOval startPos ->
-                    [ onMouseUp <| Json.map (AddEllipse startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddEllipse startPos << toDrawingPosition) Mouse.position ]
 
                 DrawingCircle startPos ->
-                    [ onMouseUp <| Json.map (AddEllipse startPos << circleMouse startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddEllipse startPos << circleMouse startPos << toDrawingPosition) Mouse.position ]
 
         DrawTextBox textBoxDrawing ->
             case textBoxDrawing of
                 NoText ->
-                    [ onMouseDown (Json.map (StartTextBox << toPos) Mouse.position) ]
+                    [ onMouseDown (Json.map (StartTextBox << toDrawingPosition) Mouse.position) ]
 
                 DrawingTextBox start ->
-                    [ onMouseUp (Json.map (PlaceTextBox start << toPos) Mouse.position) ]
+                    [ onMouseUp (Json.map (PlaceTextBox start << toDrawingPosition) Mouse.position) ]
 
                 EditingText ({ start, end, text, angle } as textBox) ->
-                    [ if mouseIsOverRotateButton (rotateButtonPosition start end) (toPos curMouse) then
-                        Html.Events.onMouseDown <| BeginRotatingTextBox 0 textBox
-                      else if text == "" then
+                    [ -- if mouseIsOverRotateButton (rotateButtonPosition start end) (toPos curMouse) then
+                      -- Html.Events.onMouseDown <| BeginRotatingTextBox 0 textBox
+                      if text == "" then
                         onClick Undo
                       else
                         onClick <| AddTextBox textBox
                     ]
 
                 RotatingText ({ start } as textBox) ->
-                    [ onMouseUp <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toDrawingPosition) Mouse.position ]
 
         DrawLine lineDrawing ->
             case lineDrawing of
                 NoLine ->
-                    [ onMouseDown (Json.map (StartLine << toPos) Mouse.position) ]
+                    [ onMouseDown (Json.map (StartLine << toDrawingPosition) Mouse.position) ]
 
                 DrawingLine startPos ->
-                    [ onMouseUp (Json.map (AddLine startPos << toPos) Mouse.position) ]
+                    [ onMouseUp (Json.map (AddLine startPos << toDrawingPosition) Mouse.position) ]
 
                 DrawingDiscreteLine startPos ->
-                    [ onMouseUp <| Json.map (AddLine startPos << stepMouse startPos << toPos) Mouse.position ]
+                    [ onMouseUp <| Json.map (AddLine startPos << stepMouse startPos << toDrawingPosition) Mouse.position ]
 
         DrawSpotlightRect roundedRectMode ->
             case roundedRectMode of
                 NoRoundedRect ->
-                    [ onMouseDown (Json.map (StartSpotlightRect << toPos) Mouse.position) ]
+                    [ onMouseDown (Json.map (StartSpotlightRect << toDrawingPosition) Mouse.position) ]
 
                 DrawingRoundedRect startPos ->
-                    [ onMouseUp (Json.map (AddSpotlightRect startPos << toPos) Mouse.position) ]
+                    [ onMouseUp (Json.map (AddSpotlightRect startPos << toDrawingPosition) Mouse.position) ]
 
                 DrawingRoundedSquare startPos ->
-                    [ onMouseUp (Json.map (AddSpotlightRect startPos << circleMouse startPos << toPos) Mouse.position) ]
+                    [ onMouseUp (Json.map (AddSpotlightRect startPos << circleMouse startPos << toDrawingPosition) Mouse.position) ]
 
         Selection ->
             []
 
 
-viewCanvas : EditState -> Mouse.Position -> Keyboard.Extra.State -> Image -> Html Msg
-viewCanvas editState curMouse keyboardState image =
+viewCanvas : Model -> Image -> Html Msg
+viewCanvas model image =
     let
-        toPos =
-            toPosition image.width image.height
+        editState =
+            model.edits.present
 
         attrs =
-            canvasEvents toPos editState.drawing curMouse
-                ++ [ id "canvas"
-                   , class "image-edit"
-                   , style
-                        [ "width" => toString (round image.width) ++ "px"
-                        , "height" => toString (round image.height) ++ "px"
-                        ]
-                   ]
+            [ Html.id "canvas"
+            , Html.class "image-edit"
+            , Html.style
+                [ "width" => toString (round image.width) ++ "px"
+                , "height" => toString (round image.height) ++ "px"
+                , "cursor" => movementStateToCursor model.movementState
+                ]
+            ]
+                ++ case model.movementState of
+                    DrawingAnnotation ->
+                        drawingEvents editState.drawing model.mouse
 
-        currentDrawing =
-            drawingToAnnotation editState (toPos curMouse) keyboardState
-                |> Maybe.map (viewAnnotation image.width image.height)
-                |> Maybe.withDefault (toForm Element.empty)
+                    HoveringOverAnnotation ->
+                        []
+
+                    HoveringOverShownVertices ->
+                        []
+
+                    OutsideShownVertices ->
+                        onClick RemoveVertices :: drawingEvents editState.drawing model.mouse
+
+                    MovingAnnotation _ _ _ ->
+                        []
+
+        toDrawing =
+            viewDrawing image.width image.height editState.drawing model
 
         annotations =
             editState.annotations
-                |> List.reverse
-                |> List.map (viewAnnotation image.width image.height)
+                |> Array.toList
+                |> List.indexedMap (viewAnnotation image.width image.height model.movementState)
+                |> List.concat
 
-        forms =
-            viewImage image :: (annotations ++ [ currentDrawing ])
+        spotlights =
+            editState.annotations
+                |> Array.filter isSpotlightShape
+                |> Array.map spotlightFillToMaskFill
+                |> Array.toList
+                |> List.indexedMap (viewAnnotation image.width image.height model.movementState)
+                |> List.concat
+
+        cutOuts =
+            if isDrawingSpotlight editState.drawing then
+                spotlights ++ toDrawing True
+            else
+                spotlights
+
+        definitions =
+            List.map viewArrowHeadDefinition strokeColorOptions
+                |> (::) (viewMask model.movementState image.width image.height cutOuts)
+                |> defs []
+                |> List.singleton
+
+        mask =
+            [ rect [ x "0", y "0", Attr.height <| toString image.height, Attr.width <| toString image.width, Attr.mask "url(#Mask)" ] [] ]
+
+        firstSpotlightIndex =
+            editState.annotations
+                |> Array.toList
+                |> List.Extra.findIndex isSpotlightShape
+                |> Maybe.withDefault 0
+
+        svgChildren =
+            if List.isEmpty spotlights && not (isDrawingSpotlight editState.drawing) then
+                annotations ++ definitions ++ toDrawing False
+            else if isDrawingSpotlight editState.drawing then
+                definitions ++ (List.take firstSpotlightIndex annotations) ++ mask ++ (List.drop firstSpotlightIndex annotations) ++ toDrawing False
+            else
+                definitions ++ (List.take firstSpotlightIndex annotations) ++ mask ++ (List.drop firstSpotlightIndex annotations) ++ toDrawing False
+
+        svgs =
+            svg
+                [ Attr.id "drawing"
+                , Attr.class "drawing"
+                , Attr.width <| toString <| image.width
+                , Attr.height <| toString <| image.height
+                , Html.attribute "xmlns" "http://www.w3.org/2000/svg"
+                ]
+                svgChildren
     in
-        forms
-            |> collage (round image.width) (round image.height)
-            |> toHtml
-            |> List.singleton
-            |> div attrs
+        div attrs [ svgs, viewImage model.movementState image ]
+
+
+viewArrowHeadDefinition : Color -> Svg Msg
+viewArrowHeadDefinition color =
+    marker [ Attr.id <| "arrow-head--" ++ Color.Convert.colorToHex color, orient "auto", markerWidth "2", markerHeight "4", refX "0.1", refY "2" ]
+        [ Svg.path [ d "M0,0 V4 L2,2 Z", Attr.fill <| Color.Convert.colorToHex color ] []
+        ]
+
+
+isDrawingSpotlight : Drawing -> Bool
+isDrawingSpotlight drawing =
+    case drawing of
+        DrawSpotlightRect roundedRectMode ->
+            case roundedRectMode of
+                DrawingRoundedRect _ ->
+                    True
+
+                DrawingRoundedSquare _ ->
+                    True
+
+                _ ->
+                    False
+
+        _ ->
+            False
 
 
 isSpotlightShape : Annotation -> Bool
@@ -1400,14 +1585,41 @@ isSpotlightShape annotation =
             False
 
 
-viewAnnotation : Float -> Float -> Annotation -> Collage.Form
-viewAnnotation width height annotation =
+spotlightFillToMaskFill : Annotation -> Annotation
+spotlightFillToMaskFill annotation =
+    case annotation of
+        Rect_ rect ->
+            case rect.fill of
+                SpotlightFill ->
+                    Rect_ { rect | fill = MaskFill }
+
+                _ ->
+                    annotation
+
+        _ ->
+            annotation
+
+
+viewAnnotation : Float -> Float -> MovementState -> Int -> Annotation -> List (Svg Msg)
+viewAnnotation width height movementState index annotation =
     case annotation of
         Arrow_ arrow ->
             viewArrow arrow
 
         Rect_ rect ->
-            viewRect rect
+            viewRect
+                (case movementState of
+                    MovingAnnotation index annotation startPos ->
+                        [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
+                        ]
+
+                    _ ->
+                        [ SE.on "mousedown" <| Json.map (StartMovingAnnotation index (Rect_ { rect | showVertices = True }) << toDrawingPosition) Mouse.position
+                        , SE.onMouseOver ShowGrabHand
+                        , SE.onMouseOut HideGrabHand
+                        ]
+                )
+                rect
 
         Ellipse_ ellipse ->
             viewEllipse ellipse
@@ -1418,276 +1630,492 @@ viewAnnotation width height annotation =
         TextBox_ textBox ->
             viewTextBox textBox
 
-        Mask_ url ->
-            viewMask width height url
 
-
-viewOpaqueAnnotation : Annotation -> Collage.Form
-viewOpaqueAnnotation annotation =
-    case annotation of
-        Rect_ rect ->
-            case rect.fill of
-                SpotlightFill ->
-                    viewRect { rect | fill = SolidFill Color.black }
+viewMask : MovementState -> Float -> Float -> List (Svg Msg) -> Svg Msg
+viewMask movementState width height shapes =
+    rect
+        ([ x "0"
+         , y "0"
+         , Attr.width <| toString width
+         , Attr.height <| toString height
+         , opacity "0.5"
+         , fill "white"
+         ]
+            ++ case movementState of
+                HoveringOverAnnotation ->
+                    [ onMouseEnter HideGrabHand ]
 
                 _ ->
-                    viewRect rect
-
-        _ ->
-            toForm Element.empty
-
-
-viewMask : Float -> Float -> String -> Collage.Form
-viewMask width height url =
-    toForm <| Element.image (round width) (round height) url
+                    []
+        )
+        []
+        :: shapes
+        |> Svg.mask [ Attr.id "Mask" ]
 
 
-viewBlankRectangle : Collage.Form
-viewBlankRectangle =
-    Collage.rect 5 5
-        |> Collage.filled Color.white
-        |> Collage.alpha 0
-
-
-viewOffscreenCanvas : Float -> Float -> List Collage.Form -> Maybe Collage.Form -> Html Msg
-viewOffscreenCanvas width height opaqueShapes maybeViewDrawing =
-    maybeViewDrawing
-        |> Maybe.withDefault viewBlankRectangle
-        |> List.singleton
-        |> List.append opaqueShapes
-        |> Collage.collage (round width) (round height)
-        |> toHtml
-        |> List.singleton
-        |> div [ class "offscreen-canvas" ]
-
-
-drawingToAnnotation : EditState -> Position -> Keyboard.Extra.State -> Maybe Annotation
-drawingToAnnotation { drawing, fill, strokeColor, stroke, strokeStyle, fontSize } mouse keyboardState =
+viewDrawing : Float -> Float -> Drawing -> Model -> Bool -> List (Svg Msg)
+viewDrawing width height drawing { fill, strokeColor, stroke, strokeStyle, fontSize, mouse, keyboardState } isInMask =
     case drawing of
         DrawRect rectMode ->
             case rectMode of
                 NoRect ->
-                    Nothing
+                    []
 
                 DrawingRect startPos ->
-                    Just <| Rect_ <| Rect startPos mouse fill strokeColor stroke strokeStyle False
+                    Rect startPos mouse fill strokeColor stroke strokeStyle False False
+                        |> viewRect []
 
                 DrawingSquare startPos ->
-                    Just <| Rect_ <| Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle False
+                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle False False
+                        |> viewRect []
 
         DrawRoundedRect rectMode ->
             case rectMode of
                 NoRoundedRect ->
-                    Nothing
+                    []
 
                 DrawingRoundedRect startPos ->
-                    Just <| Rect_ <| Rect startPos mouse fill strokeColor stroke strokeStyle True
+                    Rect startPos mouse fill strokeColor stroke strokeStyle True False
+                        |> viewRect []
 
                 DrawingRoundedSquare startPos ->
-                    Just <| Rect_ <| Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True
+                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True False
+                        |> viewRect []
 
         DrawArrow arrowDrawing ->
             case arrowDrawing of
                 NoArrow ->
-                    Nothing
+                    []
 
                 DrawingArrow pos ->
-                    Just <| Arrow_ <| Arrow pos mouse strokeColor stroke strokeStyle
+                    Arrow pos mouse strokeColor stroke strokeStyle
+                        |> viewArrow
 
                 DrawingDiscreteArrow pos ->
-                    Just <| Arrow_ <| Arrow pos (stepMouse pos mouse) strokeColor stroke strokeStyle
+                    Arrow pos (stepMouse pos mouse) strokeColor stroke strokeStyle
+                        |> viewArrow
 
         DrawEllipse ellipseDrawing ->
             case ellipseDrawing of
                 NoEllipse ->
-                    Nothing
+                    []
 
                 DrawingOval pos ->
-                    Just <| Ellipse_ <| Ellipse pos mouse strokeColor stroke strokeStyle
+                    Ellipse pos mouse fill strokeColor stroke strokeStyle
+                        |> viewEllipse
 
                 DrawingCircle pos ->
-                    Just <| Ellipse_ <| Ellipse pos (circleMouse pos mouse) strokeColor stroke strokeStyle
+                    Ellipse pos (circleMouse pos mouse) fill strokeColor stroke strokeStyle
+                        |> viewEllipse
 
         DrawTextBox textBoxDrawing ->
             case textBoxDrawing of
                 NoText ->
-                    Nothing
+                    []
 
                 DrawingTextBox pos ->
-                    Just <| TextBox_ <| TextBox pos mouse "" strokeColor stroke fontSize 0
+                    TextBox pos mouse "" strokeColor stroke fontSize 0
+                        |> viewTextBoxWithBorder
 
-                -- |> viewTextBoxWithBorder
                 EditingText { start, end, text, angle } ->
-                    Just <| TextBox_ <| TextBox start end text strokeColor stroke fontSize angle
+                    TextBox start end text strokeColor stroke fontSize angle
+                        |> viewTextInputBox
 
-                -- |> viewTextBoxWithRotateButton
                 RotatingText { start, end, text, angle } ->
-                    Just <| TextBox_ <| TextBox start end text strokeColor stroke fontSize angle
+                    TextBox start end text strokeColor stroke fontSize angle
+                        |> viewTextBoxWithRotateButton
 
-        -- |> viewRotatingTextBox
         DrawLine lineMode ->
             case lineMode of
                 NoLine ->
-                    Nothing
+                    []
 
                 DrawingLine pos ->
-                    Just <| Line_ <| Line pos mouse strokeColor stroke strokeStyle
+                    Line pos mouse strokeColor stroke strokeStyle
+                        |> viewLine
 
                 DrawingDiscreteLine pos ->
-                    Just <| Line_ <| Line pos (stepMouse pos mouse) strokeColor stroke strokeStyle
+                    Line pos (stepMouse pos mouse) strokeColor stroke strokeStyle
+                        |> viewLine
 
         DrawSpotlightRect rectMode ->
-            case rectMode of
-                NoRoundedRect ->
-                    Nothing
+            let
+                ( rectFill, rectStrokeColor ) =
+                    if isInMask then
+                        ( MaskFill, Color.white )
+                    else
+                        ( EmptyFill, strokeColor )
+            in
+                case rectMode of
+                    NoRoundedRect ->
+                        []
 
-                DrawingRoundedRect startPos ->
-                    Just <| Rect_ <| Rect startPos mouse SpotlightFill strokeColor stroke strokeStyle True
+                    DrawingRoundedRect startPos ->
+                        Rect startPos mouse rectFill rectStrokeColor stroke strokeStyle True False
+                            |> viewRect []
 
-                DrawingRoundedSquare startPos ->
-                    Just <| Rect_ <| Rect startPos (circleMouse startPos mouse) SpotlightFill strokeColor stroke strokeStyle True
+                    DrawingRoundedSquare startPos ->
+                        Rect startPos (circleMouse startPos mouse) rectFill rectStrokeColor stroke strokeStyle True False
+                            |> viewRect []
 
         Selection ->
-            Nothing
+            []
 
 
-viewRect : Rect -> Collage.Form
-viewRect ({ start, end, fill, strokeColor, stroke, strokeStyle, rounded } as rect) =
+fillStyle : Fill -> List (Svg.Attribute Msg)
+fillStyle fill =
+    case fill of
+        SolidFill color ->
+            [ Attr.fill <| Color.Convert.colorToHex color ]
+
+        SpotlightFill ->
+            [ Attr.fill "white", fillOpacity "0" ]
+
+        MaskFill ->
+            [ Attr.fill "black" ]
+
+        EmptyFill ->
+            [ Attr.fill "white", fillOpacity "0" ]
+
+
+viewRect : List (Svg.Attribute Msg) -> Rect -> List (Svg Msg)
+viewRect attrs ({ start, end, fill, strokeColor, stroke, rounded } as rect) =
     let
-        styledLine =
-            styleLine strokeColor stroke strokeStyle
+        strokeStyle =
+            [ toLineStyle rect.strokeStyle ]
+                ++ if rounded then
+                    [ rx "15", ry "15" ]
+                   else
+                    []
 
-        lineStyle =
-            { styledLine
-                | join =
-                    if rounded then
-                        Collage.Smooth
-                    else
-                        Collage.Sharp 10
-            }
+        vertices =
+            [ viewVertex start.x start.y
+            , viewVertex end.x start.y
+            , viewVertex start.x end.y
+            , viewVertex end.x end.y
+            ]
+    in
+        [ Svg.rect
+            ([ Attr.width <| toString <| abs <| end.x - start.x
+             , Attr.height <| toString <| abs <| end.y - start.y
+             , x <| toString <| Basics.min start.x end.x
+             , y <| toString <| Basics.min start.y end.y
+             , strokeWidth <| toString <| strokeToWidth stroke
+             , Attr.stroke <| Color.Convert.colorToHex strokeColor
+             ]
+                ++ fillStyle fill
+                ++ strokeStyle
+                ++ attrs
+            )
+            []
+        ]
+            ++ if rect.showVertices then
+                vertices
+               else
+                []
 
-        rect =
-            Collage.rect (dx start end) (dy start end)
 
-        form =
+viewVertex : Int -> Int -> Svg Msg
+viewVertex x y =
+    circle
+        [ cx <| toString x
+        , cy <| toString y
+        , r "7"
+        , fill <| Color.Convert.colorToHex Color.blue
+        ]
+        []
+
+
+viewArrow : Arrow -> List (Svg Msg)
+viewArrow ({ start, end, fill, stroke, strokeStyle } as arrow) =
+    [ Svg.path
+        [ markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex fill ++ ")"
+        , strokeWidth <| toString <| strokeToWidth stroke
+        , toLineStyle strokeStyle
+        , Attr.fill "none"
+        , Attr.stroke <| Color.Convert.colorToHex fill
+        , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+        ]
+        []
+    ]
+
+
+viewEllipse : Ellipse -> List (Svg Msg)
+viewEllipse ({ start, end, fill, strokeColor, stroke, strokeStyle } as ellipse) =
+    [ Svg.ellipse
+        ([ rx <| toString <| abs <| end.x - start.x
+         , ry <| toString <| abs <| end.y - start.y
+         , cx <| toString <| start.x
+         , cy <| toString <| start.y
+         , Attr.strokeWidth <| toString <| strokeToWidth stroke
+         , Attr.stroke <| Color.Convert.colorToHex strokeColor
+         , toLineStyle strokeStyle
+         ]
+            ++ fillStyle fill
+        )
+        []
+    ]
+
+
+viewText : TextBox -> Svg Msg
+viewText ({ start, end, text, fill, fontSize, angle } as textBox) =
+    text_
+        [ x <| toString <| start.x
+        , y <| toString <| start.y
+        , Attr.fontSize <| toString fontSize
+        , Attr.stroke <| toString fill
+        ]
+        [ Svg.text text ]
+
+
+viewTextBoxBorder : StartPosition -> EndPosition -> List (Svg Msg)
+viewTextBoxBorder start end =
+    viewRect [] <| Rect start end EmptyFill Color.black Thin Dashed False False
+
+
+viewRotateButton : StartPosition -> EndPosition -> Html Msg
+viewRotateButton start end =
+    circle
+        [ cx <| toString <| start.x + ((end.x - start.x) // 2)
+        , cy <| toString <| start.y - ((end.y - start.y) // 2)
+        , r <| toString <| 7
+        ]
+        []
+
+
+viewTextBox : TextBox -> List (Svg Msg)
+viewTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
+    [ viewText textBox ]
+
+
+viewTextBoxWithBorder : TextBox -> List (Svg Msg)
+viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
+    viewTextBoxBorder start end
+        ++ [ viewText textBox
+           ]
+
+
+viewTextBoxWithRotateButton : TextBox -> List (Svg Msg)
+viewTextBoxWithRotateButton ({ start, end, text, fill, fontSize, angle } as textBox) =
+    viewTextBoxBorder start end
+        ++ [ viewRotateButton start end
+           , viewText textBox
+           ]
+
+
+viewTextInputBox : TextBox -> List (Svg Msg)
+viewTextInputBox ({ start, end, text, fill, fontSize, angle } as textBox) =
+    viewTextBoxBorder start end
+        ++ [ viewRotateButton start end
+           , foreignObject
+                []
+                [ Html.input
+                    [ Html.id "text-box-edit"
+                    , Html.class "text-box--edit"
+                    , onInput <| TextBoxInput textBox
+                    , Html.value text
+                    , Html.style [ "top" => toString start.y ++ "px", "left" => toString start.x ++ "px" ]
+                    ]
+                    []
+                ]
+           ]
+
+
+viewLine : Line -> List (Svg Msg)
+viewLine { start, end, fill, stroke, strokeStyle } =
+    [ Svg.path
+        [ strokeWidth <| toString <| strokeToWidth stroke
+        , Attr.fill "none"
+        , Attr.stroke <| Color.Convert.colorToHex fill
+        , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+        ]
+        []
+    ]
+
+
+viewImage : MovementState -> Image -> Html Msg
+viewImage movementState { width, height, url } =
+    Html.img
+        ([ Html.class "image-to-annotate"
+         , Html.width (round width)
+         , Html.height (round height)
+         , src url
+         ]
+            ++ case movementState of
+                HoveringOverAnnotation ->
+                    [ onMouseEnter HideGrabHand ]
+
+                _ ->
+                    []
+        )
+        []
+
+
+viewSolidIcon : Html msg
+viewSolidIcon =
+    viewLineStroke 4 []
+
+
+viewDottedIcon : Html msg
+viewDottedIcon =
+    viewLineStroke 4 [ strokeDasharray "5, 5" ]
+
+
+viewDashedIcon : Html msg
+viewDashedIcon =
+    viewLineStroke 4 [ strokeDasharray "10, 5" ]
+
+
+viewResetArrow : Html msg
+viewResetArrow =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 14.155 14.155" ]
+        [ g [ fill "grey" ]
+            [ Svg.path [ d "M12.083,1.887c-0.795-0.794-1.73-1.359-2.727-1.697v2.135c0.48,0.239,0.935,0.55,1.334,0.95c1.993,1.994,1.993,5.236,0,7.229c-1.993,1.99-5.233,1.99-7.229,0c-1.991-1.995-1.991-5.235,0-7.229C3.466,3.269,3.482,3.259,3.489,3.25h0.002l1.181,1.179L4.665,0.685L0.923,0.68l1.176,1.176C2.092,1.868,2.081,1.88,2.072,1.887c-2.763,2.762-2.763,7.243,0,10.005c2.767,2.765,7.245,2.765,10.011,0C14.844,9.13,14.847,4.649,12.083,1.887z" ] [] ]
+        ]
+
+
+viewUndoArrow : Html msg
+viewUndoArrow =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 26.676 26.676" ]
+        [ g [ fill "grey" ]
+            [ Svg.path [ d "M26.105,21.891c-0.229,0-0.439-0.131-0.529-0.346l0,0c-0.066-0.156-1.716-3.857-7.885-4.59c-1.285-0.156-2.824-0.236-4.693-0.25v4.613c0,0.213-0.115,0.406-0.304,0.508c-0.188,0.098-0.413,0.084-0.588-0.033L0.254,13.815C0.094,13.708,0,13.528,0,13.339c0-0.191,0.094-0.365,0.254-0.477l11.857-7.979c0.175-0.121,0.398-0.129,0.588-0.029c0.19,0.102,0.303,0.295,0.303,0.502v4.293c2.578,0.336,13.674,2.33,13.674,11.674c0,0.271-0.191,0.508-0.459,0.562C26.18,21.891,26.141,21.891,26.105,21.891z" ] []
+            ]
+        ]
+
+
+viewArrowIcon : Html msg
+viewArrowIcon =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 347.341 347.341" ]
+        [ polygon [ points "347.341,107.783 347.339,0 239.559,0.002 282.843,43.285 0,326.128 21.213,347.341 304.056,64.498", fill "grey" ] []
+        ]
+
+
+viewRectangleIcon : Html msg
+viewRectangleIcon =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 40 40" ]
+        [ rect [ x "10", y "10", Attr.width "20", Attr.height "20", fill "white", stroke "grey" ] []
+        ]
+
+
+viewRoundedRectangleIcon : Html msg
+viewRoundedRectangleIcon =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 40 40" ]
+        [ rect [ x "10", y "10", Attr.width "20", Attr.height "20", rx "2", ry "2", fill "white", stroke "grey" ] []
+        ]
+
+
+viewEllipseIcon : Html msg
+viewEllipseIcon =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
+        [ ellipse [ cx "10", cy "10", rx "8", ry "5", stroke "grey", strokeWidth "2", fill "white" ] []
+        ]
+
+
+viewFillIcon : Fill -> Html msg
+viewFillIcon fill =
+    let
+        ( fillAttr, showRedLine ) =
             case fill of
                 SolidFill color ->
-                    Collage.filled color rect
+                    if color == Color.white then
+                        [ Attr.fill <| Color.Convert.colorToHex Color.white
+                        , Attr.stroke <| Color.Convert.colorToHex Color.black
+                        , r "9"
+                        ]
+                            => False
+                    else
+                        [ Attr.fill <| Color.Convert.colorToHex color ]
+                            => False
 
                 SpotlightFill ->
-                    Collage.outlined lineStyle rect
+                    [ Attr.fill "white" ]
+                        => False
+
+                MaskFill ->
+                    [ Attr.fill "white" ]
+                        => False
 
                 EmptyFill ->
-                    Collage.outlined lineStyle rect
+                    [ Attr.fill "white", fillOpacity "0", stroke <| Color.Convert.colorToHex Color.red, r "9" ]
+                        => True
     in
-        form
-            |> alignWithMouse start end 0
+        svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
+            ([ circle
+                ([ cx "10", cy "10", r "10" ]
+                    ++ fillAttr
+                )
+                []
+             ]
+                ++ if showRedLine then
+                    [ viewLineIcon Color.red 2 ]
+                   else
+                    []
+            )
 
 
-styleLine : Color -> LineStroke -> StrokeStyle -> Collage.LineStyle
-styleLine fill stroke strokeStyle =
-    let
-        strokeWidth =
-            toFloat <| strokeToWidth stroke
-
-        lineStrokeStyled =
-            toLineStyle strokeStyle
-    in
-        { lineStrokeStyled | width = strokeWidth, color = fill }
-
-
-viewArrow : Arrow -> Collage.Form
-viewArrow ({ start, end, fill, stroke, strokeStyle } as arrow) =
-    let
-        strokeWidth =
-            toFloat <| strokeToWidth stroke
-
-        arrowHeadRadius =
-            strokeWidth * 2
-    in
-        [ Collage.ngon 3 arrowHeadRadius
-            |> filled fill
-            |> rotate (arrowAngle start end)
-            |> rotate (degrees 60)
-            |> move start
-        , Collage.segment start end
-            |> Collage.traced (styleLine fill stroke strokeStyle)
+viewStrokeColorIcon : Color -> Html msg
+viewStrokeColorIcon strokeColor =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
+        [ circle
+            ([ cx "10", cy "10", r "9", stroke <| Color.Convert.colorToHex strokeColor, fill "white" ]
+                ++ if strokeColor == Color.white then
+                    [ Attr.fill <| Color.Convert.colorToHex Color.black ]
+                   else
+                    []
+            )
+            []
         ]
-            |> Collage.group
 
 
-viewEllipse : Ellipse -> Collage.Form
-viewEllipse ({ start, end, fill, stroke, strokeStyle } as ellipse) =
-    Collage.oval (dx start end) (dy start end)
-        |> Collage.outlined (styleLine fill stroke strokeStyle)
-        |> alignWithMouse start end 0
+viewLineStrokeDropdownIcon : Color -> Html msg
+viewLineStrokeDropdownIcon strokeColor =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
+        [ g [ stroke <| Color.Convert.colorToHex strokeColor ]
+            [ line [ x1 "0", x2 "20", y1 "10", y2 "10", strokeWidth "6" ] []
+            ]
+        ]
 
 
-viewText : String -> Color -> Float -> Collage.Form
-viewText text fill fontSize =
-    Text.fromString text
-        |> Text.height fontSize
-        |> Text.color fill
-        |> Collage.text
+viewLineIcon : Color -> Int -> Html msg
+viewLineIcon strokeColor strokeWidth =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
+        [ g [ stroke <| Color.Convert.colorToHex strokeColor ]
+            [ line [ x1 "0", x2 "20", y1 "20", y2 "0", Attr.strokeWidth <| toString <| strokeWidth ] []
+            ]
+        ]
 
 
-viewTextBoxBorder : StartPosition -> EndPosition -> Collage.Form
-viewTextBoxBorder start end =
-    Collage.rect (dx start end) (dy start end)
-        |> Collage.outlined (Collage.dotted Color.black)
+viewLineStroke : number -> List (Svg.Attribute msg) -> Html msg
+viewLineStroke strokeWidth attrs =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
+        [ g [ stroke "grey" ]
+            [ line
+                ([ x1 "0"
+                 , x2 "20"
+                 , y1 "10"
+                 , y2 "10"
+                 , Attr.strokeWidth <| toString <| strokeWidth
+                 ]
+                    ++ attrs
+                )
+                []
+            ]
+        ]
 
 
-viewRotateButton : StartPosition -> EndPosition -> Collage.Form
-viewRotateButton start end =
-    Collage.circle 7
-        |> Collage.filled Color.green
-        |> Collage.moveY (3 * (dy start end) / 4)
+viewDownArrow : Html msg
+viewDownArrow =
+    svg [ Attr.height "20", Attr.width "20", viewBox "0 0 48 48" ]
+        [ Svg.path [ d "M14 20l10 10 10-10z", fill "grey" ] []
+        , Svg.path [ d "M0 0h48v48h-48z", fill "none" ] []
+        ]
 
 
-viewTextBox : TextBox -> Collage.Form
-viewTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
-    viewText text fill fontSize
-        |> alignWithMouse start end angle
-
-
-viewTextBoxWithBorder : TextBox -> Collage.Form
-viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
-    [ viewTextBoxBorder start end
-    , viewText text fill fontSize
-    ]
-        |> Collage.group
-        |> alignWithMouse start end angle
-
-
-viewTextBoxWithRotateButton : TextBox -> Collage.Form
-viewTextBoxWithRotateButton ({ start, end, text, fill, fontSize, angle } as textBox) =
-    [ viewRotateButton start end
-    , viewTextBoxBorder start end
-    , viewText text fill fontSize
-    ]
-        |> Collage.group
-        |> alignWithMouse start end angle
-
-
-viewRotatingTextBox : TextBox -> Collage.Form
-viewRotatingTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
-    [ viewRotateButton start end
-    , viewTextBoxBorder start end
-    , viewText text fill fontSize
-    ]
-        |> Collage.group
-        |> alignWithMouse start end angle
-
-
-viewLine : Line -> Collage.Form
-viewLine { start, end, fill, stroke, strokeStyle } =
-    Collage.segment start end
-        |> Collage.traced (styleLine fill stroke strokeStyle)
-
-
-viewImage : Image -> Collage.Form
-viewImage { width, height, url } =
-    toForm <| Element.image (round width) (round height) url
+viewTextIcon : Html msg
+viewTextIcon =
+    svg [ viewBox "0 0 405 405", Attr.height "20", Attr.width "20" ]
+        [ Svg.path [ fill "grey", d "M34.784,0v132.809h43.61v-33.98c0-7.906,3.012-15.808,9.041-21.837c6.037-6.029,13.943-9.041,21.845-9.041h46.323v262.891c0,7.906-3.012,15.804-9.041,21.841c-6.033,6.029-13.943,9.041-21.841,9.041h-32.99v43.61h221.858v-43.61h-32.981c-7.91,0-15.808-3.012-21.833-9.041c-6.042-6.037-9.05-13.939-9.05-21.841V67.951h46.323c7.91,0,15.808,3.012,21.841,9.041c6.025,6.029,9.041,13.935,9.041,21.837v33.98h43.618V0H34.784z" ] []
+        ]
 
 
 
@@ -1730,21 +2158,11 @@ decodeTextInputKey submitMsg =
         |> Json.andThen fromKeyResult
 
 
-toPosition : Float -> Float -> Mouse.Position -> Position
-toPosition width height { x, y } =
-    ( toFloat x - ((width + 30) / 2), ((height + 30) / 2) - toFloat y )
-
-
-fromPosition : Float -> Float -> Position -> Mouse.Position
-fromPosition width height ( x, y ) =
-    Mouse.Position (round (x + ((width + 30) / 2))) (round ((y * -1) + ((height + 30) / 2)))
-
-
 arrowAngle : StartPosition -> EndPosition -> Float
-arrowAngle ( x1, y1 ) ( x2, y2 ) =
+arrowAngle a b =
     let
         theta =
-            atan2 (y2 - y1) (x2 - x1)
+            atan2 (toFloat (b.y - a.y)) (toFloat (b.x - a.x))
 
         radians =
             if theta < 0.0 then
@@ -1863,9 +2281,6 @@ trackMouse drawing =
                 DrawingTextBox _ ->
                     True
 
-                EditingText _ ->
-                    True
-
                 RotatingText _ ->
                     True
 
@@ -1897,56 +2312,51 @@ trackMouse drawing =
 
 toDeltas : Float -> Float -> Position
 toDeltas h theta =
-    ( cos theta * h, (sin theta) * h )
-
-
-toDelta : Position -> Position -> Position
-toDelta ( x1, y1 ) ( x2, y2 ) =
-    ( x2 - x1, y2 - y1 )
-
-
-dx : Position -> Position -> Float
-dx ( x1, _ ) ( x2, _ ) =
-    x2 - x1
-
-
-dy : Position -> Position -> Float
-dy ( _, y1 ) ( _, y2 ) =
-    y2 - y1
+    Position (round (cos theta * h)) (round (sin theta * h))
 
 
 halfDistance : Position -> Position -> Position
 halfDistance start end =
     let
         ( dx, dy ) =
-            toDelta start end
+            ( end.x - start.x, end.y - start.y )
     in
-        ( dx / 2, dy / 2 )
+        Position (dx // 2) (dy // 2)
 
 
 calcDistance : Position -> Position -> Float
-calcDistance ( x1, y1 ) ( x2, y2 ) =
-    sqrt <| (x2 - x1) ^ 2 + (y2 - y1) ^ 2
+calcDistance a b =
+    sqrt <| toFloat <| (b.x - a.x) ^ 2 + (b.y - b.x) ^ 2
 
 
 stepMouse : StartPosition -> EndPosition -> EndPosition
-stepMouse (( x1, y1 ) as startPos) (( x2, y2 ) as curPos) =
+stepMouse startPos curPos =
     arrowAngle startPos curPos
         / (pi / 4)
         |> round
         |> toFloat
         |> (*) (pi / 4)
         |> toDeltas (calcDistance startPos curPos)
-        |> Tuple.mapFirst ((+) x1)
-        |> Tuple.mapSecond ((+) y1)
+        |> positionMapX ((+) startPos.x)
+        |> positionMapY ((+) startPos.y)
+
+
+positionMapX : (Int -> Int) -> Position -> Position
+positionMapX fn pos =
+    { pos | x = fn pos.x }
+
+
+positionMapY : (Int -> Int) -> Position -> Position
+positionMapY fn pos =
+    { pos | y = fn pos.y }
 
 
 circleMouse : StartPosition -> EndPosition -> EndPosition
-circleMouse ( x1, y1 ) ( x2, y2 ) =
-    if y2 < y1 then
-        ( x2, y1 - abs x2 - x1 )
+circleMouse a b =
+    if b.y < a.y then
+        Position b.x (a.y - abs b.x - a.x)
     else
-        ( x2, y1 + abs x2 - x1 )
+        Position b.x (a.y + abs b.x - a.x)
 
 
 strokeToWidth : LineStroke -> Int
@@ -1968,42 +2378,46 @@ strokeToWidth stroke =
             10
 
 
-rotateButtonPosition : StartPosition -> EndPosition -> Position
-rotateButtonPosition ( x1, y1 ) ( x2, y2 ) =
-    let
-        dy =
-            y2 - y1
-
-        buttonY =
-            Basics.max y1 y2 + dy / 4
-    in
-        ( (x1 + ((x2 - x1) / 2)), buttonY )
-
-
 mouseIsOverRotateButton : ( Float, Float ) -> ( Float, Float ) -> Bool
 mouseIsOverRotateButton ( x1, y1 ) ( x2, y2 ) =
     abs (x1 - x2) < 10 && (abs y2 - y1) < 10
 
 
-alignWithMouse : StartPosition -> EndPosition -> Float -> Collage.Form -> Collage.Form
-alignWithMouse start end angle form =
-    form
-        |> Collage.move start
-        |> Collage.move (halfDistance start end)
-        |> Collage.rotate angle
-
-
-toLineStyle : StrokeStyle -> Collage.LineStyle
+toLineStyle : StrokeStyle -> Svg.Attribute Msg
 toLineStyle strokeStyle =
     case strokeStyle of
         Solid ->
-            Collage.defaultLine
+            strokeDasharray ""
 
         Dotted ->
-            Collage.dotted Color.black
+            strokeDasharray "1, 5"
 
         Dashed ->
-            Collage.dashed Color.black
+            strokeDasharray "10, 5"
+
+
+toDrawingPosition : Mouse.Position -> Mouse.Position
+toDrawingPosition mouse =
+    { mouse | x = mouse.x - 10, y = mouse.y - 64 }
+
+
+movementStateToCursor : MovementState -> String
+movementStateToCursor movementState =
+    case movementState of
+        DrawingAnnotation ->
+            "crosshair"
+
+        HoveringOverAnnotation ->
+            "pointer"
+
+        HoveringOverShownVertices ->
+            "move"
+
+        OutsideShownVertices ->
+            "crosshair"
+
+        MovingAnnotation _ _ _ ->
+            "move"
 
 
 
@@ -2013,16 +2427,7 @@ toLineStyle strokeStyle =
 port exportToImage : Image -> Cmd msg
 
 
-port drawMask : String -> Cmd msg
-
-
-port cleanUpOldMask : String -> Cmd msg
-
-
 port setImages : (List Image -> msg) -> Sub msg
-
-
-port updateMask : (String -> msg) -> Sub msg
 
 
 
@@ -2038,12 +2443,16 @@ subscriptions model =
 
             Just images ->
                 if trackMouse model.edits.present.drawing then
-                    Mouse.moves (SetMouse (List.Zipper.current images))
+                    Mouse.moves (SetMouse (List.Zipper.current images) << toDrawingPosition)
                 else
-                    Sub.none
+                    case model.movementState of
+                        MovingAnnotation index annotation startPos ->
+                            Mouse.moves (MoveAnnotation index annotation startPos << toDrawingPosition)
+
+                        _ ->
+                            Sub.none
         , Sub.map KeyboardMsg Keyboard.Extra.subscriptions
         , setImages SetImages
-        , updateMask SetMask
         ]
 
 
