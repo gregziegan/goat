@@ -100,7 +100,6 @@ type alias Rect =
     , stroke : LineStroke
     , strokeStyle : StrokeStyle
     , rounded : Bool
-    , showVertices : Bool
     }
 
 
@@ -183,7 +182,7 @@ type Annotation
 
 
 type alias EditState =
-    { annotations : Array Annotation
+    { annotations : Array ( Annotation, Bool )
     , drawing : Maybe Drawing
     }
 
@@ -370,7 +369,7 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, images, keyboardState } as model) =
+update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, images, keyboardState, editMode } as model) =
     let
         editState =
             edits.present
@@ -385,65 +384,62 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
     in
         case msg of
             StartRect pos ->
-                { editState | drawing = Just <| DrawRect <| DrawingRect pos }
+                editState
+                    |> startAnnotation pos editMode
                     |> logChange model
                     |> updateMouse images pos
                     => []
 
             AddRect start end ->
-                { editState
-                    | annotations = Array.push (Rect_ <| Rect start end fill strokeColor stroke strokeStyle False False) editState.annotations
-                    , drawing = Nothing
-                }
+                editState
+                    |> addAnnotation (Rect_ <| Rect start end fill strokeColor stroke strokeStyle False)
                     |> skipChange model
                     |> hoverOverAnnotation
                     => []
 
             StartRoundedRect pos ->
-                { editState | drawing = Just <| DrawRoundedRect <| DrawingRoundedRect pos }
+                editState
+                    |> startAnnotation pos editMode
                     |> logChange model
                     |> updateMouse images pos
                     => []
 
             AddRoundedRect start end ->
-                { editState
-                    | annotations = Array.push (Rect_ <| Rect start end fill strokeColor stroke strokeStyle True False) editState.annotations
-                    , drawing = Nothing
-                }
+                editState
+                    |> addAnnotation (Rect_ <| Rect start end fill strokeColor stroke strokeStyle True)
                     |> skipChange model
                     |> hoverOverAnnotation
                     => []
 
             StartArrow pos ->
-                { editState | drawing = Just <| DrawArrow <| DrawingArrow pos }
+                editState
+                    |> startAnnotation pos editMode
                     |> logChange model
                     |> updateMouse images pos
                     => []
 
             AddArrow startPos endPos ->
-                { editState
-                    | annotations = Array.push (Arrow_ <| Arrow startPos endPos strokeColor stroke strokeStyle) editState.annotations
-                    , drawing = Nothing
-                }
+                editState
+                    |> addAnnotation (Arrow_ <| Arrow startPos endPos strokeColor stroke strokeStyle)
                     |> skipChange model
                     => []
 
             StartEllipse pos ->
-                { editState | drawing = Just <| DrawEllipse <| DrawingOval pos }
+                editState
+                    |> startAnnotation pos editMode
                     |> logChange model
                     |> updateMouse images pos
                     => []
 
             AddEllipse startPos endPos ->
-                { editState
-                    | annotations = Array.push (Ellipse_ <| Ellipse startPos endPos fill strokeColor stroke strokeStyle) editState.annotations
-                    , drawing = Nothing
-                }
+                editState
+                    |> addAnnotation (Ellipse_ <| Ellipse startPos endPos fill strokeColor stroke strokeStyle)
                     |> skipChange model
                     => []
 
             StartTextBox pos ->
-                { editState | drawing = Just <| DrawTextBox <| DrawingTextBox pos }
+                editState
+                    |> startAnnotation pos editMode
                     |> logChange model
                     |> updateMouse images pos
                     => []
@@ -483,38 +479,34 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     => []
 
             AddTextBox { start, end, text, angle } ->
-                { editState
-                    | annotations = Array.push (TextBox_ <| TextBox start end text strokeColor stroke fontSize angle) editState.annotations
-                    , drawing = Nothing
-                }
+                editState
+                    |> addAnnotation (TextBox_ <| TextBox start end text strokeColor stroke fontSize angle)
                     |> skipChange model
                     => []
 
             StartLine pos ->
-                { editState | drawing = Just <| DrawLine <| DrawingLine pos }
+                editState
+                    |> startAnnotation pos editMode
                     |> logChange model
                     |> updateMouse images pos
                     => []
 
             AddLine startPos endPos ->
-                { editState
-                    | annotations = Array.push (Line_ <| Line startPos endPos strokeColor stroke strokeStyle) editState.annotations
-                    , drawing = Nothing
-                }
+                editState
+                    |> addAnnotation (Line_ <| Line startPos endPos strokeColor stroke strokeStyle)
                     |> skipChange model
                     => []
 
             StartSpotlightRect pos ->
-                { editState | drawing = Just <| DrawSpotlightRect <| DrawingRoundedRect pos }
+                editState
+                    |> startAnnotation pos editMode
                     |> logChange model
                     |> updateMouse images pos
                     => []
 
             AddSpotlightRect startPos endPos ->
-                { editState
-                    | annotations = Array.push (Rect_ <| Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True False) editState.annotations
-                    , drawing = Nothing
-                }
+                editState
+                    |> addAnnotation (Rect_ <| Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True)
                     |> skipChange model
                     => []
 
@@ -691,6 +683,44 @@ skipChange model editState =
     { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
+startAnnotation : Position -> EditMode -> EditState -> EditState
+startAnnotation startPos editMode editState =
+    { editState | drawing = Just <| drawingFromEditMode startPos editMode }
+
+
+drawingFromEditMode : Position -> EditMode -> Drawing
+drawingFromEditMode startPos editMode =
+    case editMode of
+        EditRect ->
+            DrawRect <| DrawingRect startPos
+
+        EditRoundedRect ->
+            DrawRoundedRect <| DrawingRoundedRect startPos
+
+        EditEllipse ->
+            DrawEllipse <| DrawingOval startPos
+
+        EditArrow ->
+            DrawArrow <| DrawingArrow startPos
+
+        EditLine ->
+            DrawLine <| DrawingLine startPos
+
+        EditTextBox ->
+            DrawTextBox <| DrawingTextBox startPos
+
+        EditSpotlightRect ->
+            DrawSpotlightRect <| DrawingRoundedRect startPos
+
+
+addAnnotation : Annotation -> EditState -> EditState
+addAnnotation annotation editState =
+    { editState
+        | annotations = Array.push ( annotation, False ) editState.annotations
+        , drawing = Nothing
+    }
+
+
 updateTextBoxWithNewFontSize : Drawing -> Drawing
 updateTextBoxWithNewFontSize drawing =
     case drawing of
@@ -727,32 +757,18 @@ verticesAreShown model =
 
 
 showVertices : Int -> Annotation -> EditState -> EditState
-showVertices index newAnnotation editState =
-    { editState | annotations = Array.set index newAnnotation editState.annotations }
+showVertices index annotation editState =
+    { editState | annotations = Array.set index ( annotation, True ) editState.annotations }
 
 
-removeAllVertices : Array Annotation -> Array Annotation
+removeAllVertices : Array ( Annotation, Bool ) -> Array ( Annotation, Bool )
 removeAllVertices annotations =
-    Array.map removeVertices annotations
+    Array.map (Tuple.mapSecond (always False)) annotations
 
 
-removeVertices : Annotation -> Annotation
-removeVertices annotation =
-    case annotation of
-        Arrow_ arrow ->
-            Arrow_ arrow
-
-        Rect_ rect ->
-            Rect_ { rect | showVertices = False }
-
-        Ellipse_ ellipse ->
-            Ellipse_ ellipse
-
-        TextBox_ textBox ->
-            TextBox_ textBox
-
-        Line_ line ->
-            Line_ line
+removeVertices : ( Annotation, Bool ) -> ( Annotation, Bool )
+removeVertices ( annotation, showVertices ) =
+    ( annotation, False )
 
 
 startMovingAnnotation : Int -> Annotation -> StartPosition -> Model -> Model
@@ -762,7 +778,7 @@ startMovingAnnotation index annotation startPos model =
 
 moveAnnotation : Int -> Annotation -> StartPosition -> EndPosition -> EditState -> EditState
 moveAnnotation index annotation oldPos newPos editState =
-    { editState | annotations = Array.set index (move oldPos newPos annotation) editState.annotations }
+    { editState | annotations = Array.set index ( move oldPos newPos annotation, True ) editState.annotations }
 
 
 move : Mouse.Position -> Mouse.Position -> Annotation -> Annotation
@@ -924,42 +940,40 @@ transitionOnShift drawing =
             drawing
 
 
+updateDrawingsOnShift : EditState -> EditState
+updateDrawingsOnShift editState =
+    case editState.drawing of
+        Just drawing ->
+            transitionOnShift drawing
+                |> updateDrawing editState
+
+        Nothing ->
+            editState
+
+
 alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> Model
 alterDrawingsWithKeyboard maybeKeyChange model =
-    let
-        drawingUpdate =
-            updateDrawing model.edits.present
+    case maybeKeyChange of
+        Just keyChange ->
+            case keyChange of
+                KeyDown key ->
+                    case key of
+                        Keyboard.Extra.Shift ->
+                            { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
 
-        updateDrawingsOnShift editState =
-            case editState.drawing of
-                Just drawing ->
-                    transitionOnShift drawing
-                        |> drawingUpdate
+                        _ ->
+                            model
 
-                Nothing ->
-                    editState
-    in
-        case maybeKeyChange of
-            Just keyChange ->
-                case keyChange of
-                    KeyDown key ->
-                        case key of
-                            Keyboard.Extra.Shift ->
-                                { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
+                KeyUp key ->
+                    case key of
+                        Keyboard.Extra.Shift ->
+                            { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
 
-                            _ ->
-                                model
+                        _ ->
+                            model
 
-                    KeyUp key ->
-                        case key of
-                            Keyboard.Extra.Shift ->
-                                { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
-
-                            _ ->
-                                model
-
-            Nothing ->
-                model
+        Nothing ->
+            model
 
 
 
@@ -1008,9 +1022,6 @@ viewInfoScreen =
 viewImageAnnotator : Model -> Image -> Html Msg
 viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDropdown, editMode, lastLineOption, lastShapeOption, lastSpotlightOption } as model) selectedImage =
     let
-        { drawing } =
-            edits.present
-
         toDropdownMenu =
             viewDropdownMenu currentDropdown editMode model
     in
@@ -1507,8 +1518,8 @@ viewCanvas model image =
 
         spotlights =
             editState.annotations
-                |> Array.filter isSpotlightShape
-                |> Array.map spotlightFillToMaskFill
+                |> Array.filter (isSpotlightShape << Tuple.first)
+                |> Array.map (Tuple.mapFirst spotlightFillToMaskFill)
                 |> Array.toList
                 |> List.indexedMap (viewAnnotation image.width image.height model.movementState)
                 |> List.concat
@@ -1531,7 +1542,7 @@ viewCanvas model image =
         firstSpotlightIndex =
             editState.annotations
                 |> Array.toList
-                |> List.Extra.findIndex isSpotlightShape
+                |> List.Extra.findIndex (isSpotlightShape << Tuple.first)
                 |> Maybe.withDefault 0
 
         svgChildren =
@@ -1607,8 +1618,8 @@ spotlightFillToMaskFill annotation =
             annotation
 
 
-viewAnnotation : Float -> Float -> MovementState -> Int -> Annotation -> List (Svg Msg)
-viewAnnotation width height movementState index annotation =
+viewAnnotation : Float -> Float -> MovementState -> Int -> ( Annotation, Bool ) -> List (Svg Msg)
+viewAnnotation width height movementState index ( annotation, showVertices ) =
     case annotation of
         Arrow_ arrow ->
             viewArrow arrow
@@ -1621,11 +1632,12 @@ viewAnnotation width height movementState index annotation =
                         ]
 
                     _ ->
-                        [ SE.on "mousedown" <| Json.map (StartMovingAnnotation index (Rect_ { rect | showVertices = True }) << toDrawingPosition) Mouse.position
+                        [ SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
                         , SE.onMouseOver ShowGrabHand
                         , SE.onMouseOut HideGrabHand
                         ]
                 )
+                showVertices
                 rect
 
         Ellipse_ ellipse ->
@@ -1666,22 +1678,22 @@ viewDrawing width height drawing { fill, strokeColor, stroke, strokeStyle, fontS
         DrawRect rectMode ->
             case rectMode of
                 DrawingRect startPos ->
-                    Rect startPos mouse fill strokeColor stroke strokeStyle False False
-                        |> viewRect []
+                    Rect startPos mouse fill strokeColor stroke strokeStyle False
+                        |> viewRect [] False
 
                 DrawingSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle False False
-                        |> viewRect []
+                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle False
+                        |> viewRect [] False
 
         DrawRoundedRect rectMode ->
             case rectMode of
                 DrawingRoundedRect startPos ->
-                    Rect startPos mouse fill strokeColor stroke strokeStyle True False
-                        |> viewRect []
+                    Rect startPos mouse fill strokeColor stroke strokeStyle True
+                        |> viewRect [] False
 
                 DrawingRoundedSquare startPos ->
-                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True False
-                        |> viewRect []
+                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True
+                        |> viewRect [] False
 
         DrawArrow arrowDrawing ->
             case arrowDrawing of
@@ -1707,15 +1719,15 @@ viewDrawing width height drawing { fill, strokeColor, stroke, strokeStyle, fontS
             case textBoxDrawing of
                 DrawingTextBox pos ->
                     TextBox pos mouse "" strokeColor stroke fontSize 0
-                        |> viewTextBoxWithBorder
+                        |> viewTextBoxWithBorder False
 
                 EditingText { start, end, text, angle } ->
                     TextBox start end text strokeColor stroke fontSize angle
-                        |> viewTextInputBox
+                        |> viewTextInputBox False
 
                 RotatingText { start, end, text, angle } ->
                     TextBox start end text strokeColor stroke fontSize angle
-                        |> viewTextBoxWithRotateButton
+                        |> viewTextBoxWithRotateButton False
 
         DrawLine lineMode ->
             case lineMode of
@@ -1737,12 +1749,12 @@ viewDrawing width height drawing { fill, strokeColor, stroke, strokeStyle, fontS
             in
                 case rectMode of
                     DrawingRoundedRect startPos ->
-                        Rect startPos mouse rectFill rectStrokeColor stroke strokeStyle True False
-                            |> viewRect []
+                        Rect startPos mouse rectFill rectStrokeColor stroke strokeStyle True
+                            |> viewRect [] False
 
                     DrawingRoundedSquare startPos ->
-                        Rect startPos (circleMouse startPos mouse) rectFill rectStrokeColor stroke strokeStyle True False
-                            |> viewRect []
+                        Rect startPos (circleMouse startPos mouse) rectFill rectStrokeColor stroke strokeStyle True
+                            |> viewRect [] False
 
 
 fillStyle : Fill -> List (Svg.Attribute Msg)
@@ -1761,8 +1773,8 @@ fillStyle fill =
             [ Attr.fill "white", fillOpacity "0" ]
 
 
-viewRect : List (Svg.Attribute Msg) -> Rect -> List (Svg Msg)
-viewRect attrs ({ start, end, fill, strokeColor, stroke, rounded } as rect) =
+viewRect : List (Svg.Attribute Msg) -> Bool -> Rect -> List (Svg Msg)
+viewRect attrs showVertices ({ start, end, fill, strokeColor, stroke, rounded } as rect) =
     let
         strokeStyle =
             [ toLineStyle rect.strokeStyle ]
@@ -1792,7 +1804,7 @@ viewRect attrs ({ start, end, fill, strokeColor, stroke, rounded } as rect) =
             )
             []
         ]
-            ++ if rect.showVertices then
+            ++ if showVertices then
                 vertices
                else
                 []
@@ -1851,9 +1863,9 @@ viewText ({ start, end, text, fill, fontSize, angle } as textBox) =
         [ Svg.text text ]
 
 
-viewTextBoxBorder : StartPosition -> EndPosition -> List (Svg Msg)
-viewTextBoxBorder start end =
-    viewRect [] <| Rect start end EmptyFill Color.black Thin Dashed False False
+viewTextBoxBorder : StartPosition -> EndPosition -> Bool -> List (Svg Msg)
+viewTextBoxBorder start end showVertices =
+    viewRect [] showVertices <| Rect start end EmptyFill Color.black Thin Dashed False
 
 
 viewRotateButton : StartPosition -> EndPosition -> Html Msg
@@ -1871,24 +1883,24 @@ viewTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
     [ viewText textBox ]
 
 
-viewTextBoxWithBorder : TextBox -> List (Svg Msg)
-viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
-    viewTextBoxBorder start end
+viewTextBoxWithBorder : Bool -> TextBox -> List (Svg Msg)
+viewTextBoxWithBorder showVertices ({ start, end, text, fill, fontSize, angle } as textBox) =
+    viewTextBoxBorder start end showVertices
         ++ [ viewText textBox
            ]
 
 
-viewTextBoxWithRotateButton : TextBox -> List (Svg Msg)
-viewTextBoxWithRotateButton ({ start, end, text, fill, fontSize, angle } as textBox) =
-    viewTextBoxBorder start end
+viewTextBoxWithRotateButton : Bool -> TextBox -> List (Svg Msg)
+viewTextBoxWithRotateButton showVertices ({ start, end, text, fill, fontSize, angle } as textBox) =
+    viewTextBoxBorder start end showVertices
         ++ [ viewRotateButton start end
            , viewText textBox
            ]
 
 
-viewTextInputBox : TextBox -> List (Svg Msg)
-viewTextInputBox ({ start, end, text, fill, fontSize, angle } as textBox) =
-    viewTextBoxBorder start end
+viewTextInputBox : Bool -> TextBox -> List (Svg Msg)
+viewTextInputBox showVertices ({ start, end, text, fill, fontSize, angle } as textBox) =
+    viewTextBoxBorder start end showVertices
         ++ [ viewRotateButton start end
            , foreignObject
                 []
