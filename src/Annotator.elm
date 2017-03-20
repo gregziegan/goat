@@ -464,17 +464,20 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                            ]
 
             TextBoxInput { start, end, angle } text ->
-                { editState | drawing = Just <| DrawTextBox <| EditingText <| TextBox start end text strokeColor stroke fontSize angle }
+                editState
+                    |> changeDrawing (DrawTextBox <| EditingText <| TextBox start end text strokeColor stroke fontSize angle)
                     |> skipChange model
                     => []
 
             BeginRotatingTextBox angle { start, end, text } ->
-                { editState | drawing = Just <| DrawTextBox <| RotatingText <| TextBox start end text strokeColor stroke fontSize angle }
+                editState
+                    |> changeDrawing (DrawTextBox <| RotatingText <| TextBox start end text strokeColor stroke fontSize angle)
                     |> skipChange model
                     => []
 
             FinishRotatingTextBox { start, end, text } angle ->
-                { editState | drawing = Just <| DrawTextBox <| EditingText <| TextBox start end text strokeColor stroke fontSize angle }
+                editState
+                    |> changeDrawing (DrawTextBox <| EditingText <| TextBox start end text strokeColor stroke fontSize angle)
                     |> skipChange model
                     => []
 
@@ -688,6 +691,11 @@ startAnnotation startPos editMode editState =
     { editState | drawing = Just <| drawingFromEditMode startPos editMode }
 
 
+changeDrawing : Drawing -> EditState -> EditState
+changeDrawing drawing editState =
+    { editState | drawing = Just drawing }
+
+
 drawingFromEditMode : Position -> EditMode -> Drawing
 drawingFromEditMode startPos editMode =
     case editMode of
@@ -792,19 +800,19 @@ move oldPos newPos annotation =
     in
         case annotation of
             Arrow_ arrow ->
-                Arrow_ arrow
+                Arrow_ { arrow | start = shiftPosition dX dY arrow.start, end = shiftPosition dX dY arrow.end }
 
             Rect_ rect ->
                 Rect_ { rect | start = shiftPosition dX dY rect.start, end = shiftPosition dX dY rect.end }
 
             Ellipse_ ellipse ->
-                Ellipse_ ellipse
+                Ellipse_ { ellipse | start = shiftPosition dX dY ellipse.start, end = shiftPosition dX dY ellipse.end }
 
             TextBox_ textBox ->
-                TextBox_ textBox
+                TextBox_ { textBox | start = shiftPosition dX dY textBox.start, end = shiftPosition dX dY textBox.end }
 
             Line_ line ->
-                Line_ line
+                Line_ { line | start = shiftPosition dX dY line.start, end = shiftPosition dX dY line.end }
 
 
 shiftPosition : Int -> Int -> Mouse.Position -> Mouse.Position
@@ -1028,7 +1036,7 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
         div
             [ Html.class "annotation-app" ]
             [ div [ Html.class "controls" ]
-                [ viewButtonGroup [ viewLineDropdown editMode lastLineOption toDropdownMenu, viewShapeDropdown editMode lastShapeOption toDropdownMenu, viewTextSizeDropdown toDropdownMenu, viewSpotlightDropdown editMode lastSpotlightOption toDropdownMenu ]
+                [ viewButtonGroup [ viewLineDropdown editMode lastLineOption toDropdownMenu, viewShapeDropdown editMode lastShapeOption toDropdownMenu, viewTextSizeDropdown editMode toDropdownMenu, viewSpotlightDropdown editMode lastSpotlightOption toDropdownMenu ]
                 , viewButtonGroup [ viewFillDropdown toDropdownMenu fill, viewStrokeColorDropdown toDropdownMenu strokeColor, viewLineStrokeDropdown toDropdownMenu ]
                 , viewHistoryControls
                 , button [ onClick Export, Html.class "export-button" ] [ Html.text "Export" ]
@@ -1068,17 +1076,21 @@ viewHistoryControls =
         ]
 
 
-viewTextSizeDropdown : (EditOption -> Html Msg) -> Html Msg
-viewTextSizeDropdown toDropdownMenu =
+viewTextSizeDropdown : EditMode -> (EditOption -> Html Msg) -> Html Msg
+viewTextSizeDropdown editMode toDropdownMenu =
     div
         [ Html.class "dropdown-things"
         ]
         [ button
-            [ onClick <| ToggleDropdown Fonts
-            , Html.class "dropdown-button"
+            [ onClick <| ChangeEditMode EditTextBox
+            , Html.classList [ "dropdown-button" => True, "dropdown-button--selected" => editMode == EditTextBox ]
             ]
-            [ viewTextIcon
-            , viewDownArrow
+            [ viewTextIcon ]
+        , button
+            [ onClick <| ToggleDropdown Fonts
+            , Html.class "dropdown-arrow"
+            ]
+            [ viewDownArrow
             ]
         , toDropdownMenu Fonts
         ]
@@ -1618,36 +1630,41 @@ spotlightFillToMaskFill annotation =
             annotation
 
 
+movementStateEvents : Int -> Annotation -> MovementState -> List (Svg.Attribute Msg)
+movementStateEvents index annotation movementState =
+    case movementState of
+        MovingAnnotation index annotation startPos ->
+            [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
+            ]
+
+        _ ->
+            [ SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
+            , SE.onMouseOver ShowGrabHand
+            , SE.onMouseOut HideGrabHand
+            ]
+
+
 viewAnnotation : Float -> Float -> MovementState -> Int -> ( Annotation, Bool ) -> List (Svg Msg)
 viewAnnotation width height movementState index ( annotation, showVertices ) =
-    case annotation of
-        Arrow_ arrow ->
-            viewArrow arrow
+    let
+        toMovementEvents =
+            movementStateEvents index annotation
+    in
+        case annotation of
+            Arrow_ arrow ->
+                viewArrow (toMovementEvents movementState) arrow showVertices
 
-        Rect_ rect ->
-            viewRect
-                (case movementState of
-                    MovingAnnotation index annotation startPos ->
-                        [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
-                        ]
+            Rect_ rect ->
+                viewRect (toMovementEvents movementState) rect showVertices
 
-                    _ ->
-                        [ SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
-                        , SE.onMouseOver ShowGrabHand
-                        , SE.onMouseOut HideGrabHand
-                        ]
-                )
-                showVertices
-                rect
+            Ellipse_ ellipse ->
+                viewEllipse (toMovementEvents movementState) ellipse showVertices
 
-        Ellipse_ ellipse ->
-            viewEllipse ellipse
+            Line_ line ->
+                viewLine (toMovementEvents movementState) line showVertices
 
-        Line_ line ->
-            viewLine line
-
-        TextBox_ textBox ->
-            viewTextBox textBox
+            TextBox_ textBox ->
+                viewTextBox (toMovementEvents movementState) textBox showVertices
 
 
 viewMask : MovementState -> Float -> Float -> List (Svg Msg) -> Svg Msg
@@ -1673,88 +1690,96 @@ viewMask movementState width height shapes =
 
 
 viewDrawing : Float -> Float -> Drawing -> Model -> Bool -> List (Svg Msg)
-viewDrawing width height drawing { fill, strokeColor, stroke, strokeStyle, fontSize, mouse, keyboardState } isInMask =
+viewDrawing width height drawing model isInMask =
+    let
+        modelAccountingForMask =
+            if isInMask then
+                if model.editMode == EditSpotlightRect then
+                    { model | fill = MaskFill, strokeColor = Color.white }
+                else
+                    { model | fill = EmptyFill }
+            else
+                model
+    in
+        (viewDrawingHelper width height drawing modelAccountingForMask) False
+
+
+viewDrawingHelper : Float -> Float -> Drawing -> Model -> (Bool -> List (Svg Msg))
+viewDrawingHelper width height drawing { fill, strokeColor, stroke, strokeStyle, fontSize, mouse, keyboardState } =
     case drawing of
         DrawRect rectMode ->
             case rectMode of
                 DrawingRect startPos ->
                     Rect startPos mouse fill strokeColor stroke strokeStyle False
-                        |> viewRect [] False
+                        |> viewRect []
 
                 DrawingSquare startPos ->
                     Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle False
-                        |> viewRect [] False
+                        |> viewRect []
 
         DrawRoundedRect rectMode ->
             case rectMode of
                 DrawingRoundedRect startPos ->
                     Rect startPos mouse fill strokeColor stroke strokeStyle True
-                        |> viewRect [] False
+                        |> viewRect []
 
                 DrawingRoundedSquare startPos ->
                     Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True
-                        |> viewRect [] False
+                        |> viewRect []
 
         DrawArrow arrowDrawing ->
             case arrowDrawing of
                 DrawingArrow pos ->
                     Arrow pos mouse strokeColor stroke strokeStyle
-                        |> viewArrow
+                        |> viewArrow []
 
                 DrawingDiscreteArrow pos ->
                     Arrow pos (stepMouse pos mouse) strokeColor stroke strokeStyle
-                        |> viewArrow
+                        |> viewArrow []
 
         DrawEllipse ellipseDrawing ->
             case ellipseDrawing of
                 DrawingOval pos ->
                     Ellipse pos mouse fill strokeColor stroke strokeStyle
-                        |> viewEllipse
+                        |> viewEllipse []
 
                 DrawingCircle pos ->
                     Ellipse pos (circleMouse pos mouse) fill strokeColor stroke strokeStyle
-                        |> viewEllipse
+                        |> viewEllipse []
 
         DrawTextBox textBoxDrawing ->
             case textBoxDrawing of
                 DrawingTextBox pos ->
                     TextBox pos mouse "" strokeColor stroke fontSize 0
-                        |> viewTextBoxWithBorder False
+                        |> viewTextBoxWithBorder []
 
                 EditingText { start, end, text, angle } ->
                     TextBox start end text strokeColor stroke fontSize angle
-                        |> viewTextInputBox False
+                        |> viewTextInputBox []
 
                 RotatingText { start, end, text, angle } ->
                     TextBox start end text strokeColor stroke fontSize angle
-                        |> viewTextBoxWithRotateButton False
+                        |> viewTextBoxWithRotateButton []
 
         DrawLine lineMode ->
             case lineMode of
                 DrawingLine pos ->
                     Line pos mouse strokeColor stroke strokeStyle
-                        |> viewLine
+                        |> viewLine []
 
                 DrawingDiscreteLine pos ->
                     Line pos (stepMouse pos mouse) strokeColor stroke strokeStyle
-                        |> viewLine
+                        |> viewLine []
 
         DrawSpotlightRect rectMode ->
-            let
-                ( rectFill, rectStrokeColor ) =
-                    if isInMask then
-                        ( MaskFill, Color.white )
-                    else
-                        ( EmptyFill, strokeColor )
-            in
-                case rectMode of
-                    DrawingRoundedRect startPos ->
-                        Rect startPos mouse rectFill rectStrokeColor stroke strokeStyle True
-                            |> viewRect [] False
+            case rectMode of
+                DrawingRoundedRect startPos ->
+                    Rect startPos mouse fill strokeColor stroke strokeStyle True
+                        |> viewRect []
 
-                    DrawingRoundedSquare startPos ->
-                        Rect startPos (circleMouse startPos mouse) rectFill rectStrokeColor stroke strokeStyle True
-                            |> viewRect [] False
+                DrawingRoundedSquare startPos ->
+                    Rect startPos (circleMouse startPos mouse) fill strokeColor stroke strokeStyle True
+                        |> viewRect []
 
 
 fillStyle : Fill -> List (Svg.Attribute Msg)
@@ -1773,8 +1798,8 @@ fillStyle fill =
             [ Attr.fill "white", fillOpacity "0" ]
 
 
-viewRect : List (Svg.Attribute Msg) -> Bool -> Rect -> List (Svg Msg)
-viewRect attrs showVertices ({ start, end, fill, strokeColor, stroke, rounded } as rect) =
+viewRect : List (Svg.Attribute Msg) -> Rect -> Bool -> List (Svg Msg)
+viewRect attrs ({ start, end, fill, strokeColor, stroke, rounded } as rect) showVertices =
     let
         strokeStyle =
             [ toLineStyle rect.strokeStyle ]
@@ -1782,13 +1807,6 @@ viewRect attrs showVertices ({ start, end, fill, strokeColor, stroke, rounded } 
                     [ rx "15", ry "15" ]
                    else
                     []
-
-        vertices =
-            [ viewVertex start.x start.y
-            , viewVertex end.x start.y
-            , viewVertex start.x end.y
-            , viewVertex end.x end.y
-            ]
     in
         [ Svg.rect
             ([ Attr.width <| toString <| abs <| end.x - start.x
@@ -1805,9 +1823,18 @@ viewRect attrs showVertices ({ start, end, fill, strokeColor, stroke, rounded } 
             []
         ]
             ++ if showVertices then
-                vertices
+                rectVertices start end
                else
                 []
+
+
+rectVertices : StartPosition -> EndPosition -> List (Svg Msg)
+rectVertices start end =
+    [ viewVertex start.x start.y
+    , viewVertex end.x start.y
+    , viewVertex start.x end.y
+    , viewVertex end.x end.y
+    ]
 
 
 viewVertex : Int -> Int -> Svg Msg
@@ -1821,22 +1848,35 @@ viewVertex x y =
         []
 
 
-viewArrow : Arrow -> List (Svg Msg)
-viewArrow ({ start, end, fill, stroke, strokeStyle } as arrow) =
+viewArrow : List (Svg.Attribute Msg) -> Arrow -> Bool -> List (Svg Msg)
+viewArrow attrs ({ start, end, fill, stroke, strokeStyle } as arrow) showVertices =
     [ Svg.path
-        [ markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex fill ++ ")"
-        , strokeWidth <| toString <| strokeToWidth stroke
-        , toLineStyle strokeStyle
-        , Attr.fill "none"
-        , Attr.stroke <| Color.Convert.colorToHex fill
-        , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
-        ]
+        ([ markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex fill ++ ")"
+         , strokeWidth <| toString <| strokeToWidth stroke
+         , toLineStyle strokeStyle
+         , Attr.fill "none"
+         , Attr.stroke <| Color.Convert.colorToHex fill
+         , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+         ]
+            ++ attrs
+        )
         []
+    ]
+        ++ if showVertices then
+            arrowVertices start end
+           else
+            []
+
+
+arrowVertices : StartPosition -> EndPosition -> List (Svg Msg)
+arrowVertices start end =
+    [ viewVertex start.x start.y
+    , viewVertex end.x end.y
     ]
 
 
-viewEllipse : Ellipse -> List (Svg Msg)
-viewEllipse ({ start, end, fill, strokeColor, stroke, strokeStyle } as ellipse) =
+viewEllipse : List (Svg.Attribute Msg) -> Ellipse -> Bool -> List (Svg Msg)
+viewEllipse attrs ({ start, end, fill, strokeColor, stroke, strokeStyle } as ellipse) showVertices =
     [ Svg.ellipse
         ([ rx <| toString <| abs <| end.x - start.x
          , ry <| toString <| abs <| end.y - start.y
@@ -1847,9 +1887,14 @@ viewEllipse ({ start, end, fill, strokeColor, stroke, strokeStyle } as ellipse) 
          , toLineStyle strokeStyle
          ]
             ++ fillStyle fill
+            ++ attrs
         )
         []
     ]
+        ++ if showVertices then
+            rectVertices start end
+           else
+            []
 
 
 viewText : TextBox -> Svg Msg
@@ -1863,9 +1908,9 @@ viewText ({ start, end, text, fill, fontSize, angle } as textBox) =
         [ Svg.text text ]
 
 
-viewTextBoxBorder : StartPosition -> EndPosition -> Bool -> List (Svg Msg)
-viewTextBoxBorder start end showVertices =
-    viewRect [] showVertices <| Rect start end EmptyFill Color.black Thin Dashed False
+viewTextBoxBorder : List (Svg.Attribute Msg) -> StartPosition -> EndPosition -> Bool -> List (Svg Msg)
+viewTextBoxBorder attrs start end showVertices =
+    viewRect attrs (Rect start end EmptyFill Color.black Thin Dashed False) showVertices
 
 
 viewRotateButton : StartPosition -> EndPosition -> Html Msg
@@ -1878,29 +1923,39 @@ viewRotateButton start end =
         []
 
 
-viewTextBox : TextBox -> List (Svg Msg)
-viewTextBox ({ start, end, text, fill, fontSize, angle } as textBox) =
-    [ viewText textBox ]
+viewTextBox : List (Svg.Attribute Msg) -> TextBox -> Bool -> List (Svg Msg)
+viewTextBox attrs ({ start, end, text, fill, fontSize, angle } as textBox) showVertices =
+    viewTextBoxBorder attrs start end showVertices
+        ++ [ viewText textBox ]
 
 
-viewTextBoxWithBorder : Bool -> TextBox -> List (Svg Msg)
-viewTextBoxWithBorder showVertices ({ start, end, text, fill, fontSize, angle } as textBox) =
-    viewTextBoxBorder start end showVertices
-        ++ [ viewText textBox
-           ]
+viewTextBoxVertices : StartPosition -> EndPosition -> Bool -> List (Svg Msg)
+viewTextBoxVertices start end showVertices =
+    if showVertices then
+        rectVertices start end
+    else
+        []
 
 
-viewTextBoxWithRotateButton : Bool -> TextBox -> List (Svg Msg)
-viewTextBoxWithRotateButton showVertices ({ start, end, text, fill, fontSize, angle } as textBox) =
-    viewTextBoxBorder start end showVertices
+viewTextBoxWithBorder : List (Svg.Attribute Msg) -> TextBox -> Bool -> List (Svg Msg)
+viewTextBoxWithBorder attrs ({ start, end, text, fill, fontSize, angle } as textBox) showVertices =
+    viewTextBoxBorder attrs start end showVertices
+        ++ [ viewText textBox ]
+        ++ viewTextBoxVertices start end showVertices
+
+
+viewTextBoxWithRotateButton : List (Svg.Attribute Msg) -> TextBox -> Bool -> List (Svg Msg)
+viewTextBoxWithRotateButton attrs ({ start, end, text, fill, fontSize, angle } as textBox) showVertices =
+    viewTextBoxBorder attrs start end showVertices
         ++ [ viewRotateButton start end
            , viewText textBox
            ]
+        ++ viewTextBoxVertices start end showVertices
 
 
-viewTextInputBox : Bool -> TextBox -> List (Svg Msg)
-viewTextInputBox showVertices ({ start, end, text, fill, fontSize, angle } as textBox) =
-    viewTextBoxBorder start end showVertices
+viewTextInputBox : List (Svg.Attribute Msg) -> TextBox -> Bool -> List (Svg Msg)
+viewTextInputBox attrs ({ start, end, text, fill, fontSize, angle } as textBox) showVertices =
+    viewTextBoxBorder attrs start end showVertices
         ++ [ viewRotateButton start end
            , foreignObject
                 []
@@ -1914,16 +1969,19 @@ viewTextInputBox showVertices ({ start, end, text, fill, fontSize, angle } as te
                     []
                 ]
            ]
+        ++ viewTextBoxVertices start end showVertices
 
 
-viewLine : Line -> List (Svg Msg)
-viewLine { start, end, fill, stroke, strokeStyle } =
+viewLine : List (Svg.Attribute Msg) -> Line -> Bool -> List (Svg Msg)
+viewLine attrs { start, end, fill, stroke, strokeStyle } showVertices =
     [ Svg.path
-        [ strokeWidth <| toString <| strokeToWidth stroke
-        , Attr.fill "none"
-        , Attr.stroke <| Color.Convert.colorToHex fill
-        , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
-        ]
+        ([ strokeWidth <| toString <| strokeToWidth stroke
+         , Attr.fill "none"
+         , Attr.stroke <| Color.Convert.colorToHex fill
+         , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+         ]
+            ++ attrs
+        )
         []
     ]
 
@@ -2168,31 +2226,6 @@ arrowAngle a b =
         radians
 
 
-drawingToEditMode : Drawing -> EditMode
-drawingToEditMode drawing =
-    case drawing of
-        DrawRect _ ->
-            EditRect
-
-        DrawRoundedRect _ ->
-            EditRoundedRect
-
-        DrawArrow _ ->
-            EditArrow
-
-        DrawEllipse _ ->
-            EditEllipse
-
-        DrawTextBox _ ->
-            EditTextBox
-
-        DrawLine _ ->
-            EditLine
-
-        DrawSpotlightRect roundedRectMode ->
-            EditSpotlightRect
-
-
 trackMouse : Drawing -> Bool
 trackMouse drawing =
     case drawing of
@@ -2226,15 +2259,6 @@ trackMouse drawing =
 toDeltas : Float -> Float -> Position
 toDeltas h theta =
     Position (round (cos theta * h)) (round (sin theta * h))
-
-
-halfDistance : Position -> Position -> Position
-halfDistance start end =
-    let
-        ( dx, dy ) =
-            ( end.x - start.x, end.y - start.y )
-    in
-        Position (dx // 2) (dy // 2)
 
 
 calcDistance : Position -> Position -> Float

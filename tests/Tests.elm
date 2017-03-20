@@ -1,23 +1,25 @@
 module Tests exposing (..)
 
+import Color
 import Test exposing (..)
 import Expect
 import Fuzz exposing (Fuzzer)
 import Annotator exposing (..)
+import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
 
 
 doNotTrackMouseStates : List Drawing
 doNotTrackMouseStates =
-    [ DrawRect NoRect, DrawRoundedRect NoRoundedRect, DrawEllipse NoEllipse, DrawArrow NoArrow, DrawLine NoLine, DrawTextBox NoText, Selection ]
+    [ DrawTextBox <| EditingText (TextBox { x = 0, y = 0 } { x = 0, y = 0 } "" Color.red VeryThin 0.0 0.0) ]
 
 
 position : Fuzzer Position
 position =
     Fuzz.custom
-        (Random.map2 (,) (Random.float -100.0 100.0) (Random.float -100.0 100.0))
-        (\( x, y ) -> Shrink.map (,) (Shrink.float x) |> Shrink.andMap (Shrink.float y))
+        (Random.map2 Position (Random.int -100 100) (Random.int -100 100))
+        (\{ x, y } -> Shrink.map Position (Shrink.int x) |> Shrink.andMap (Shrink.int y))
 
 
 all : Test
