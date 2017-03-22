@@ -119,6 +119,13 @@
   cursor: pointer;
 }
 
+.history-button:disabled {
+  border-color: transparent;
+  box-shadow: none;
+  cursor: not-allowed;
+  color: #ddd;
+}
+
 .image-selector {
   display: flex;
 }
