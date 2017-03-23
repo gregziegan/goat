@@ -1646,11 +1646,15 @@ viewCanvas model image =
                     OutsideSelectedAnnotation ->
                         drawingStateEvents model.editMode editState.drawing model.mouse
 
-                    MovingAnnotation _ _ _ ->
-                        [ Html.Events.onMouseLeave ResetToReadyToDraw ]
+                    MovingAnnotation index annotation startPos ->
+                        [ Html.Events.onMouseLeave ResetToReadyToDraw
+                        , SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
+                        ]
 
-                    ResizingAnnotation _ _ _ _ ->
-                        [ Html.Events.onMouseLeave ResetToReadyToDraw ]
+                    ResizingAnnotation index annotation startPos vertex ->
+                        [ Html.Events.onMouseLeave ResetToReadyToDraw
+                        , SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
+                        ]
 
         toDrawing =
             case editState.drawing of
