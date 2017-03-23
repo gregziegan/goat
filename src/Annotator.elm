@@ -708,7 +708,7 @@ skipChange model editState =
 
 startAnnotation : Position -> EditMode -> Maybe (Zipper Image) -> Model -> EditState -> Model
 startAnnotation startPos editMode images model editState =
-    { editState | drawing = Just <| drawingFromEditMode startPos editMode }
+    { editState | drawing = Just <| drawingFromEditMode startPos editMode model.keyboardState }
         |> removeAllVertices
         |> logChange model
         |> startDrawing
@@ -725,29 +725,57 @@ changeDrawing drawing editState =
     { editState | drawing = Just drawing }
 
 
-drawingFromEditMode : Position -> EditMode -> Drawing
-drawingFromEditMode startPos editMode =
-    case editMode of
-        EditRect ->
-            DrawRect <| DrawingRect startPos
+roundedRectDrawing : Bool -> StartPosition -> RoundedRectMode
+roundedRectDrawing shiftPressed startPos =
+    if shiftPressed then
+        DrawingRoundedSquare startPos
+    else
+        DrawingRoundedRect startPos
 
-        EditRoundedRect ->
-            DrawRoundedRect <| DrawingRoundedRect startPos
 
-        EditEllipse ->
-            DrawEllipse <| DrawingOval startPos
+drawingFromEditMode : Position -> EditMode -> Keyboard.Extra.State -> Drawing
+drawingFromEditMode startPos editMode keyboardState =
+    let
+        shiftPressed =
+            Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
+    in
+        case editMode of
+            EditRect ->
+                DrawRect <|
+                    if shiftPressed then
+                        DrawingSquare startPos
+                    else
+                        DrawingRect startPos
 
-        EditArrow ->
-            DrawArrow <| DrawingArrow startPos
+            EditRoundedRect ->
+                DrawRoundedRect <| roundedRectDrawing shiftPressed startPos
 
-        EditLine ->
-            DrawLine <| DrawingLine startPos
+            EditEllipse ->
+                DrawEllipse <|
+                    if shiftPressed then
+                        DrawingCircle startPos
+                    else
+                        DrawingOval startPos
 
-        EditTextBox ->
-            DrawTextBox <| DrawingTextBox startPos
+            EditArrow ->
+                DrawArrow <|
+                    if shiftPressed then
+                        DrawingDiscreteArrow startPos
+                    else
+                        DrawingArrow startPos
 
-        EditSpotlightRect ->
-            DrawSpotlightRect <| DrawingRoundedRect startPos
+            EditLine ->
+                DrawLine <|
+                    if shiftPressed then
+                        DrawingDiscreteLine startPos
+                    else
+                        DrawingLine startPos
+
+            EditTextBox ->
+                DrawTextBox <| DrawingTextBox startPos
+
+            EditSpotlightRect ->
+                DrawSpotlightRect <| roundedRectDrawing shiftPressed startPos
 
 
 addAnnotation : Annotation -> Model -> EditState -> Model
