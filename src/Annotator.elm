@@ -1094,10 +1094,16 @@ alterDrawingsWithKeyboard maybeKeyChange model =
                             { model | edits = UndoList.mapPresent cancelDrawing model.edits }
 
                         Keyboard.Extra.Delete ->
-                            { model | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits }
+                            { model
+                                | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
+                                , movementState = ReadyToDraw
+                            }
 
                         Keyboard.Extra.BackSpace ->
-                            { model | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits }
+                            { model
+                                | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
+                                , movementState = ReadyToDraw
+                            }
 
                         _ ->
                             model
