@@ -1688,7 +1688,7 @@ viewCanvas model image =
                 |> List.singleton
 
         mask =
-            [ rect [ x "0", y "0", Attr.height <| toString image.height, Attr.width <| toString image.width, Attr.mask "url(#Mask)" ] [] ]
+            [ rect [ x "0", y "0", Attr.height <| toString image.height, Attr.width <| toString image.width, Attr.mask "url(#Mask)", Attr.style "pointer-events: none;" ] [] ]
 
         firstSpotlightIndex =
             editState.annotations
