@@ -7,7 +7,8 @@
     <script src="elm.js"></script>
     <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
     <script>
-      var app = Elm.Annotator.embed(document.getElementById("root"));
+      var isMac = navigator.userAgent.indexOf('Mac OS X') != -1
+      var app = Elm.Annotator.embed(document.getElementById("root"), { isMac: isMac });
 
       app.ports.exportToImage.subscribe(function(image) {
         var canvas = document.createElement('canvas')

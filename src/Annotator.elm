@@ -24,6 +24,10 @@ import UndoList exposing (UndoList)
 -- MODEL
 
 
+type alias Flags =
+    { isMac : Bool }
+
+
 type alias StartPosition =
     Position
 
@@ -185,6 +189,11 @@ type Vertex
     | StartPlusY
 
 
+type OperatingSystem
+    = MacOS
+    | Windows
+
+
 type MovementState
     = ReadyToDraw
     | DrawingAnnotation
@@ -213,6 +222,7 @@ type alias Model =
     , imageSelected : Bool
     , currentDropdown : Maybe EditOption
     , movementState : MovementState
+    , operatingSystem : OperatingSystem
     }
 
 
@@ -301,8 +311,8 @@ initialEditState =
     }
 
 
-init : ( Model, List (Cmd Msg) )
-init =
+init : Flags -> ( Model, List (Cmd Msg) )
+init flags =
     { edits = UndoList.fresh initialEditState
     , fill = EmptyFill
     , strokeColor = Color.red
@@ -319,6 +329,11 @@ init =
     , imageSelected = False
     , currentDropdown = Nothing
     , movementState = ReadyToDraw
+    , operatingSystem =
+        if flags.isMac then
+            MacOS
+        else
+            Windows
     }
         => []
 
@@ -1081,43 +1096,89 @@ deleteSelectedDrawings editState =
 
 
 alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> Model
-alterDrawingsWithKeyboard maybeKeyChange model =
-    case maybeKeyChange of
-        Just keyChange ->
-            case keyChange of
-                KeyDown key ->
-                    case key of
-                        Keyboard.Extra.Shift ->
-                            { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
+alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
+    let
+        controlKey =
+            case model.operatingSystem of
+                MacOS ->
+                    Keyboard.Extra.Super
 
-                        Keyboard.Extra.Escape ->
-                            { model | edits = UndoList.mapPresent cancelDrawing model.edits }
+                Windows ->
+                    Keyboard.Extra.Control
+    in
+        case maybeKeyChange of
+            Just keyChange ->
+                case keyChange of
+                    KeyDown key ->
+                        case key of
+                            Keyboard.Extra.Shift ->
+                                { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
 
-                        Keyboard.Extra.Delete ->
-                            { model
-                                | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
-                                , movementState = ReadyToDraw
-                            }
+                            Keyboard.Extra.Escape ->
+                                { model | edits = UndoList.mapPresent cancelDrawing model.edits }
 
-                        Keyboard.Extra.BackSpace ->
-                            { model
-                                | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
-                                , movementState = ReadyToDraw
-                            }
+                            Keyboard.Extra.Delete ->
+                                { model
+                                    | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
+                                    , movementState = ReadyToDraw
+                                }
 
-                        _ ->
-                            model
+                            Keyboard.Extra.BackSpace ->
+                                { model
+                                    | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
+                                    , movementState = ReadyToDraw
+                                }
 
-                KeyUp key ->
-                    case key of
-                        Keyboard.Extra.Shift ->
-                            { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
+                            Keyboard.Extra.CharZ ->
+                                if
+                                    Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
+                                        && Keyboard.Extra.isPressed controlKey keyboardState
+                                then
+                                    { model | edits = UndoList.redo model.edits }
+                                else if Keyboard.Extra.isPressed controlKey keyboardState then
+                                    { model | edits = UndoList.undo model.edits }
+                                else
+                                    model
 
-                        _ ->
-                            model
+                            Keyboard.Extra.Control ->
+                                if model.operatingSystem == MacOS then
+                                    model
+                                else if
+                                    Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
+                                        && Keyboard.Extra.isPressed Keyboard.Extra.CharZ keyboardState
+                                then
+                                    { model | edits = UndoList.redo model.edits }
+                                else if Keyboard.Extra.isPressed Keyboard.Extra.CharZ keyboardState then
+                                    { model | edits = UndoList.undo model.edits }
+                                else
+                                    model
 
-        Nothing ->
-            model
+                            Keyboard.Extra.Super ->
+                                if model.operatingSystem == Windows then
+                                    model
+                                else if
+                                    Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
+                                        && Keyboard.Extra.isPressed Keyboard.Extra.CharZ keyboardState
+                                then
+                                    { model | edits = UndoList.redo model.edits }
+                                else if Keyboard.Extra.isPressed Keyboard.Extra.CharZ keyboardState then
+                                    { model | edits = UndoList.undo model.edits }
+                                else
+                                    model
+
+                            _ ->
+                                model
+
+                    KeyUp key ->
+                        case key of
+                            Keyboard.Extra.Shift ->
+                                { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
+
+                            _ ->
+                                model
+
+            Nothing ->
+                model
 
 
 
@@ -2053,7 +2114,7 @@ rectAttributes { start, end, fill, strokeColor, stroke, strokeStyle, rounded } =
         , strokeWidth <| toString <| strokeToWidth stroke
         , Attr.stroke <| Color.Convert.colorToHex strokeColor
         , Attr.style <| pointerEvents fill
-          --  , Attr.filter "url(#dropShadow)"
+          -- , Attr.filter "url(#dropShadow)"
         ]
             ++ strokeStyles
             ++ fillStyle fill
@@ -2154,7 +2215,7 @@ ellipseAttributes { start, end, fill, strokeColor, stroke, strokeStyle } =
     , Attr.stroke <| Color.Convert.colorToHex strokeColor
     , toLineStyle strokeStyle
     , Attr.style <| pointerEvents fill
-      --  , Attr.filter "url(#dropShadow)"
+      -- , Attr.filter "url(#dropShadow)"
     ]
         ++ fillStyle fill
 
@@ -2218,7 +2279,7 @@ lineAttributes { start, end, fill, stroke, strokeStyle } =
     , Attr.fill "none"
     , Attr.stroke <| Color.Convert.colorToHex fill
     , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
-      --  , Attr.filter "url(#dropShadow)"
+      -- , Attr.filter "url(#dropShadow)"
     ]
 
 
@@ -2643,10 +2704,10 @@ subscriptions model =
 -- MAIN
 
 
-main : Program Never Model Msg
+main : Program Flags Model Msg
 main =
-    Html.program
-        { init = Rocket.batchInit init
+    Html.programWithFlags
+        { init = init >> Rocket.batchInit
         , update = update >> Rocket.batchUpdate
         , view = view
         , subscriptions = subscriptions
