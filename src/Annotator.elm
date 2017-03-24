@@ -9,7 +9,7 @@ import Html exposing (Attribute, Html, button, div, p, text)
 import Html.Attributes as Html exposing (class, classList, disabled, height, id, src, start, style, type_, width)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onMouseEnter, onMouseLeave, onWithOptions)
 import Json.Decode as Json
-import Keyboard.Extra exposing (Key, KeyChange(..))
+import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange(..), isPressed)
 import List.Extra
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
@@ -217,7 +217,7 @@ type alias Model =
     , lastLineOption : EditMode
     , lastSpotlightOption : EditMode
     , mouse : Mouse.Position
-    , keyboardState : Keyboard.Extra.State
+    , keyboardState : Keyboard.State
     , images : Maybe (Zipper Image)
     , imageSelected : Bool
     , currentDropdown : Maybe EditOption
@@ -324,7 +324,7 @@ init flags =
     , lastLineOption = EditArrow
     , lastSpotlightOption = EditSpotlightRect
     , mouse = Mouse.Position 0 0
-    , keyboardState = Keyboard.Extra.initialState
+    , keyboardState = Keyboard.initialState
     , images = List.Zipper.fromList []
     , imageSelected = False
     , currentDropdown = Nothing
@@ -363,7 +363,7 @@ type Msg
     | AddSpotlightRect StartPosition EndPosition
     | SetMouse Image Mouse.Position
     | SetImages (List Image)
-    | KeyboardMsg Keyboard.Extra.Msg
+    | KeyboardMsg Keyboard.Msg
     | SelectImage Image
     | ChangeEditMode EditMode
     | SelectFill Fill
@@ -525,7 +525,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
             KeyboardMsg keyMsg ->
                 let
                     ( keyboardState, maybeKeyChange ) =
-                        Keyboard.Extra.updateWithKeyChange keyMsg model.keyboardState
+                        Keyboard.updateWithKeyChange keyMsg model.keyboardState
                 in
                     { model | keyboardState = keyboardState }
                         |> alterDrawingsWithKeyboard maybeKeyChange
@@ -748,11 +748,11 @@ roundedRectDrawing shiftPressed startPos =
         DrawingRoundedRect startPos
 
 
-drawingFromEditMode : Position -> EditMode -> Keyboard.Extra.State -> Drawing
+drawingFromEditMode : Position -> EditMode -> Keyboard.State -> Drawing
 drawingFromEditMode startPos editMode keyboardState =
     let
         shiftPressed =
-            Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
+            isPressed Shift keyboardState
     in
         case editMode of
             EditRect ->
@@ -1101,67 +1101,58 @@ alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
         controlKey =
             case model.operatingSystem of
                 MacOS ->
-                    Keyboard.Extra.Super
+                    Super
 
                 Windows ->
-                    Keyboard.Extra.Control
+                    Control
     in
         case maybeKeyChange of
             Just keyChange ->
                 case keyChange of
                     KeyDown key ->
                         case key of
-                            Keyboard.Extra.Shift ->
+                            Shift ->
                                 { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
 
-                            Keyboard.Extra.Escape ->
+                            Escape ->
                                 { model | edits = UndoList.mapPresent cancelDrawing model.edits }
 
-                            Keyboard.Extra.Delete ->
+                            Delete ->
                                 { model
                                     | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
                                     , movementState = ReadyToDraw
                                 }
 
-                            Keyboard.Extra.BackSpace ->
+                            BackSpace ->
                                 { model
                                     | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
                                     , movementState = ReadyToDraw
                                 }
 
-                            Keyboard.Extra.CharZ ->
-                                if
-                                    Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
-                                        && Keyboard.Extra.isPressed controlKey keyboardState
-                                then
+                            CharZ ->
+                                if isPressed Shift keyboardState && isPressed controlKey keyboardState then
                                     { model | edits = UndoList.redo model.edits }
-                                else if Keyboard.Extra.isPressed controlKey keyboardState then
+                                else if isPressed controlKey keyboardState then
                                     { model | edits = UndoList.undo model.edits }
                                 else
                                     model
 
-                            Keyboard.Extra.Control ->
+                            Control ->
                                 if model.operatingSystem == MacOS then
                                     model
-                                else if
-                                    Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
-                                        && Keyboard.Extra.isPressed Keyboard.Extra.CharZ keyboardState
-                                then
+                                else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
                                     { model | edits = UndoList.redo model.edits }
-                                else if Keyboard.Extra.isPressed Keyboard.Extra.CharZ keyboardState then
+                                else if isPressed CharZ keyboardState then
                                     { model | edits = UndoList.undo model.edits }
                                 else
                                     model
 
-                            Keyboard.Extra.Super ->
+                            Super ->
                                 if model.operatingSystem == Windows then
                                     model
-                                else if
-                                    Keyboard.Extra.isPressed Keyboard.Extra.Shift keyboardState
-                                        && Keyboard.Extra.isPressed Keyboard.Extra.CharZ keyboardState
-                                then
+                                else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
                                     { model | edits = UndoList.redo model.edits }
-                                else if Keyboard.Extra.isPressed Keyboard.Extra.CharZ keyboardState then
+                                else if isPressed CharZ keyboardState then
                                     { model | edits = UndoList.undo model.edits }
                                 else
                                     model
@@ -1171,7 +1162,7 @@ alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
 
                     KeyUp key ->
                         case key of
-                            Keyboard.Extra.Shift ->
+                            Shift ->
                                 { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
 
                             _ ->
@@ -2695,7 +2686,7 @@ subscriptions model =
 
                         _ ->
                             Sub.none
-        , Sub.map KeyboardMsg Keyboard.Extra.subscriptions
+        , Sub.map KeyboardMsg Keyboard.subscriptions
         , setImages SetImages
         ]
 
