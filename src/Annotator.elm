@@ -2563,7 +2563,7 @@ toDeltas h theta =
 
 calcDistance : Position -> Position -> Float
 calcDistance a b =
-    sqrt <| toFloat <| (b.x - a.x) ^ 2 + (b.y - b.x) ^ 2
+    sqrt <| toFloat <| (b.x - a.x) ^ 2 + (b.y - a.y) ^ 2
 
 
 stepMouse : StartPosition -> EndPosition -> EndPosition
