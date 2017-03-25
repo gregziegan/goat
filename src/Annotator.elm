@@ -56,12 +56,6 @@ type EllipseMode
     | DrawingCircle StartPosition
 
 
-type TextMode
-    = DrawingTextBox StartPosition
-    | EditingText TextBox
-    | RotatingText TextBox
-
-
 type LineMode
     = DrawingLine StartPosition
     | DrawingDiscreteLine StartPosition
@@ -72,7 +66,7 @@ type Drawing
     | DrawRect RectMode
     | DrawRoundedRect RoundedRectMode
     | DrawEllipse EllipseMode
-    | DrawTextBox TextMode
+    | DrawTextBox StartPosition
     | DrawLine LineMode
     | DrawSpotlightRect RoundedRectMode
 
@@ -203,6 +197,7 @@ type MovementState
     | OutsideSelectedAnnotation
     | MovingAnnotation Int Annotation StartPosition
     | ResizingAnnotation Int Annotation StartPosition Vertex
+    | EditingATextBox Int Annotation
 
 
 type alias Model =
@@ -352,16 +347,15 @@ type Msg
     | StartEllipse StartPosition
     | AddEllipse StartPosition EndPosition
     | StartTextBox StartPosition
-    | PlaceTextBox StartPosition EndPosition
-    | TextBoxInput TextBox String
-    | BeginRotatingTextBox Float TextBox
-    | FinishRotatingTextBox TextBox Float
-    | AddTextBox TextBox
+    | AddTextBox StartPosition EndPosition
+    | SwitchToEditingText Int Annotation
+    | SetText Int TextBox String
+    | FinishTextEditing
     | StartLine StartPosition
     | AddLine StartPosition EndPosition
     | StartSpotlightRect StartPosition
     | AddSpotlightRect StartPosition EndPosition
-    | SetMouse Image Mouse.Position
+    | ResizeDrawing Image Mouse.Position
     | SetImages (List Image)
     | KeyboardMsg Keyboard.Msg
     | SelectImage Image
@@ -449,46 +443,37 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     |> startAnnotation pos editMode images model
                     => []
 
-            PlaceTextBox startPos endPos ->
+            AddTextBox start end ->
                 let
-                    initialEditState =
-                        TextBox startPos endPos "" strokeColor stroke fontSize 0
+                    initialTextBox =
+                        TextBox_ <| TextBox start end "" strokeColor stroke fontSize 0
 
                     tryToEdit result =
                         case result of
                             Ok _ ->
-                                TextBoxInput initialEditState ""
+                                SwitchToEditingText (Array.length editState.annotations) initialTextBox
 
                             Err _ ->
                                 Undo
                 in
-                    { editState | drawing = Just <| DrawTextBox <| EditingText initialEditState }
-                        |> skipChange model
+                    editState
+                        |> addAnnotation initialTextBox model
                         => [ Dom.focus "text-box-edit"
                                 |> Task.attempt tryToEdit
                            ]
 
-            TextBoxInput { start, end, angle } text ->
-                editState
-                    |> changeDrawing (DrawTextBox <| EditingText <| TextBox start end text strokeColor stroke fontSize angle)
+            SwitchToEditingText index annotation ->
+                { model | movementState = EditingATextBox index annotation }
+                    => []
+
+            SetText index textBox newText ->
+                { editState | annotations = Array.set index ( TextBox_ { textBox | text = newText }, True ) editState.annotations }
                     |> skipChange model
                     => []
 
-            BeginRotatingTextBox angle { start, end, text } ->
-                editState
-                    |> changeDrawing (DrawTextBox <| RotatingText <| TextBox start end text strokeColor stroke fontSize angle)
-                    |> skipChange model
-                    => []
-
-            FinishRotatingTextBox { start, end, text } angle ->
-                editState
-                    |> changeDrawing (DrawTextBox <| EditingText <| TextBox start end text strokeColor stroke fontSize angle)
-                    |> skipChange model
-                    => []
-
-            AddTextBox { start, end, text, angle } ->
-                editState
-                    |> addAnnotation (TextBox_ <| TextBox start end text strokeColor stroke fontSize angle) model
+            FinishTextEditing ->
+                model
+                    |> hoverOverAnnotation
                     => []
 
             StartLine pos ->
@@ -511,9 +496,8 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     |> addAnnotation (Rect_ <| Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True) model
                     => []
 
-            SetMouse { width, height } pos ->
+            ResizeDrawing { width, height } pos ->
                 editState
-                    |> updateDrawingIfRotating pos
                     |> skipChange model
                     |> setMouse pos
                     => []
@@ -787,7 +771,7 @@ drawingFromEditMode startPos editMode keyboardState =
                         DrawingLine startPos
 
             EditTextBox ->
-                DrawTextBox <| DrawingTextBox startPos
+                DrawTextBox startPos
 
             EditSpotlightRect ->
                 DrawSpotlightRect <| roundedRectDrawing shiftPressed startPos
@@ -992,27 +976,6 @@ setMouse mouse model =
 updateDrawing : EditState -> Drawing -> EditState
 updateDrawing editState drawing =
     { editState | drawing = Just drawing }
-
-
-updateRotatingDrawing : Position -> Drawing -> Drawing
-updateRotatingDrawing position drawing =
-    case drawing of
-        DrawTextBox textMode ->
-            case textMode of
-                RotatingText textBox ->
-                    DrawTextBox <| RotatingText { textBox | angle = arrowAngle textBox.start position }
-
-                _ ->
-                    drawing
-
-        _ ->
-            drawing
-
-
-updateDrawingIfRotating : Position -> EditState -> EditState
-updateDrawingIfRotating position editState =
-    Maybe.map (updateDrawing editState << updateRotatingDrawing position) editState.drawing
-        |> Maybe.withDefault editState
 
 
 transitionOnShift : Drawing -> Drawing
@@ -1638,20 +1601,8 @@ drawingEvents drawing curMouse =
                 DrawingCircle startPos ->
                     onMouseUpOrLeave <| Json.map (AddEllipse startPos << equalXandY startPos << toDrawingPosition) Mouse.position
 
-        DrawTextBox textBoxDrawing ->
-            case textBoxDrawing of
-                DrawingTextBox start ->
-                    onMouseUpOrLeave (Json.map (PlaceTextBox start << toDrawingPosition) Mouse.position)
-
-                EditingText ({ start, end, text, angle } as textBox) ->
-                    [ if text == "" then
-                        onClick Undo
-                      else
-                        onClick <| AddTextBox textBox
-                    ]
-
-                RotatingText ({ start } as textBox) ->
-                    onMouseUpOrLeave <| Json.map (FinishRotatingTextBox textBox << arrowAngle start << toDrawingPosition) Mouse.position
+        DrawTextBox start ->
+            onMouseUpOrLeave (Json.map (AddTextBox start << toDrawingPosition) Mouse.position)
 
         DrawLine lineDrawing ->
             case lineDrawing of
@@ -1713,6 +1664,9 @@ viewCanvas model image =
                         [ Html.Events.onMouseLeave ResetToReadyToDraw
                         , SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
                         ]
+
+                    EditingATextBox _ _ ->
+                        []
 
         toDrawing =
             case editState.drawing of
@@ -1870,7 +1824,13 @@ movementStateEvents index annotation movementState =
             , SE.onMouseOut LeaveAnnotation
             ]
 
-        _ ->
+        HoveringOverVertex ->
+            []
+
+        ResizingAnnotation _ _ _ _ ->
+            []
+
+        EditingATextBox _ _ ->
             []
 
 
@@ -1897,7 +1857,7 @@ viewAnnotation width height movementState index ( annotation, showVertices ) =
                 viewLine movementEvents toVertexEvents line showVertices
 
             TextBox_ textBox ->
-                viewTextBox movementEvents toVertexEvents False textBox showVertices
+                viewTextBox movementEvents toVertexEvents movementState index textBox showVertices
 
 
 movementStateVertexEvents : Int -> Annotation -> MovementState -> Vertex -> List (Svg.Attribute Msg)
@@ -2004,19 +1964,9 @@ viewDrawingHelper width height drawing { fill, strokeColor, stroke, strokeStyle,
                     Ellipse pos (equalXandY pos mouse) fill strokeColor stroke strokeStyle
                         |> viewEllipseDrawing
 
-        DrawTextBox textBoxDrawing ->
-            case textBoxDrawing of
-                DrawingTextBox pos ->
-                    TextBox pos mouse "" strokeColor stroke fontSize 0
-                        |> viewTextBoxWithBorder
-
-                EditingText { start, end, text, angle } ->
-                    viewTextBox [] (always []) True (TextBox start end text strokeColor stroke fontSize angle) False
-                        |> Svg.g []
-
-                RotatingText { start, end, text, angle } ->
-                    viewTextBox [] (always []) True (TextBox start end text strokeColor stroke fontSize angle) False
-                        |> Svg.g []
+        DrawTextBox startPos ->
+            TextBox startPos mouse "" strokeColor stroke fontSize 0
+                |> viewTextBoxWithBorder
 
         DrawLine lineMode ->
             case lineMode of
@@ -2222,24 +2172,37 @@ viewText ({ start, end, text, fill, fontSize, angle } as textBox) =
         [ Svg.text text ]
 
 
-viewTextBox : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Bool -> TextBox -> Bool -> List (Svg Msg)
-viewTextBox attrs toVertexEvents editing ({ start, end, text, fill, fontSize, angle } as textBox) showVertices =
-    if editing then
-        viewRect attrs toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) showVertices
-            ++ [ foreignObject
-                    []
-                    [ Html.input
-                        [ Html.id "text-box-edit"
-                        , Html.class "text-box--edit"
-                        , onInput <| TextBoxInput textBox
-                        , Html.value text
-                        , Html.style [ "top" => toString start.y ++ "px", "left" => toString start.x ++ "px" ]
-                        ]
-                        []
-                    ]
-               ]
-    else
-        [ viewText textBox ]
+viewTextBox : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> MovementState -> Int -> TextBox -> Bool -> List (Svg Msg)
+viewTextBox attrs toVertexEvents movementState index textBox showVertices =
+    case movementState of
+        EditingATextBox editIndex _ ->
+            viewInputBox index textBox True :: viewRect attrs toVertexEvents (Rect textBox.start textBox.end EmptyFill Color.black Thin Solid False) showVertices
+
+        _ ->
+            if showVertices then
+                [ viewText textBox, viewInputBox index textBox False ] ++ viewRect attrs toVertexEvents (Rect textBox.start textBox.end EmptyFill Color.black Thin Solid False) showVertices
+            else
+                [ viewText textBox, viewInputBox index textBox False ]
+
+
+viewInputBox : Int -> TextBox -> Bool -> Svg Msg
+viewInputBox index ({ start, end, text, fill, fontSize, angle } as textBox) visible =
+    let
+        options =
+            { preventDefault = True, stopPropagation = False }
+    in
+        foreignObject
+            []
+            [ Html.input
+                [ Html.id "text-box-edit"
+                , Html.classList [ "text-box" => True, "text-box--edit" => visible ]
+                , onInput <| SetText index textBox
+                , onWithOptions "keydown" options (decodeTextInputKey <| FinishTextEditing)
+                , Html.value text
+                , Html.style [ "top" => toString start.y ++ "px", "left" => toString start.x ++ "px" ]
+                ]
+                []
+            ]
 
 
 viewTextBoxWithBorder : TextBox -> Svg Msg
@@ -2517,36 +2480,6 @@ arrowAngle a b =
         radians
 
 
-trackMouse : Drawing -> Bool
-trackMouse drawing =
-    case drawing of
-        DrawArrow arrowMode ->
-            True
-
-        DrawRoundedRect rectMode ->
-            True
-
-        DrawRect rectMode ->
-            True
-
-        DrawEllipse ellipseMode ->
-            True
-
-        DrawTextBox textMode ->
-            case textMode of
-                EditingText _ ->
-                    False
-
-                _ ->
-                    True
-
-        DrawLine lineMode ->
-            True
-
-        DrawSpotlightRect roundedRectMode ->
-            True
-
-
 toDeltas : Float -> Float -> Position
 toDeltas h theta =
     Position (round (cos theta * h)) (round (sin theta * h))
@@ -2651,6 +2584,9 @@ movementStateToCursor movementState =
         ResizingAnnotation _ _ _ vertex ->
             "nesw-resize"
 
+        EditingATextBox _ _ ->
+            "crosshair"
+
 
 
 -- PORTS
@@ -2674,8 +2610,8 @@ subscriptions model =
                 Sub.none
 
             Just images ->
-                if Maybe.withDefault False <| Maybe.map trackMouse model.edits.present.drawing then
-                    Mouse.moves (SetMouse (List.Zipper.current images) << toDrawingPosition)
+                if model.edits.present.drawing /= Nothing then
+                    Mouse.moves (ResizeDrawing (List.Zipper.current images) << toDrawingPosition)
                 else
                     case model.movementState of
                         ResizingAnnotation index annotation startPos vertex ->
@@ -2684,9 +2620,11 @@ subscriptions model =
                         MovingAnnotation index annotation startPos ->
                             Mouse.moves (MoveAnnotation index annotation startPos << toDrawingPosition)
 
-                        _ ->
+                        EditingATextBox _ _ ->
                             Sub.none
-        , Sub.map KeyboardMsg Keyboard.subscriptions
+
+                        _ ->
+                            Sub.map KeyboardMsg Keyboard.subscriptions
         , setImages SetImages
         ]
 
