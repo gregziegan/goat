@@ -61,10 +61,6 @@
   background-color: rgb(67, 187, 184);
 }
 
-.hidden-input {
-  opacity: 0;
-}
-
 .edit-mode--selected {
   background-color: rgb(67, 187, 184);
   color: white;
@@ -148,6 +144,7 @@
 .text-box {
   position: absolute;
   opacity: 0;
+  background-color: transparent;
 }
 
 .text-box--edit {

@@ -1,12 +1,12 @@
 port module Annotator exposing (..)
 
 import Array exposing (Array)
-import Char exposing (KeyCode)
+import AutoExpand
 import Color exposing (Color)
 import Color.Convert
 import Dom
 import Html exposing (Attribute, Html, button, div, p, text)
-import Html.Attributes as Html exposing (class, classList, disabled, height, id, src, start, style, type_, width)
+import Html.Attributes as Html exposing (class, classList, disabled, height, id, readonly, src, start, style, type_, width)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onMouseEnter, onMouseLeave, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange(..), isPressed)
@@ -117,6 +117,7 @@ type alias TextBox =
     , stroke : LineStroke
     , fontSize : Float
     , angle : Float
+    , autoexpand : AutoExpand.State
     }
 
 
@@ -338,49 +339,62 @@ init flags =
 
 
 type Msg
-    = StartRect StartPosition
+    = -- Line Updates
+      StartLine StartPosition
+    | AddLine StartPosition EndPosition
+    | StartArrow StartPosition
+    | AddArrow StartPosition EndPosition
+      -- Shape Updates
+    | StartRect StartPosition
     | AddRect StartPosition EndPosition
     | StartRoundedRect StartPosition
     | AddRoundedRect StartPosition EndPosition
-    | StartArrow StartPosition
-    | AddArrow StartPosition EndPosition
     | StartEllipse StartPosition
     | AddEllipse StartPosition EndPosition
+      -- TextBox Updates
     | StartTextBox StartPosition
     | AddTextBox StartPosition EndPosition
     | SwitchToEditingText Int Annotation
     | SetText Int TextBox String
     | FinishTextEditing
-    | StartLine StartPosition
-    | AddLine StartPosition EndPosition
+    | AutoExpandInput Int { textValue : String, state : AutoExpand.State }
+      -- Spotlight Updates
     | StartSpotlightRect StartPosition
     | AddSpotlightRect StartPosition EndPosition
-    | ResizeDrawing Image Mouse.Position
-    | SetImages (List Image)
-    | KeyboardMsg Keyboard.Msg
-    | SelectImage Image
     | ChangeEditMode EditMode
+      -- Annotation Attribute updates
     | SelectFill Fill
     | SelectStrokeColor Color
     | SelectLineStroke LineStroke
     | SelectStrokeStyle StrokeStyle
     | SelectFontSize Float
+      -- Control UI updates
     | ToggleDropdown EditOption
     | CloseDropdown
+      -- Selection Updates
     | HoverOverAnnotation
     | LeaveAnnotation
     | ShowResizeIcon
     | ResetToReadyToDraw
     | SelectAnnotation Int Annotation StartPosition
+      -- Move updates
     | StartMovingAnnotation Int Annotation StartPosition
     | MoveAnnotation Int Annotation StartPosition EndPosition
+      -- Resize updates
+    | ResizeDrawing Image Mouse.Position
     | FinishMovingAnnotation Int Annotation StartPosition EndPosition
     | StartResizingAnnotation Int Annotation Vertex StartPosition
     | ResizeAnnotation Int Annotation Vertex StartPosition EndPosition
     | FinishResizingAnnotation Int Annotation Vertex StartPosition EndPosition
+      -- History updates
     | Undo
     | Redo
     | Export
+      -- Image Selection updates
+    | SelectImage Image
+    | SetImages (List Image)
+      -- Keyboard updates
+    | KeyboardMsg Keyboard.Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
@@ -445,8 +459,11 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
             AddTextBox start end ->
                 let
+                    numAnnotations =
+                        Array.length editState.annotations
+
                     initialTextBox =
-                        TextBox_ <| TextBox start end "" strokeColor stroke fontSize 0
+                        TextBox_ <| TextBox start end "Text" strokeColor stroke fontSize 0 (AutoExpand.initState (config numAnnotations fontSize))
 
                     tryToEdit result =
                         case result of
@@ -474,6 +491,17 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
             FinishTextEditing ->
                 model
                     |> hoverOverAnnotation
+                    => []
+
+            AutoExpandInput index { state, textValue } ->
+                { editState
+                    | annotations =
+                        editState.annotations
+                            |> Array.get index
+                            |> Maybe.map (\ann -> Array.set index (autoExpandAnnotation state textValue ann) editState.annotations)
+                            |> Maybe.withDefault editState.annotations
+                }
+                    |> skipChange model
                     => []
 
             StartLine pos ->
@@ -722,6 +750,16 @@ startDrawing model =
 changeDrawing : Drawing -> EditState -> EditState
 changeDrawing drawing editState =
     { editState | drawing = Just drawing }
+
+
+autoExpandAnnotation : AutoExpand.State -> String -> ( Annotation, Bool ) -> ( Annotation, Bool )
+autoExpandAnnotation state textValue ( annotation, showVertices ) =
+    case annotation of
+        TextBox_ textBox ->
+            ( TextBox_ { textBox | autoexpand = state, text = textValue }, False )
+
+        _ ->
+            ( annotation, showVertices )
 
 
 roundedRectDrawing : Bool -> StartPosition -> RoundedRectMode
@@ -1666,7 +1704,7 @@ viewCanvas model image =
                         ]
 
                     EditingATextBox _ _ ->
-                        []
+                        [ onClick FinishTextEditing ]
 
         toDrawing =
             case editState.drawing of
@@ -1965,7 +2003,7 @@ viewDrawingHelper width height drawing { fill, strokeColor, stroke, strokeStyle,
                         |> viewEllipseDrawing
 
         DrawTextBox startPos ->
-            TextBox startPos mouse "" strokeColor stroke fontSize 0
+            TextBox startPos mouse "" strokeColor stroke fontSize 0 (AutoExpand.initState (config 0 fontSize))
                 |> viewTextBoxWithBorder
 
         DrawLine lineMode ->
@@ -2161,55 +2199,65 @@ ellipseAttributes { start, end, fill, strokeColor, stroke, strokeStyle } =
         ++ fillStyle fill
 
 
-viewText : TextBox -> Svg Msg
-viewText ({ start, end, text, fill, fontSize, angle } as textBox) =
-    text_
-        [ x <| toString <| start.x
-        , y <| toString <| start.y
-        , Attr.fontSize <| toString fontSize
-        , Attr.stroke <| toString fill
-        ]
-        [ Svg.text text ]
-
-
 viewTextBox : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> MovementState -> Int -> TextBox -> Bool -> List (Svg Msg)
 viewTextBox attrs toVertexEvents movementState index textBox showVertices =
-    case movementState of
-        EditingATextBox editIndex _ ->
-            viewInputBox index textBox True :: viewRect attrs toVertexEvents (Rect textBox.start textBox.end EmptyFill Color.black Thin Solid False) showVertices
-
-        _ ->
-            if showVertices then
-                [ viewText textBox, viewInputBox index textBox False ] ++ viewRect attrs toVertexEvents (Rect textBox.start textBox.end EmptyFill Color.black Thin Solid False) showVertices
-            else
-                [ viewText textBox, viewInputBox index textBox False ]
-
-
-viewInputBox : Int -> TextBox -> Bool -> Svg Msg
-viewInputBox index ({ start, end, text, fill, fontSize, angle } as textBox) visible =
     let
-        options =
-            { preventDefault = True, stopPropagation = False }
+        toInputBox =
+            viewInputBox index textBox
+
+        ( isReadonly, editStateEvents ) =
+            case movementState of
+                EditingATextBox editIndex _ ->
+                    ( False, [] )
+
+                _ ->
+                    ( True, [ Html.Events.onDoubleClick <| SwitchToEditingText index (TextBox_ textBox) ] )
     in
-        foreignObject
-            []
+        if showVertices then
+            [ toInputBox isReadonly editStateEvents ] ++ viewRect attrs toVertexEvents (Rect textBox.start textBox.end EmptyFill Color.black Thin Solid False) showVertices
+        else
+            [ toInputBox isReadonly editStateEvents ]
+
+
+viewInputBox : Int -> TextBox -> Bool -> List (Html.Attribute Msg) -> Svg Msg
+viewInputBox index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) isReadonly attrs =
+    foreignObject
+        []
+        [ div
+            ([ Html.class "text-box-container"
+             , Html.style
+                [ "top" => toPx start.y
+                , "left" => toPx start.x
+                , "width" => toPx (abs (end.x - start.x))
+                , "font-size" => toPx fontSize
+                , "position" => "absolute"
+                , "border"
+                    => if isReadonly then
+                        "none"
+                       else
+                        "1px solid #dedede"
+                ]
+             , readonly isReadonly
+             , Html.attribute "onclick" "event.stopPropagation();"
+             ]
+                ++ attrs
+            )
             [ Html.input
                 [ Html.id "text-box-edit"
-                , Html.classList [ "text-box" => True, "text-box--edit" => visible ]
-                , onInput <| SetText index textBox
-                , onWithOptions "keydown" options (decodeTextInputKey <| FinishTextEditing)
-                , Html.value text
-                , Html.style [ "top" => toString start.y ++ "px", "left" => toString start.x ++ "px" ]
+                , Html.class "text-box-input"
+                , Html.style [ "position" => "absolute", "opacity" => "0", "z-index" => "-1" ]
+                , Html.attribute "onfocus" "this.nextSibling.focus();"
                 ]
                 []
+            , AutoExpand.view (config index fontSize) autoexpand text
             ]
+        ]
 
 
 viewTextBoxWithBorder : TextBox -> Svg Msg
 viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
     Svg.g []
         [ viewRectDrawing (Rect start end EmptyFill Color.black Thin Solid False)
-        , viewText textBox
         ]
 
 
@@ -2439,30 +2487,9 @@ onMouseUpOrLeave decodeToMsg =
     [ on "mouseleave" decodeToMsg, onMouseUp decodeToMsg ]
 
 
-handleTextBoxInputKey : Msg -> KeyCode -> Result String Msg
-handleTextBoxInputKey submitMsg code =
-    if code == 13 then
-        Ok submitMsg
-    else if code == 27 then
-        Ok Undo
-    else
-        Err "not handling that key"
-
-
-fromKeyResult : Result String Msg -> Json.Decoder Msg
-fromKeyResult result =
-    case result of
-        Ok msg ->
-            Json.succeed msg
-
-        Err errMsg ->
-            Json.fail errMsg
-
-
-decodeTextInputKey : Msg -> Json.Decoder Msg
-decodeTextInputKey submitMsg =
-    Json.map (handleTextBoxInputKey submitMsg) keyCode
-        |> Json.andThen fromKeyResult
+toPx : number -> String
+toPx number =
+    toString number ++ "px"
 
 
 arrowAngle : StartPosition -> EndPosition -> Float
@@ -2586,6 +2613,29 @@ movementStateToCursor movementState =
 
         EditingATextBox _ _ ->
             "crosshair"
+
+
+
+-- Configuration
+
+
+config : Int -> Float -> AutoExpand.Config Msg
+config index fontSize =
+    AutoExpand.config
+        { onInput = AutoExpandInput index
+        , padding = 2
+        , lineHeight = fontSize
+        , minRows = 1
+        , maxRows = 4
+        , styles =
+            [ "background-color" => "transparent"
+            , "resize" => "none"
+            , "border" => "none"
+            , "outline" => "none"
+            , "z-index" => "1000"
+            , "font-size" => toPx fontSize
+            ]
+        }
 
 
 
