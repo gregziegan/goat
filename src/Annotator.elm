@@ -565,7 +565,10 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     => []
 
             SelectFill fill ->
-                { model | fill = fill }
+                editState
+                    |> updateAnySelectedAnnotations (updateFill fill)
+                    |> logChange model
+                    |> setFill fill
                     |> closeDropdown
                     => []
 
@@ -587,7 +590,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
             SelectFontSize fontSize ->
                 editState
                     |> updateSelectedAnnotations (updateFontSize fontSize)
-                    |> skipChange model
+                    |> logChange model
                     |> setFontSize fontSize
                     |> closeDropdown
                     => []
@@ -836,6 +839,19 @@ updateSelectedAnnotations fn editState =
     { editState | annotations = Array.map (updateSelectedAnnotation fn) editState.annotations }
 
 
+updateAnySelectedAnnotations : (Annotation -> Annotation) -> EditState -> EditState
+updateAnySelectedAnnotations fn editState =
+    { editState | annotations = Array.map (updateAnySelectedAnnotation fn) editState.annotations }
+
+
+updateAnySelectedAnnotation : (Annotation -> Annotation) -> ( Annotation, SelectState ) -> ( Annotation, SelectState )
+updateAnySelectedAnnotation fn ( annotation, selectState ) =
+    if isSelected selectState then
+        ( fn annotation, selectState )
+    else
+        ( annotation, selectState )
+
+
 updateSelectedAnnotation : (Annotation -> Annotation) -> ( Annotation, SelectState ) -> ( Annotation, SelectState )
 updateSelectedAnnotation updateAnno ( annotation, selectState ) =
     case selectState of
@@ -844,6 +860,25 @@ updateSelectedAnnotation updateAnno ( annotation, selectState ) =
 
         _ ->
             ( annotation, selectState )
+
+
+updateFill : Fill -> Annotation -> Annotation
+updateFill fill annotation =
+    case annotation of
+        Arrow_ _ ->
+            annotation
+
+        Rect_ rect ->
+            Rect_ { rect | fill = fill }
+
+        Ellipse_ ellipse ->
+            Ellipse_ { ellipse | fill = fill }
+
+        TextBox_ textBox ->
+            annotation
+
+        Line_ _ ->
+            annotation
 
 
 updateFontSize : Float -> Annotation -> Annotation
@@ -871,6 +906,11 @@ updateLastDrawOption editMode model =
 verticesAreShown : Model -> Model
 verticesAreShown model =
     { model | movementState = HoveringOverSelectedAnnotation }
+
+
+setFill : Fill -> Model -> Model
+setFill fill model =
+    { model | fill = fill }
 
 
 setFontSize : Float -> Model -> Model
