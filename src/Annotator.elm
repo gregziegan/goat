@@ -573,7 +573,10 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     => []
 
             SelectStrokeColor strokeColor ->
-                { model | strokeColor = strokeColor }
+                editState
+                    |> updateAnySelectedAnnotations (updateStrokeColor strokeColor)
+                    |> logChange model
+                    |> setStrokeColor strokeColor
                     |> closeDropdown
                     => []
 
@@ -862,6 +865,25 @@ updateSelectedAnnotation updateAnno ( annotation, selectState ) =
             ( annotation, selectState )
 
 
+updateStrokeColor : Color -> Annotation -> Annotation
+updateStrokeColor strokeColor annotation =
+    case annotation of
+        Arrow_ line ->
+            Arrow_ { line | fill = strokeColor }
+
+        Rect_ rect ->
+            Rect_ { rect | strokeColor = strokeColor }
+
+        Ellipse_ ellipse ->
+            Ellipse_ { ellipse | strokeColor = strokeColor }
+
+        TextBox_ textBox ->
+            TextBox_ { textBox | fill = strokeColor }
+
+        Line_ line ->
+            Line_ { line | fill = strokeColor }
+
+
 updateFill : Fill -> Annotation -> Annotation
 updateFill fill annotation =
     case annotation of
@@ -916,6 +938,11 @@ setFill fill model =
 setFontSize : Float -> Model -> Model
 setFontSize fontSize model =
     { model | fontSize = fontSize }
+
+
+setStrokeColor : Color -> Model -> Model
+setStrokeColor strokeColor model =
+    { model | strokeColor = strokeColor }
 
 
 showVertices : Int -> Annotation -> EditState -> EditState
@@ -2307,6 +2334,7 @@ viewInputBox index ({ start, end, text, fill, fontSize, angle, autoexpand } as t
                         "none"
                        else
                         "1px solid #dedede"
+                , "color" => Color.Convert.colorToHex fill
                 ]
              , readonly isReadonly
              , Html.attribute "onclick" "event.stopPropagation();"
@@ -2705,6 +2733,7 @@ config index fontSize =
             , "outline" => "none"
             , "z-index" => "1000"
             , "font-size" => toPx fontSize
+            , "color" => "currentColor"
             ]
         }
 
