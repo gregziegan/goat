@@ -581,12 +581,18 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     => []
 
             SelectLineStroke lineStroke ->
-                { model | stroke = lineStroke }
+                editState
+                    |> updateAnySelectedAnnotations (updateLineStroke lineStroke)
+                    |> logChange model
+                    |> setLineStroke lineStroke
                     |> closeDropdown
                     => []
 
             SelectStrokeStyle strokeStyle ->
-                { model | strokeStyle = strokeStyle }
+                editState
+                    |> updateAnySelectedAnnotations (updateStrokeStyle strokeStyle)
+                    |> logChange model
+                    |> setStrokeStyle strokeStyle
                     |> closeDropdown
                     => []
 
@@ -903,6 +909,44 @@ updateFill fill annotation =
             annotation
 
 
+updateLineStroke : LineStroke -> Annotation -> Annotation
+updateLineStroke lineStroke annotation =
+    case annotation of
+        Arrow_ line ->
+            Arrow_ { line | stroke = lineStroke }
+
+        Rect_ rect ->
+            Rect_ { rect | stroke = lineStroke }
+
+        Ellipse_ ellipse ->
+            Ellipse_ { ellipse | stroke = lineStroke }
+
+        TextBox_ textBox ->
+            annotation
+
+        Line_ line ->
+            Line_ { line | stroke = lineStroke }
+
+
+updateStrokeStyle : StrokeStyle -> Annotation -> Annotation
+updateStrokeStyle strokeStyle annotation =
+    case annotation of
+        Arrow_ line ->
+            Arrow_ { line | strokeStyle = strokeStyle }
+
+        Rect_ rect ->
+            Rect_ { rect | strokeStyle = strokeStyle }
+
+        Ellipse_ ellipse ->
+            Ellipse_ { ellipse | strokeStyle = strokeStyle }
+
+        TextBox_ textBox ->
+            annotation
+
+        Line_ line ->
+            Line_ { line | strokeStyle = strokeStyle }
+
+
 updateFontSize : Float -> Annotation -> Annotation
 updateFontSize fontSize annotation =
     case annotation of
@@ -938,6 +982,16 @@ setFill fill model =
 setFontSize : Float -> Model -> Model
 setFontSize fontSize model =
     { model | fontSize = fontSize }
+
+
+setLineStroke : LineStroke -> Model -> Model
+setLineStroke lineStroke model =
+    { model | stroke = lineStroke }
+
+
+setStrokeStyle : StrokeStyle -> Model -> Model
+setStrokeStyle strokeStyle model =
+    { model | strokeStyle = strokeStyle }
 
 
 setStrokeColor : Color -> Model -> Model
@@ -2380,6 +2434,7 @@ lineAttributes { start, end, fill, stroke, strokeStyle } =
     , Attr.fill "none"
     , Attr.stroke <| Color.Convert.colorToHex fill
     , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+    , toLineStyle strokeStyle
       -- , Attr.filter "url(#dropShadow)"
     ]
 
