@@ -172,9 +172,15 @@ type Annotation
 
 
 type alias EditState =
-    { annotations : Array ( Annotation, Bool )
+    { annotations : Array ( Annotation, SelectState )
     , drawing : Maybe Drawing
     }
+
+
+type SelectState
+    = Selected
+    | NotSelected
+    | SelectedWithVertices
 
 
 type Vertex
@@ -419,7 +425,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
             AddRect start end ->
                 editState
-                    |> addAnnotation (Rect_ <| Rect start end fill strokeColor stroke strokeStyle False) model
+                    |> addAnnotation ( (Rect_ <| Rect start end fill strokeColor stroke strokeStyle False), NotSelected ) model
                     => []
 
             StartRoundedRect pos ->
@@ -429,7 +435,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
             AddRoundedRect start end ->
                 editState
-                    |> addAnnotation (Rect_ <| Rect start end fill strokeColor stroke strokeStyle True) model
+                    |> addAnnotation ( (Rect_ <| Rect start end fill strokeColor stroke strokeStyle True), NotSelected ) model
                     => []
 
             StartArrow pos ->
@@ -439,7 +445,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
             AddArrow startPos endPos ->
                 editState
-                    |> addAnnotation (Arrow_ <| Line startPos endPos strokeColor stroke strokeStyle) model
+                    |> addAnnotation ( (Arrow_ <| Line startPos endPos strokeColor stroke strokeStyle), NotSelected ) model
                     => []
 
             StartEllipse pos ->
@@ -449,7 +455,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
             AddEllipse startPos endPos ->
                 editState
-                    |> addAnnotation (Ellipse_ <| Ellipse startPos endPos fill strokeColor stroke strokeStyle) model
+                    |> addAnnotation ( (Ellipse_ <| Ellipse startPos endPos fill strokeColor stroke strokeStyle), NotSelected ) model
                     => []
 
             StartTextBox pos ->
@@ -474,7 +480,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                                 Undo
                 in
                     editState
-                        |> addAnnotation initialTextBox model
+                        |> addAnnotation ( initialTextBox, Selected ) model
                         => [ Dom.focus "text-box-edit"
                                 |> Task.attempt tryToEdit
                            ]
@@ -484,7 +490,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     => []
 
             SetText index textBox newText ->
-                { editState | annotations = Array.set index ( TextBox_ { textBox | text = newText }, True ) editState.annotations }
+                { editState | annotations = Array.set index ( TextBox_ { textBox | text = newText }, Selected ) editState.annotations }
                     |> skipChange model
                     => []
 
@@ -511,7 +517,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
             AddLine startPos endPos ->
                 editState
-                    |> addAnnotation (Line_ <| Line startPos endPos strokeColor stroke strokeStyle) model
+                    |> addAnnotation ( (Line_ <| Line startPos endPos strokeColor stroke strokeStyle), NotSelected ) model
                     => []
 
             StartSpotlightRect pos ->
@@ -521,7 +527,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
             AddSpotlightRect startPos endPos ->
                 editState
-                    |> addAnnotation (Rect_ <| Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True) model
+                    |> addAnnotation ( (Rect_ <| Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True), NotSelected ) model
                     => []
 
             ResizeDrawing { width, height } pos ->
@@ -579,15 +585,15 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     => []
 
             SelectFontSize fontSize ->
-                { model | fontSize = fontSize }
+                editState
+                    |> updateSelectedAnnotations (updateFontSize fontSize)
+                    |> skipChange model
+                    |> setFontSize fontSize
                     |> closeDropdown
                     => []
 
             ToggleDropdown editOption ->
-                { editState
-                    | drawing = updateDrawingWithFontSize editOption editState
-                }
-                    |> skipChange model
+                model
                     |> toggleDropdown editOption
                     => []
 
@@ -752,14 +758,14 @@ changeDrawing drawing editState =
     { editState | drawing = Just drawing }
 
 
-autoExpandAnnotation : AutoExpand.State -> String -> ( Annotation, Bool ) -> ( Annotation, Bool )
-autoExpandAnnotation state textValue ( annotation, showVertices ) =
+autoExpandAnnotation : AutoExpand.State -> String -> ( Annotation, SelectState ) -> ( Annotation, SelectState )
+autoExpandAnnotation state textValue ( annotation, selection ) =
     case annotation of
         TextBox_ textBox ->
-            ( TextBox_ { textBox | autoexpand = state, text = textValue }, False )
+            ( TextBox_ { textBox | autoexpand = state, text = textValue }, Selected )
 
         _ ->
-            ( annotation, showVertices )
+            ( annotation, selection )
 
 
 roundedRectDrawing : Bool -> StartPosition -> RoundedRectMode
@@ -815,32 +821,39 @@ drawingFromEditMode startPos editMode keyboardState =
                 DrawSpotlightRect <| roundedRectDrawing shiftPressed startPos
 
 
-addAnnotation : Annotation -> Model -> EditState -> Model
+addAnnotation : ( Annotation, SelectState ) -> Model -> EditState -> Model
 addAnnotation annotation model editState =
     { editState
-        | annotations = Array.push ( annotation, False ) editState.annotations
+        | annotations = Array.push annotation editState.annotations
         , drawing = Nothing
     }
         |> skipChange model
         |> hoverOverAnnotation
 
 
-updateTextBoxWithNewFontSize : Drawing -> Drawing
-updateTextBoxWithNewFontSize drawing =
-    case drawing of
-        DrawTextBox textMode ->
-            DrawTextBox textMode
+updateSelectedAnnotations : (Annotation -> Annotation) -> EditState -> EditState
+updateSelectedAnnotations fn editState =
+    { editState | annotations = Array.map (updateSelectedAnnotation fn) editState.annotations }
+
+
+updateSelectedAnnotation : (Annotation -> Annotation) -> ( Annotation, SelectState ) -> ( Annotation, SelectState )
+updateSelectedAnnotation updateAnno ( annotation, selectState ) =
+    case selectState of
+        Selected ->
+            ( updateAnno annotation, selectState )
 
         _ ->
-            drawing
+            ( annotation, selectState )
 
 
-updateDrawingWithFontSize : EditOption -> EditState -> Maybe Drawing
-updateDrawingWithFontSize editOption editState =
-    if editOption == Fonts then
-        Maybe.map updateTextBoxWithNewFontSize editState.drawing
-    else
-        editState.drawing
+updateFontSize : Float -> Annotation -> Annotation
+updateFontSize fontSize annotation =
+    case annotation of
+        TextBox_ textBox ->
+            TextBox_ { textBox | fontSize = fontSize }
+
+        _ ->
+            annotation
 
 
 updateLastDrawOption : EditMode -> Model -> Model
@@ -860,19 +873,24 @@ verticesAreShown model =
     { model | movementState = HoveringOverSelectedAnnotation }
 
 
+setFontSize : Float -> Model -> Model
+setFontSize fontSize model =
+    { model | fontSize = fontSize }
+
+
 showVertices : Int -> Annotation -> EditState -> EditState
 showVertices index annotation editState =
-    { editState | annotations = Array.set index ( annotation, True ) editState.annotations }
+    { editState | annotations = Array.set index ( annotation, SelectedWithVertices ) editState.annotations }
 
 
 removeAllVertices : EditState -> EditState
 removeAllVertices editState =
-    { editState | annotations = Array.map (Tuple.mapSecond (always False)) editState.annotations }
+    { editState | annotations = Array.map (Tuple.mapSecond (always NotSelected)) editState.annotations }
 
 
-removeVertices : ( Annotation, Bool ) -> ( Annotation, Bool )
-removeVertices ( annotation, showVertices ) =
-    ( annotation, False )
+removeVertices : ( Annotation, SelectState ) -> ( Annotation, SelectState )
+removeVertices ( annotation, selectState ) =
+    ( annotation, NotSelected )
 
 
 startMovingAnnotation : Int -> Annotation -> StartPosition -> Model -> Model
@@ -882,7 +900,7 @@ startMovingAnnotation index annotation startPos model =
 
 moveAnnotation : Int -> Annotation -> StartPosition -> EndPosition -> EditState -> EditState
 moveAnnotation index annotation oldPos newPos editState =
-    { editState | annotations = Array.set index ( move oldPos newPos annotation, True ) editState.annotations }
+    { editState | annotations = Array.set index ( move oldPos newPos annotation, SelectedWithVertices ) editState.annotations }
 
 
 startResizingAnnotation : Int -> Annotation -> Vertex -> StartPosition -> Model -> Model
@@ -892,7 +910,7 @@ startResizingAnnotation index annotation vertex startPos model =
 
 resizeAnnotation : Int -> Annotation -> Vertex -> StartPosition -> EndPosition -> EditState -> EditState
 resizeAnnotation index annotation vertex oldPos newPos editState =
-    { editState | annotations = Array.set index ( resize oldPos newPos vertex annotation, True ) editState.annotations }
+    { editState | annotations = Array.set index ( resize oldPos newPos vertex annotation, SelectedWithVertices ) editState.annotations }
 
 
 resizeVertices : Position -> Vertex -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
@@ -1093,7 +1111,20 @@ cancelDrawing editState =
 
 deleteSelectedDrawings : EditState -> EditState
 deleteSelectedDrawings editState =
-    { editState | annotations = Array.filter (not << Tuple.second) editState.annotations }
+    { editState | annotations = Array.filter (not << isSelected << Tuple.second) editState.annotations }
+
+
+isSelected : SelectState -> Bool
+isSelected selectState =
+    case selectState of
+        Selected ->
+            True
+
+        NotSelected ->
+            False
+
+        SelectedWithVertices ->
+            True
 
 
 alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> Model
@@ -1872,8 +1903,8 @@ movementStateEvents index annotation movementState =
             []
 
 
-viewAnnotation : Float -> Float -> MovementState -> Int -> ( Annotation, Bool ) -> List (Svg Msg)
-viewAnnotation width height movementState index ( annotation, showVertices ) =
+viewAnnotation : Float -> Float -> MovementState -> Int -> ( Annotation, SelectState ) -> List (Svg Msg)
+viewAnnotation width height movementState index ( annotation, selectState ) =
     let
         movementEvents =
             movementStateEvents index annotation movementState
@@ -1883,19 +1914,19 @@ viewAnnotation width height movementState index ( annotation, showVertices ) =
     in
         case annotation of
             Arrow_ arrow ->
-                viewArrow movementEvents toVertexEvents arrow showVertices
+                viewArrow movementEvents toVertexEvents arrow selectState
 
             Rect_ rect ->
-                viewRect movementEvents toVertexEvents rect showVertices
+                viewRect movementEvents toVertexEvents rect selectState
 
             Ellipse_ ellipse ->
-                viewEllipse movementEvents toVertexEvents ellipse showVertices
+                viewEllipse movementEvents toVertexEvents ellipse selectState
 
             Line_ line ->
-                viewLine movementEvents toVertexEvents line showVertices
+                viewLine movementEvents toVertexEvents line selectState
 
             TextBox_ textBox ->
-                viewTextBox movementEvents toVertexEvents movementState index textBox showVertices
+                viewTextBox movementEvents toVertexEvents movementState index textBox selectState
 
 
 movementStateVertexEvents : Int -> Annotation -> MovementState -> Vertex -> List (Svg.Attribute Msg)
@@ -2059,13 +2090,13 @@ pointerEvents fill =
             "pointer-events: visibleStroke;"
 
 
-viewRect : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Rect -> Bool -> List (Svg Msg)
-viewRect attrs toVertexEvents rect showVertices =
+viewRect : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Rect -> SelectState -> List (Svg Msg)
+viewRect attrs toVertexEvents rect selectState =
     [ Svg.rect
         (rectAttributes rect ++ attrs)
         []
     ]
-        ++ if showVertices then
+        ++ if selectState == SelectedWithVertices then
             rectVertices toVertexEvents rect.start rect.end
            else
             []
@@ -2121,8 +2152,8 @@ viewVertex vertexEvents x y =
         []
 
 
-viewArrow : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Line -> Bool -> List (Svg Msg)
-viewArrow attrs toVertexEvents line showVertices =
+viewArrow : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Line -> SelectState -> List (Svg Msg)
+viewArrow attrs toVertexEvents line selectState =
     [ Svg.path
         (arrowAttributes line
             ++ lineAttributes line
@@ -2130,7 +2161,7 @@ viewArrow attrs toVertexEvents line showVertices =
         )
         []
     ]
-        ++ if showVertices then
+        ++ if selectState == SelectedWithVertices then
             arrowVertices toVertexEvents line.start line.end
            else
             []
@@ -2170,10 +2201,10 @@ ellipseVertices toVertexEvents start end =
         rectVertices toVertexEvents rectStart end
 
 
-viewEllipse : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Ellipse -> Bool -> List (Svg Msg)
-viewEllipse attrs toVertexEvents ellipse showVertices =
+viewEllipse : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Ellipse -> SelectState -> List (Svg Msg)
+viewEllipse attrs toVertexEvents ellipse selectState =
     [ Svg.ellipse (ellipseAttributes ellipse ++ attrs) [] ]
-        ++ if showVertices then
+        ++ if selectState == SelectedWithVertices then
             ellipseVertices toVertexEvents ellipse.start ellipse.end
            else
             []
@@ -2199,8 +2230,8 @@ ellipseAttributes { start, end, fill, strokeColor, stroke, strokeStyle } =
         ++ fillStyle fill
 
 
-viewTextBox : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> MovementState -> Int -> TextBox -> Bool -> List (Svg Msg)
-viewTextBox attrs toVertexEvents movementState index textBox showVertices =
+viewTextBox : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> MovementState -> Int -> TextBox -> SelectState -> List (Svg Msg)
+viewTextBox attrs toVertexEvents movementState index textBox selectState =
     let
         toInputBox =
             viewInputBox index textBox
@@ -2213,8 +2244,8 @@ viewTextBox attrs toVertexEvents movementState index textBox showVertices =
                 _ ->
                     ( True, [ Html.Events.onDoubleClick <| SwitchToEditingText index (TextBox_ textBox) ] )
     in
-        if showVertices then
-            [ toInputBox isReadonly editStateEvents ] ++ viewRect attrs toVertexEvents (Rect textBox.start textBox.end EmptyFill Color.black Thin Solid False) showVertices
+        if selectState == SelectedWithVertices then
+            [ toInputBox isReadonly editStateEvents ] ++ viewRect attrs toVertexEvents (Rect textBox.start textBox.end EmptyFill Color.black Thin Solid False) selectState
         else
             [ toInputBox isReadonly editStateEvents ]
 
@@ -2261,10 +2292,10 @@ viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
         ]
 
 
-viewLine : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Line -> Bool -> List (Svg Msg)
-viewLine attrs toVertexEvents line showVertices =
+viewLine : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Line -> SelectState -> List (Svg Msg)
+viewLine attrs toVertexEvents line selectState =
     [ Svg.path (lineAttributes line ++ attrs) [] ]
-        ++ if showVertices then
+        ++ if selectState == SelectedWithVertices then
             arrowVertices toVertexEvents line.start line.end
            else
             []
