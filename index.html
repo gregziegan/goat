@@ -12,6 +12,7 @@
 
       app.ports.exportToImage.subscribe(function(image) {
         var canvas = document.createElement('canvas')
+        canvas.crossOrigin='anonymous'
         var ctx = canvas.getContext('2d')
         var data = document.getElementById('drawing').outerHTML
         var DOMURL = window.URL || window.webkitURL || window;

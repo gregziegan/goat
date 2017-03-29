@@ -204,7 +204,7 @@ type MovementState
     | OutsideSelectedAnnotation
     | MovingAnnotation Int Annotation StartPosition
     | ResizingAnnotation Int Annotation StartPosition Vertex
-    | EditingATextBox Int Annotation
+    | EditingATextBox Int
 
 
 type alias Model =
@@ -360,9 +360,10 @@ type Msg
       -- TextBox Updates
     | StartTextBox StartPosition
     | AddTextBox StartPosition EndPosition
-    | SwitchToEditingText Int Annotation
+    | StartEditingText Int TextBox
+    | SwitchToEditingText Int
+    | FinishEditingText Int
     | SetText Int TextBox String
-    | FinishTextEditing
     | AutoExpandInput Int { textValue : String, state : AutoExpand.State }
       -- Spotlight Updates
     | StartSpotlightRect StartPosition
@@ -469,24 +470,28 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                         Array.length editState.annotations
 
                     initialTextBox =
-                        TextBox_ <| TextBox start end "Text" strokeColor stroke fontSize 0 (AutoExpand.initState (config numAnnotations fontSize))
-
-                    tryToEdit result =
-                        case result of
-                            Ok _ ->
-                                SwitchToEditingText (Array.length editState.annotations) initialTextBox
-
-                            Err _ ->
-                                Undo
+                        TextBox_ <| TextBox start end "Text" strokeColor stroke fontSize 0 (AutoExpand.initState (config numAnnotations fontSize Selected))
                 in
                     editState
                         |> addAnnotation ( initialTextBox, Selected ) model
-                        => [ Dom.focus "text-box-edit"
-                                |> Task.attempt tryToEdit
+                        => [ "text-box-edit--"
+                                ++ toString numAnnotations
+                                |> Dom.focus
+                                |> Task.attempt (tryToEdit numAnnotations)
                            ]
 
-            SwitchToEditingText index annotation ->
-                { model | movementState = EditingATextBox index annotation }
+            StartEditingText index textBox ->
+                { editState | annotations = Array.set index ( (TextBox_ textBox), Selected ) editState.annotations }
+                    |> logChange model
+                    => [ "text-box-edit--"
+                            ++ toString index
+                            |> Dom.focus
+                            |> Task.attempt (tryToEdit index)
+                       ]
+
+            SwitchToEditingText index ->
+                editState
+                    |> startEditingText index model
                     => []
 
             SetText index textBox newText ->
@@ -494,10 +499,14 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     |> skipChange model
                     => []
 
-            FinishTextEditing ->
-                model
-                    |> hoverOverAnnotation
-                    => []
+            FinishEditingText index ->
+                editState
+                    |> finishEditingText index model
+                    => [ "text-box-edit--"
+                            ++ toString index
+                            |> Dom.blur
+                            |> Task.attempt tryToBlur
+                       ]
 
             AutoExpandInput index { state, textValue } ->
                 { editState
@@ -547,7 +556,6 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                 in
                     { model | keyboardState = keyboardState }
                         |> alterDrawingsWithKeyboard maybeKeyChange
-                        => []
 
             SelectImage image ->
                 case model.images of
@@ -659,21 +667,8 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     => []
 
             ResetToReadyToDraw ->
-                { model
-                    | movementState =
-                        case model.movementState of
-                            OutsideSelectedAnnotation ->
-                                OutsideSelectedAnnotation
-
-                            MovingAnnotation _ _ _ ->
-                                OutsideSelectedAnnotation
-
-                            ResizingAnnotation _ _ _ _ ->
-                                OutsideSelectedAnnotation
-
-                            _ ->
-                                ReadyToDraw
-                }
+                model
+                    |> resetToReadyToDraw
                     => []
 
             StartMovingAnnotation index annotation startPos ->
@@ -841,6 +836,27 @@ addAnnotation annotation model editState =
     }
         |> skipChange model
         |> hoverOverAnnotation
+
+
+startEditingTextBox : Int -> EditState -> EditState
+startEditingTextBox index editState =
+    { editState
+        | annotations =
+            case Array.get index editState.annotations of
+                Just ( textbox, _ ) ->
+                    Array.set index ( textbox, Selected ) editState.annotations
+
+                Nothing ->
+                    editState.annotations
+    }
+
+
+startEditingText : Int -> Model -> EditState -> Model
+startEditingText index model editState =
+    { model
+        | edits = UndoList.new (startEditingTextBox index editState) model.edits
+        , movementState = EditingATextBox index
+    }
 
 
 updateSelectedAnnotations : (Annotation -> Annotation) -> EditState -> EditState
@@ -1248,8 +1264,83 @@ isSelected selectState =
             True
 
 
-alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> Model
+finishEditingTextHelper : Int -> EditState -> EditState
+finishEditingTextHelper index editState =
+    { editState
+        | annotations =
+            case Array.get index editState.annotations of
+                Just ( annotation, _ ) ->
+                    Array.set index ( annotation, NotSelected ) editState.annotations
+
+                Nothing ->
+                    editState.annotations
+    }
+
+
+finishEditingText : Int -> Model -> EditState -> Model
+finishEditingText index model editState =
+    { model
+        | edits = UndoList.new (finishEditingTextHelper index editState) model.edits
+        , movementState = ReadyToDraw
+    }
+
+
+resetToReadyToDraw : Model -> Model
+resetToReadyToDraw model =
+    { model
+        | movementState =
+            case model.movementState of
+                OutsideSelectedAnnotation ->
+                    OutsideSelectedAnnotation
+
+                MovingAnnotation _ _ _ ->
+                    OutsideSelectedAnnotation
+
+                ResizingAnnotation _ _ _ _ ->
+                    OutsideSelectedAnnotation
+
+                _ ->
+                    ReadyToDraw
+    }
+
+
+alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
 alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
+    case model.movementState of
+        EditingATextBox index ->
+            alterTextBoxDrawing maybeKeyChange index model
+
+        _ ->
+            alterDrawing maybeKeyChange model
+                => []
+
+
+alterTextBoxDrawing maybeKeyChange index model =
+    case maybeKeyChange of
+        Just keyChange ->
+            case keyChange of
+                KeyDown key ->
+                    case key of
+                        Escape ->
+                            model.edits.present
+                                |> finishEditingText index model
+                                => [ "text-box-edit--"
+                                        ++ toString index
+                                        |> Dom.blur
+                                        |> Task.attempt tryToBlur
+                                   ]
+
+                        _ ->
+                            model => []
+
+                KeyUp key ->
+                    model => []
+
+        Nothing ->
+            model => []
+
+
+alterDrawing maybeKeyChange ({ keyboardState } as model) =
     let
         controlKey =
             case model.operatingSystem of
@@ -1383,7 +1474,7 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
                 , button [ onClick Export, Html.class "export-button" ] [ Html.text "Save" ]
                 ]
             , viewCanvas model selectedImage
-              -- , p [] [ Html.text <| toString model.movementState ]
+            , p [] [ Html.text <| toString model.movementState ]
             ]
 
 
@@ -1855,8 +1946,8 @@ viewCanvas model image =
                         , SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
                         ]
 
-                    EditingATextBox _ _ ->
-                        [ onClick FinishTextEditing ]
+                    EditingATextBox index ->
+                        drawingStateEvents model.editMode editState.drawing model.mouse ++ [ SE.onClick <| FinishEditingText index ]
 
         toDrawing =
             case editState.drawing of
@@ -2020,8 +2111,10 @@ movementStateEvents index annotation movementState =
         ResizingAnnotation _ _ _ _ ->
             []
 
-        EditingATextBox _ _ ->
-            []
+        EditingATextBox index ->
+            [ SE.onMouseOver HoverOverAnnotation
+            , SE.onMouseOut LeaveAnnotation
+            ]
 
 
 viewAnnotation : Float -> Float -> MovementState -> Int -> ( Annotation, SelectState ) -> List (Svg Msg)
@@ -2155,7 +2248,7 @@ viewDrawingHelper width height drawing { fill, strokeColor, stroke, strokeStyle,
                         |> viewEllipseDrawing
 
         DrawTextBox startPos ->
-            TextBox startPos mouse "" strokeColor stroke fontSize 0 (AutoExpand.initState (config 0 fontSize))
+            TextBox startPos mouse "" strokeColor stroke fontSize 0 (AutoExpand.initState (config 0 fontSize NotSelected))
                 |> viewTextBoxWithBorder
 
         DrawLine lineMode ->
@@ -2351,60 +2444,54 @@ ellipseAttributes { start, end, fill, strokeColor, stroke, strokeStyle } =
         ++ fillStyle fill
 
 
-viewTextBox : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> MovementState -> Int -> TextBox -> SelectState -> List (Svg Msg)
-viewTextBox attrs toVertexEvents movementState index textBox selectState =
-    let
-        toInputBox =
-            viewInputBox index textBox
-
-        ( isReadonly, editStateEvents ) =
-            case movementState of
-                EditingATextBox editIndex _ ->
-                    ( False, [] )
-
-                _ ->
-                    ( True, [ Html.Events.onDoubleClick <| SwitchToEditingText index (TextBox_ textBox) ] )
-    in
-        if selectState == SelectedWithVertices then
-            [ toInputBox isReadonly editStateEvents ] ++ viewRect attrs toVertexEvents (Rect textBox.start textBox.end EmptyFill Color.black Thin Solid False) selectState
-        else
-            [ toInputBox isReadonly editStateEvents ]
-
-
-viewInputBox : Int -> TextBox -> Bool -> List (Html.Attribute Msg) -> Svg Msg
-viewInputBox index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) isReadonly attrs =
+viewTextArea : Int -> SelectState -> TextBox -> Svg Msg
+viewTextArea index selectState { start, end, text, fill, fontSize, angle, autoexpand } =
     foreignObject
         []
         [ div
-            ([ Html.class "text-box-container"
-             , Html.style
-                [ "top" => toPx start.y
-                , "left" => toPx start.x
+            [ Html.class "text-box-container"
+            , Html.style
+                [ "top" => toPx (Basics.min start.y end.y)
+                , "left" => toPx (Basics.min start.x end.x)
                 , "width" => toPx (abs (end.x - start.x))
                 , "font-size" => toPx fontSize
-                , "position" => "absolute"
-                , "border"
-                    => if isReadonly then
-                        "none"
-                       else
-                        "1px solid #dedede"
                 , "color" => Color.Convert.colorToHex fill
                 ]
-             , readonly isReadonly
-             , Html.attribute "onclick" "event.stopPropagation();"
-             ]
-                ++ attrs
-            )
-            [ Html.input
-                [ Html.id "text-box-edit"
-                , Html.class "text-box-input"
-                , Html.style [ "position" => "absolute", "opacity" => "0", "z-index" => "-1" ]
-                , Html.attribute "onfocus" "this.nextSibling.focus();"
-                ]
-                []
-            , AutoExpand.view (config index fontSize) autoexpand text
+            , Html.attribute "onclick" "event.stopPropagation();"
+            , Html.Events.onMouseOver HoverOverAnnotation
+            , Html.Events.onMouseOut LeaveAnnotation
+            ]
+            [ AutoExpand.view (config index fontSize selectState) autoexpand text
             ]
         ]
+
+
+viewTextBox : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> MovementState -> Int -> TextBox -> SelectState -> List (Svg Msg)
+viewTextBox attrs toVertexEvents movementState index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) selectState =
+    case selectState of
+        Selected ->
+            (viewTextArea index selectState textBox)
+                |> List.singleton
+                |> flip List.append (viewRect ([ Attr.style "opacity: 0;" ] ++ attrs) toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) selectState)
+
+        NotSelected ->
+            textBox.text
+                |> String.split "\n"
+                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x ] << List.singleton << Svg.text)
+                |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
+                |> List.singleton
+                |> flip List.append (viewRect ([ Attr.style "stroke: transparent; pointer-events: auto; cursor: pointer;" ] ++ attrs) toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) selectState)
+
+        SelectedWithVertices ->
+            textBox.text
+                |> String.split "\n"
+                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x ] << List.singleton << Svg.text)
+                |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
+                |> List.singleton
+                |> flip List.append
+                    (viewRect attrs toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) NotSelected
+                        ++ viewRect (attrs ++ [ SE.onMouseDown <| StartEditingText index textBox, Attr.style "pointer-events: fill; cursor: pointer;" ]) toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) selectState
+                    )
 
 
 viewTextBoxWithBorder : TextBox -> Svg Msg
@@ -2641,6 +2728,26 @@ onMouseUpOrLeave decodeToMsg =
     [ on "mouseleave" decodeToMsg, onMouseUp decodeToMsg ]
 
 
+tryToEdit : Int -> Result Dom.Error () -> Msg
+tryToEdit index result =
+    case result of
+        Ok _ ->
+            SwitchToEditingText index
+
+        Err _ ->
+            Undo
+
+
+tryToBlur : Result Dom.Error () -> Msg
+tryToBlur result =
+    case result of
+        Ok _ ->
+            ResetToReadyToDraw
+
+        Err _ ->
+            Undo
+
+
 toPx : number -> String
 toPx number =
     toString number ++ "px"
@@ -2765,30 +2872,27 @@ movementStateToCursor movementState =
         ResizingAnnotation _ _ _ vertex ->
             "nesw-resize"
 
-        EditingATextBox _ _ ->
-            "crosshair"
+        EditingATextBox _ ->
+            "default"
 
 
 
 -- Configuration
 
 
-config : Int -> Float -> AutoExpand.Config Msg
-config index fontSize =
+config : Int -> Float -> SelectState -> AutoExpand.Config Msg
+config index fontSize selectState =
     AutoExpand.config
         { onInput = AutoExpandInput index
         , padding = 2
         , lineHeight = fontSize
         , minRows = 1
         , maxRows = 4
-        , styles =
-            [ "background-color" => "transparent"
-            , "resize" => "none"
-            , "border" => "none"
-            , "outline" => "none"
-            , "z-index" => "1000"
-            , "font-size" => toPx fontSize
-            , "color" => "currentColor"
+        , attributes =
+            [ Html.id <| "text-box-edit--" ++ toString index
+            , Html.classList [ "text-box-textarea" => True, "text-box-textarea--unselected" => selectState /= Selected ]
+            , Html.style [ "font-size" => toPx fontSize ]
+            , Html.readonly <| selectState /= Selected
             ]
         }
 
@@ -2824,9 +2928,6 @@ subscriptions model =
 
                         MovingAnnotation index annotation startPos ->
                             Mouse.moves (MoveAnnotation index annotation startPos << toDrawingPosition)
-
-                        EditingATextBox _ _ ->
-                            Sub.none
 
                         _ ->
                             Sub.map KeyboardMsg Keyboard.subscriptions
