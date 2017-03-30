@@ -104,31 +104,18 @@ button:active, button:focus {
   border: 1px solid rgb(230, 230, 230);
 }
 
-.edit-mode--selected {
-  background-color: rgb(67, 187, 184);
-  color: white;
-}
-
 .history-controls {
   display: flex;
   justify-content: space-around;
   align-items: center;
 }
 
-.export-button {
-  background-color: rgb(67, 187, 184);
-  color: #f8f8f8;
+.save-button {
+  background-color: rgb(230, 230, 230);
+  color: #555;
   border: none;
   border-radius: 4px;
   padding: 10px;
-}
-
-.button-group {
-  display: flex;
-  align-items: center;
-  border: 1px solid rgb(67, 187, 184);
-  border-radius: 4px;
-  overflow: hidden;
 }
 
 
@@ -143,8 +130,10 @@ button:active, button:focus {
   padding: 5px;
   border: none;
   background-color: white;
-  color: grey;
-  cursor: pointer;
+  color: #555;
+  width: 30px;
+  height: 30px;
+  margin: 3px;
 }
 
 .history-button:disabled {
@@ -160,7 +149,7 @@ button:active, button:focus {
 
 .image-option {
   padding: 10px;
-  border: 2px solid rgb(67, 187, 184);
+  border: 2px solid rgb(230, 230, 230);
 }
 
 .image-option:first-of-type {

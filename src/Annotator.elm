@@ -1445,7 +1445,7 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
         div
             [ Html.class "annotation-app" ]
             [ div [ Html.class "controls" ]
-                [ button [ onClick Export, Html.class "export-button" ] [ Html.text "Save" ]
+                [ button [ onClick Export, Html.class "save-button" ] [ Html.text "Save" ]
                 , viewHistoryControls edits
                 , div [ Html.class "columns" ]
                     (List.map (viewDrawingButton editMode toDropdownMenu) drawingOptions
@@ -2435,7 +2435,7 @@ viewResetArrow =
 
 viewUndoArrow : Html msg
 viewUndoArrow =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 26.676 26.676" ]
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 26.676 26.676" ]
         [ Svg.path [ d "M26.105,21.891c-0.229,0-0.439-0.131-0.529-0.346l0,0c-0.066-0.156-1.716-3.857-7.885-4.59c-1.285-0.156-2.824-0.236-4.693-0.25v4.613c0,0.213-0.115,0.406-0.304,0.508c-0.188,0.098-0.413,0.084-0.588-0.033L0.254,13.815C0.094,13.708,0,13.528,0,13.339c0-0.191,0.094-0.365,0.254-0.477l11.857-7.979c0.175-0.121,0.398-0.129,0.588-0.029c0.19,0.102,0.303,0.295,0.303,0.502v4.293c2.578,0.336,13.674,2.33,13.674,11.674c0,0.271-0.191,0.508-0.459,0.562C26.18,21.891,26.141,21.891,26.105,21.891z", fill "currentColor" ] []
         ]
 
