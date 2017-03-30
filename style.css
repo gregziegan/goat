@@ -1,5 +1,41 @@
+body {
+  margin: 0;
+}
+
+button:active, button:focus {
+  outline: 1px solid gray;
+}
+
 .annotation-app {
-  width: 520px;
+  display: flex;
+}
+
+.controls {
+  width: 65px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-bottom: 1px solid #f8f8f8;
+  padding: 5px 0;
+}
+
+.columns {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.drawing-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 5px;
+  border: 1px solid rgb(230, 230, 230);
+  background-color: white;
+}
+
+.drawing-button--selected {
+  background-color: rgb(230, 230, 230);
+  border: 1px solid rgb(230, 230, 230);
 }
 
 .offscreen-canvas {
@@ -22,20 +58,18 @@
 
 .dropdown-things {
   display: flex;
-  border-left: 1px solid rgb(67, 187, 184);
 }
 
-.dropdown-option {
+.dropdown-options {
   position: absolute;
-  margin-top: 31px;
-  margin-left: -2px;
-  border: 1px solid rgb(67, 187, 184);
-  border-radius: 4px;
+  margin-left: 34px;
+  border-radius: 1px;
   overflow: hidden;
-  width: 50px;
+  height: 30px;
   display: flex;
-  flex-direction: column;
   z-index: 2;
+  -webkit-box-shadow: 0 0 10px #d8d8d8;
+  box-shadow: 0 0 10px #d8d8d8;
 }
 
 .dropdown-button {
@@ -58,7 +92,7 @@
 }
 
 .dropdown-button--selected {
-  background-color: rgb(67, 187, 184);
+  background-color: rgb(230, 230, 230);
 }
 
 .edit-mode--selected {
@@ -88,17 +122,6 @@
   overflow: hidden;
 }
 
-.dropdown-things:first-of-type {
-  border-left: none;
-}
-
-.controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #f8f8f8;
-  padding: 10px;
-}
 
 .flip {
   transform: scaleX(-1);

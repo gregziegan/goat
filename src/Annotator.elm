@@ -154,13 +154,10 @@ type StrokeStyle
 
 
 type EditOption
-    = Shapes
-    | Lines
-    | Fonts
+    = Fonts
     | Fills
     | StrokeColors
     | Strokes
-    | SpotlightShapes
 
 
 type Annotation
@@ -215,9 +212,6 @@ type alias Model =
     , strokeStyle : StrokeStyle
     , fontSize : Float
     , editMode : EditMode
-    , lastShapeOption : EditMode
-    , lastLineOption : EditMode
-    , lastSpotlightOption : EditMode
     , mouse : Mouse.Position
     , keyboardState : Keyboard.State
     , images : Maybe (Zipper Image)
@@ -275,18 +269,15 @@ strokeStyles =
     ]
 
 
-shapeOptions : List EditMode
-shapeOptions =
-    [ EditRect
-    , EditRoundedRect
-    , EditEllipse
-    ]
-
-
-lineOptions : List EditMode
-lineOptions =
+drawingOptions : List EditMode
+drawingOptions =
     [ EditArrow
     , EditLine
+    , EditRect
+    , EditRoundedRect
+    , EditEllipse
+    , EditTextBox
+    , EditSpotlightRect
     ]
 
 
@@ -299,11 +290,6 @@ fontSizes =
     , 18
     , 20
     ]
-
-
-spotlightShapeOptions : List EditMode
-spotlightShapeOptions =
-    [ EditSpotlightRect ]
 
 
 initialEditState : EditState
@@ -322,9 +308,6 @@ init flags =
     , strokeStyle = Solid
     , fontSize = 14
     , editMode = EditArrow
-    , lastShapeOption = EditRect
-    , lastLineOption = EditArrow
-    , lastSpotlightOption = EditSpotlightRect
     , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.initialState
     , images = List.Zipper.fromList []
@@ -568,7 +551,6 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
             ChangeEditMode editMode ->
                 { model | editMode = editMode }
-                    |> updateLastDrawOption editMode
                     |> closeDropdown
                     => []
 
@@ -973,18 +955,6 @@ updateFontSize fontSize annotation =
             annotation
 
 
-updateLastDrawOption : EditMode -> Model -> Model
-updateLastDrawOption editMode model =
-    if List.member editMode shapeOptions then
-        { model | lastShapeOption = editMode }
-    else if List.member editMode lineOptions then
-        { model | lastLineOption = editMode }
-    else if List.member editMode spotlightShapeOptions then
-        { model | lastSpotlightOption = editMode }
-    else
-        model
-
-
 verticesAreShown : Model -> Model
 verticesAreShown model =
     { model | movementState = HoveringOverSelectedAnnotation }
@@ -1144,6 +1114,13 @@ toggleDropdown editOption model =
 
                 Nothing ->
                     Just editOption
+        , editMode =
+            case editOption of
+                Fonts ->
+                    EditTextBox
+
+                _ ->
+                    model.editMode
     }
 
 
@@ -1460,7 +1437,7 @@ viewInfoScreen =
 
 
 viewImageAnnotator : Model -> Image -> Html Msg
-viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDropdown, editMode, lastLineOption, lastShapeOption, lastSpotlightOption } as model) selectedImage =
+viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDropdown, editMode } as model) selectedImage =
     let
         toDropdownMenu =
             viewDropdownMenu currentDropdown editMode model
@@ -1468,37 +1445,32 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
         div
             [ Html.class "annotation-app" ]
             [ div [ Html.class "controls" ]
-                [ viewButtonGroup [ viewLineDropdown editMode lastLineOption toDropdownMenu, viewShapeDropdown editMode lastShapeOption toDropdownMenu, viewTextSizeDropdown editMode toDropdownMenu, viewSpotlightDropdown editMode lastSpotlightOption toDropdownMenu ]
-                , viewButtonGroup [ viewFillDropdown toDropdownMenu fill, viewStrokeColorDropdown toDropdownMenu strokeColor, viewLineStrokeDropdown toDropdownMenu ]
+                [ button [ onClick Export, Html.class "export-button" ] [ Html.text "Save" ]
                 , viewHistoryControls edits
-                , button [ onClick Export, Html.class "export-button" ] [ Html.text "Save" ]
+                , div [ Html.class "columns" ]
+                    (List.map (viewDrawingButton editMode toDropdownMenu) drawingOptions
+                        ++ [ viewFillDropdown toDropdownMenu fill
+                           , viewStrokeColorDropdown toDropdownMenu strokeColor
+                           , viewLineStrokeDropdown toDropdownMenu
+                           ]
+                    )
                 ]
             , viewCanvas model selectedImage
-            , p [] [ Html.text <| toString model.movementState ]
             ]
 
 
-viewSpotlightDropdown : EditMode -> EditMode -> (EditOption -> Html Msg) -> Html Msg
-viewSpotlightDropdown curEditMode lastSpotlightOption toDropdownMenu =
-    div [ Html.class "dropdown-things" ]
-        [ button
-            [ onClick <| ChangeEditMode lastSpotlightOption
-            , Html.classList [ "dropdown-button" => True, "dropdown-button--selected" => lastSpotlightOption == curEditMode ]
-            ]
-            [ viewRoundedRectangleIcon
-            ]
-        , button
-            [ onClick <| ToggleDropdown SpotlightShapes
-            , Html.classList [ "dropdown-arrow" => True, "dropdown-button--selected" => lastSpotlightOption == curEditMode ]
-            ]
-            [ viewDownArrow ]
-        , toDropdownMenu SpotlightShapes
-        ]
+viewDrawingButton : EditMode -> (EditOption -> Html Msg) -> EditMode -> Html Msg
+viewDrawingButton selectedEditMode toDropdownMenu editMode =
+    case editMode of
+        EditTextBox ->
+            viewTextSizeDropdown selectedEditMode toDropdownMenu
 
-
-viewButtonGroup : List (Html Msg) -> Html Msg
-viewButtonGroup buttons =
-    div [ Html.class "button-group" ] buttons
+        _ ->
+            button
+                [ Html.classList [ "drawing-button" => True, "drawing-button--selected" => selectedEditMode == editMode ]
+                , onClick <| ChangeEditMode editMode
+                ]
+                [ viewShapeSvg editMode ]
 
 
 viewHistoryControls : UndoList EditState -> Html Msg
@@ -1511,20 +1483,12 @@ viewHistoryControls edits =
 
 viewTextSizeDropdown : EditMode -> (EditOption -> Html Msg) -> Html Msg
 viewTextSizeDropdown editMode toDropdownMenu =
-    div
-        [ Html.class "dropdown-things"
-        ]
+    div [ Html.class "dropdown-things" ]
         [ button
-            [ onClick <| ChangeEditMode EditTextBox
+            [ onClick <| ToggleDropdown Fonts
             , Html.classList [ "dropdown-button" => True, "dropdown-button--selected" => editMode == EditTextBox ]
             ]
             [ viewTextIcon ]
-        , button
-            [ onClick <| ToggleDropdown Fonts
-            , Html.classList [ "dropdown-arrow" => True, "dropdown-button--selected" => editMode == EditTextBox ]
-            ]
-            [ viewDownArrow
-            ]
         , toDropdownMenu Fonts
         ]
 
@@ -1533,21 +1497,21 @@ viewFontSizeOptions : Float -> Html Msg
 viewFontSizeOptions fontSize =
     fontSizes
         |> List.map (viewFontSizeOption fontSize)
-        |> div [ Html.class "dropdown-option" ]
+        |> div [ Html.class "dropdown-options" ]
 
 
 viewFillOptions : Fill -> Html Msg
 viewFillOptions fill =
     fillOptions
         |> List.map (viewFillOption fill)
-        |> div [ Html.class "dropdown-option" ]
+        |> div [ Html.class "dropdown-options" ]
 
 
 viewStrokeColorOptions : Color -> Html Msg
 viewStrokeColorOptions strokeColor =
     strokeColorOptions
         |> List.map (viewStrokeColorOption strokeColor)
-        |> div [ Html.class "dropdown-option" ]
+        |> div [ Html.class "dropdown-options" ]
 
 
 viewFillOption : Fill -> Fill -> Html Msg
@@ -1595,7 +1559,6 @@ viewLineStrokeDropdown toDropdownMenu =
             , Html.class "dropdown-button"
             ]
             [ viewLineStrokeDropdownIcon Color.grey
-            , viewDownArrow
             ]
         , toDropdownMenu Strokes
         ]
@@ -1610,7 +1573,6 @@ viewFillDropdown toDropdownMenu fill =
             , Html.class "dropdown-button"
             ]
             [ viewFillIcon fill
-            , viewDownArrow
             ]
         , toDropdownMenu Fills
         ]
@@ -1625,7 +1587,6 @@ viewStrokeColorDropdown toDropdownMenu strokeColor =
             , Html.class "dropdown-button"
             ]
             [ viewStrokeColorIcon strokeColor
-            , viewDownArrow
             ]
         , toDropdownMenu StrokeColors
         ]
@@ -1643,12 +1604,6 @@ viewDropdownOptions curEditMode model selectedOption editOption =
         Html.text ""
     else
         case editOption of
-            Shapes ->
-                viewShapeOptions curEditMode
-
-            Lines ->
-                viewLineOptions curEditMode
-
             Fonts ->
                 viewFontSizeOptions model.fontSize
 
@@ -1660,87 +1615,6 @@ viewDropdownOptions curEditMode model selectedOption editOption =
 
             Strokes ->
                 viewLineStrokeOptions model.stroke model.strokeStyle
-
-            SpotlightShapes ->
-                viewSpotlightShapeOptions curEditMode
-
-
-viewSpotlightShapeOptions : EditMode -> Html Msg
-viewSpotlightShapeOptions curEditMode =
-    spotlightShapeOptions
-        |> List.map (viewSpotlightShapeOption curEditMode)
-        |> div [ Html.class "dropdown-option" ]
-
-
-viewSpotlightShapeOption : EditMode -> EditMode -> Html Msg
-viewSpotlightShapeOption curEditMode editMode =
-    button
-        [ Html.classList
-            [ "dropdown-button" => True
-            , "dropdown-button--selected" => curEditMode == editMode
-            ]
-        , onClick <| ChangeEditMode editMode
-        ]
-        [ viewShapeSvg editMode ]
-
-
-viewShapeDropdown : EditMode -> EditMode -> (EditOption -> Html Msg) -> Html Msg
-viewShapeDropdown curEditMode lastShapeOption toDropdownMenu =
-    div
-        [ Html.class "dropdown-things" ]
-        [ button
-            [ onClick <| ChangeEditMode lastShapeOption
-            , Html.classList [ "dropdown-button" => True, "dropdown-button--selected" => lastShapeOption == curEditMode ]
-            ]
-            [ viewShapeSvg lastShapeOption
-            ]
-        , button
-            [ onClick <| ToggleDropdown Shapes
-            , Html.classList [ "dropdown-arrow" => True, "dropdown-button--selected" => lastShapeOption == curEditMode ]
-            ]
-            [ viewDownArrow ]
-        , toDropdownMenu Shapes
-        ]
-
-
-viewLineDropdown : EditMode -> EditMode -> (EditOption -> Html Msg) -> Html Msg
-viewLineDropdown curEditMode lastLineOption toDropdownMenu =
-    div
-        [ Html.class "dropdown-things" ]
-        [ button
-            [ onClick <| ChangeEditMode lastLineOption
-            , Html.classList
-                [ "dropdown-button" => True
-                , "dropdown-button--selected" => lastLineOption == curEditMode
-                ]
-            ]
-            [ viewShapeSvg lastLineOption ]
-        , button
-            [ onClick <| ToggleDropdown Lines
-            , Html.classList [ "dropdown-arrow" => True, "dropdown-button--selected" => lastLineOption == curEditMode ]
-            ]
-            [ viewDownArrow ]
-        , toDropdownMenu Lines
-        ]
-
-
-viewShapeOptions : EditMode -> Html Msg
-viewShapeOptions curEditMode =
-    shapeOptions
-        |> List.map (viewShapeOption curEditMode)
-        |> div [ Html.class "dropdown-option" ]
-
-
-viewShapeOption : EditMode -> EditMode -> Html Msg
-viewShapeOption curEditMode editMode =
-    button
-        [ Html.classList
-            [ "dropdown-button" => True
-            , "dropdown-button--selected" => curEditMode == editMode
-            ]
-        , onClick <| ChangeEditMode editMode
-        ]
-        [ viewShapeSvg editMode ]
 
 
 viewShapeSvg : EditMode -> Html Msg
@@ -1768,20 +1642,13 @@ viewShapeSvg editMode =
             viewRoundedRectangleIcon
 
 
-viewLineOptions : EditMode -> Html Msg
-viewLineOptions curEditMode =
-    lineOptions
-        |> List.map (viewShapeOption curEditMode)
-        |> div [ Html.class "dropdown-option" ]
-
-
 viewLineStrokeOptions : LineStroke -> StrokeStyle -> Html Msg
 viewLineStrokeOptions strokeWidth strokeStyle =
     [ List.map (viewLineStrokeOption strokeWidth) lineStrokeOptions
     , List.map (viewStrokeStyleOption strokeStyle) strokeStyles
     ]
         |> List.concat
-        |> div [ Html.class "dropdown-option" ]
+        |> div [ Html.class "dropdown-options" ]
 
 
 viewStrokeStyleOption : StrokeStyle -> StrokeStyle -> Html Msg
@@ -2193,11 +2060,10 @@ viewDrawing : Float -> Float -> Drawing -> Model -> Bool -> Svg Msg
 viewDrawing width height drawing model isInMask =
     let
         modelAccountingForMask =
-            if isInMask then
-                if model.editMode == EditSpotlightRect then
-                    { model | fill = MaskFill, strokeColor = Color.white }
-                else
-                    { model | fill = EmptyFill }
+            if model.editMode == EditSpotlightRect && isInMask then
+                { model | fill = MaskFill, strokeColor = Color.white }
+            else if model.editMode == EditSpotlightRect then
+                { model | fill = EmptyFill }
             else
                 model
     in
@@ -2842,7 +2708,7 @@ toLineStyle strokeStyle =
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
 toDrawingPosition mouse =
-    { mouse | x = mouse.x - 10, y = mouse.y - 64 }
+    { mouse | x = mouse.x - 65, y = mouse.y }
 
 
 movementStateToCursor : MovementState -> String
