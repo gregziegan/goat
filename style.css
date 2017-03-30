@@ -2,7 +2,12 @@ body {
   margin: 0;
 }
 
-button:active, button:focus {
+* {
+  user-drag: none;
+  user-select: none;
+}
+
+button:active, button:focus, button:hover {
   outline: 1px solid rgb(230, 230, 230);
 }
 
@@ -51,12 +56,6 @@ button:active, button:focus {
 }
 
 .image-to-annotate {
-  user-drag: none;
-  user-select: none;
-  -moz-user-select: none;
-  -webkit-user-drag: none;
-  -webkit-user-select: none;
-  -ms-user-select: none;
 }
 
 .dropdown-things {
@@ -178,11 +177,6 @@ button:active, button:focus {
 }
 
 .text-box-textarea--unselected {
-  -webkit-user-select: none;
-  -khtml-user-select: none;
-  -moz-user-select: none;
-  -o-user-select: none;
-  user-select: none;
 }
 
 .text-box-textarea {
