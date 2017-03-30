@@ -3,7 +3,7 @@ body {
 }
 
 button:active, button:focus {
-  outline: 1px solid gray;
+  outline: 1px solid rgb(230, 230, 230);
 }
 
 .annotation-app {
@@ -11,7 +11,7 @@ button:active, button:focus {
 }
 
 .controls {
-  width: 65px;
+  width: 72px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -31,6 +31,9 @@ button:active, button:focus {
   padding: 5px;
   border: 1px solid rgb(230, 230, 230);
   background-color: white;
+  margin: 3px;
+  height: 30px;
+  width: 30px;
 }
 
 .drawing-button--selected {
@@ -62,7 +65,8 @@ button:active, button:focus {
 
 .dropdown-options {
   position: absolute;
-  margin-left: 34px;
+  margin-left: 40px;
+  margin-top: 3px;
   border-radius: 1px;
   overflow: hidden;
   height: 30px;
@@ -70,6 +74,7 @@ button:active, button:focus {
   z-index: 2;
   -webkit-box-shadow: 0 0 10px #d8d8d8;
   box-shadow: 0 0 10px #d8d8d8;
+  background-color: white;
 }
 
 .dropdown-button {
@@ -77,8 +82,11 @@ button:active, button:focus {
   justify-content: center;
   align-items: center;
   padding: 5px;
-  border: none;
+  border: 1px solid transparent;
   background-color: white;
+  height: 30px;
+  width: 30px;
+  margin-left: 1px;
 }
 
 .dropdown-arrow {
@@ -93,6 +101,7 @@ button:active, button:focus {
 
 .dropdown-button--selected {
   background-color: rgb(230, 230, 230);
+  border: 1px solid rgb(230, 230, 230);
 }
 
 .edit-mode--selected {

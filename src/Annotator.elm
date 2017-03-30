@@ -1486,7 +1486,7 @@ viewTextSizeDropdown editMode toDropdownMenu =
     div [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
-            , Html.classList [ "dropdown-button" => True, "dropdown-button--selected" => editMode == EditTextBox ]
+            , Html.classList [ "drawing-button" => True, "drawing-button--selected" => editMode == EditTextBox ]
             ]
             [ viewTextIcon ]
         , toDropdownMenu Fonts
@@ -1556,7 +1556,7 @@ viewLineStrokeDropdown toDropdownMenu =
         [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Strokes
-            , Html.class "dropdown-button"
+            , Html.class "drawing-button"
             ]
             [ viewLineStrokeDropdownIcon Color.grey
             ]
@@ -1570,7 +1570,7 @@ viewFillDropdown toDropdownMenu fill =
         [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fills
-            , Html.class "dropdown-button"
+            , Html.class "drawing-button"
             ]
             [ viewFillIcon fill
             ]
@@ -1584,7 +1584,7 @@ viewStrokeColorDropdown toDropdownMenu strokeColor =
         [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown StrokeColors
-            , Html.class "dropdown-button"
+            , Html.class "drawing-button"
             ]
             [ viewStrokeColorIcon strokeColor
             ]
@@ -1633,13 +1633,13 @@ viewShapeSvg editMode =
             viewArrowIcon
 
         EditLine ->
-            viewLineIcon Color.grey 2
+            viewLineIcon
 
         EditTextBox ->
             viewTextIcon
 
         EditSpotlightRect ->
-            viewRoundedRectangleIcon
+            viewSpotlightIcon
 
 
 viewLineStrokeOptions : LineStroke -> StrokeStyle -> Html Msg
@@ -2449,35 +2449,38 @@ viewArrowIcon =
 
 viewRectangleIcon : Html msg
 viewRectangleIcon =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 40 40" ]
-        [ rect [ x "10", y "10", Attr.width "20", Attr.height "20", fill "white", stroke "grey" ] []
-        ]
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M2 12h10V2H2v10zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
+
+
+viewSpotlightIcon : Html msg
+viewSpotlightIcon =
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
 
 
 viewRoundedRectangleIcon : Html msg
 viewRoundedRectangleIcon =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 40 40" ]
-        [ rect [ x "10", y "10", Attr.width "20", Attr.height "20", rx "2", ry "2", fill "white", stroke "grey" ] []
-        ]
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M2 3v8c0 .552.448 1 1 1h8c.552 0 1-.448 1-1V3c0-.552-.448-1-1-1H3c-.552 0-1 .448-1 1zM0 3c0-1.655 1.342-3 3-3h8c1.655 0 3 1.342 3 3v8c0 1.655-1.342 3-3 3H3c-1.655 0-3-1.342-3-3V3z", fillRule "nonzero", fill "#555" ] [] ]
 
 
 viewEllipseIcon : Html msg
 viewEllipseIcon =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
-        [ ellipse [ cx "10", cy "10", rx "8", ry "5", stroke "grey", strokeWidth "2", fill "white" ] []
-        ]
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill "#555" ] [] ]
 
 
 viewFillIcon : Fill -> Html msg
 viewFillIcon fill =
     let
-        ( fillAttr, showRedLine ) =
+        ( fillAttr, showLine ) =
             case fill of
                 SolidFill color ->
                     if color == Color.white then
                         [ Attr.fill <| Color.Convert.colorToHex Color.white
-                        , Attr.stroke <| Color.Convert.colorToHex Color.black
-                        , r "9"
+                        , Attr.stroke "#555"
+                        , r "6"
                         ]
                             => False
                     else
@@ -2493,18 +2496,18 @@ viewFillIcon fill =
                         => False
 
                 EmptyFill ->
-                    [ Attr.fill "white", fillOpacity "0", stroke <| Color.Convert.colorToHex Color.red, r "9" ]
+                    [ Attr.fill "#555", r "6" ]
                         => True
     in
-        svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
+        svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
             ([ circle
-                ([ cx "10", cy "10", r "10" ]
+                ([ cx "7", cy "7", r "6" ]
                     ++ fillAttr
                 )
                 []
              ]
-                ++ if showRedLine then
-                    [ viewLineIcon Color.red 2 ]
+                ++ if showLine then
+                    [ Svg.path [ d "M11 0L0 11l1 1L12 1z", fillRule "nonzero", Attr.fill "white" ] [] ]
                    else
                     []
             )
@@ -2512,16 +2515,8 @@ viewFillIcon fill =
 
 viewStrokeColorIcon : Color -> Html msg
 viewStrokeColorIcon strokeColor =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
-        [ circle
-            ([ cx "10", cy "10", r "9", stroke <| Color.Convert.colorToHex strokeColor, fill "white" ]
-                ++ if strokeColor == Color.white then
-                    [ Attr.fill <| Color.Convert.colorToHex Color.black ]
-                   else
-                    []
-            )
-            []
-        ]
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path ([ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill <| Color.Convert.colorToHex strokeColor ]) [] ]
 
 
 viewLineStrokeDropdownIcon : Color -> Html msg
@@ -2533,13 +2528,10 @@ viewLineStrokeDropdownIcon strokeColor =
         ]
 
 
-viewLineIcon : Color -> Int -> Html msg
-viewLineIcon strokeColor strokeWidth =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
-        [ g [ stroke <| Color.Convert.colorToHex strokeColor ]
-            [ line [ x1 "0", x2 "20", y1 "20", y2 "0", Attr.strokeWidth <| toString <| strokeWidth ] []
-            ]
-        ]
+viewLineIcon : Html msg
+viewLineIcon =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 12 12" ]
+        [ Svg.path [ d "M11 0L0 11l1 1L12 1z", fillRule "nonzero", fill "#555" ] [] ]
 
 
 viewLineStroke : number -> List (Svg.Attribute msg) -> Html msg
@@ -2570,8 +2562,8 @@ viewDownArrow =
 
 viewTextIcon : Html msg
 viewTextIcon =
-    svg [ viewBox "0 0 405 405", Attr.height "20", Attr.width "20" ]
-        [ Svg.path [ fill "grey", d "M34.784,0v132.809h43.61v-33.98c0-7.906,3.012-15.808,9.041-21.837c6.037-6.029,13.943-9.041,21.845-9.041h46.323v262.891c0,7.906-3.012,15.804-9.041,21.841c-6.033,6.029-13.943,9.041-21.841,9.041h-32.99v43.61h221.858v-43.61h-32.981c-7.91,0-15.808-3.012-21.833-9.041c-6.042-6.037-9.05-13.939-9.05-21.841V67.951h46.323c7.91,0,15.808,3.012,21.841,9.041c6.025,6.029,9.041,13.935,9.041,21.837v33.98h43.618V0H34.784z" ] []
+    svg [ viewBox "0 0 12 15", Attr.height "12", Attr.width "15" ]
+        [ Svg.path [ d "M0 0v4l2-2h3v10.03H3l-1 2h8l-1-2H7V2h3l2 2V0z", fillRule "evenodd" ] []
         ]
 
 
@@ -2708,7 +2700,7 @@ toLineStyle strokeStyle =
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
 toDrawingPosition mouse =
-    { mouse | x = mouse.x - 65, y = mouse.y }
+    { mouse | x = mouse.x - 72, y = mouse.y }
 
 
 movementStateToCursor : MovementState -> String
