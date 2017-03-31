@@ -9,7 +9,7 @@ import Html exposing (Attribute, Html, button, div, p, text)
 import Html.Attributes as Html exposing (class, classList, disabled, height, id, readonly, src, start, style, type_, width)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onMouseEnter, onMouseLeave, onWithOptions)
 import Json.Decode as Json
-import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange(..), isPressed)
+import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(..), isPressed)
 import List.Extra
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
@@ -1303,6 +1303,7 @@ alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
                 => []
 
 
+alterTextBoxDrawing : Maybe KeyChange -> Int -> Model -> ( Model, List (Cmd Msg) )
 alterTextBoxDrawing maybeKeyChange index model =
     case maybeKeyChange of
         Just keyChange ->
@@ -1328,6 +1329,7 @@ alterTextBoxDrawing maybeKeyChange index model =
             model => []
 
 
+alterDrawing : Maybe KeyChange -> Model -> Model
 alterDrawing maybeKeyChange ({ keyboardState } as model) =
     let
         controlKey =
@@ -2798,26 +2800,30 @@ port setImages : (List Image -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch
-        [ case model.images of
+    Sub.batch <|
+        case model.images of
             Nothing ->
-                Sub.none
+                [ setImages SetImages ]
 
             Just images ->
                 if model.edits.present.drawing /= Nothing then
-                    Mouse.moves (ResizeDrawing (List.Zipper.current images) << toDrawingPosition)
+                    [ Mouse.moves (ResizeDrawing (List.Zipper.current images) << toDrawingPosition)
+                    , Sub.map KeyboardMsg Keyboard.subscriptions
+                    ]
+                else if not model.imageSelected then
+                    []
                 else
                     case model.movementState of
                         ResizingAnnotation index annotation startPos vertex ->
-                            Mouse.moves (ResizeAnnotation index annotation vertex startPos << toDrawingPosition)
+                            [ Mouse.moves (ResizeAnnotation index annotation vertex startPos << toDrawingPosition)
+                            , Sub.map KeyboardMsg Keyboard.subscriptions
+                            ]
 
                         MovingAnnotation index annotation startPos ->
-                            Mouse.moves (MoveAnnotation index annotation startPos << toDrawingPosition)
+                            [ Mouse.moves (MoveAnnotation index annotation startPos << toDrawingPosition) ]
 
                         _ ->
-                            Sub.map KeyboardMsg Keyboard.subscriptions
-        , setImages SetImages
-        ]
+                            [ Sub.map KeyboardMsg Keyboard.subscriptions ]
 
 
 
