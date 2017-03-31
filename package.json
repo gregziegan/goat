@@ -7,5 +7,25 @@
   "license": "MIT",
   "scripts": {
     "test": "elm-test"
-  }
+  },
+  "config": {
+    "port": "4567"
+  },
+  "scripts": {
+    "start": "zendency development",
+    "bundle": "zendency bundle $1"
+  },
+  "main": "./",
+  "compiler": [],
+  "directories": {
+    "translations": "./translations"
+  },
+  "files": [
+    "./elm.js",
+    "./index.html",
+    "./style.css",
+    "./goat.jpg",
+    "./goat2.jpg",
+    "./icon_ticket_editor.svg"
+  ]
 }
