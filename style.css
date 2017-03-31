@@ -114,7 +114,17 @@ button:active, button:focus, button:hover {
   color: #555;
   border: none;
   border-radius: 4px;
-  padding: 10px;
+  padding: 10px 5px;
+  font-size: 8px;
+}
+
+.cancel-button {
+  background-color: rgb(250, 250, 250);
+  color: #555;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 5px;
+  font-size: 8px;
 }
 
 
@@ -148,7 +158,22 @@ button:active, button:focus, button:hover {
 
 .image-option {
   padding: 10px;
-  border: 2px solid rgb(230, 230, 230);
+  border: none;
+  background-color: white;
+  margin: 3px;
+  cursor: pointer;
+  position: relative;
+}
+
+.image-option:hover > .image-edit-pencil {
+  display: block;
+}
+
+.image-edit-pencil {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 10px;
 }
 
 .image-option:first-of-type {

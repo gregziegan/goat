@@ -383,6 +383,7 @@ type Msg
       -- Image Selection updates
     | SelectImage Image
     | SetImages (List Image)
+    | Cancel
       -- Keyboard updates
     | KeyboardMsg Keyboard.Msg
 
@@ -532,6 +533,10 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                 { model | images = List.Zipper.fromList images }
                     => []
 
+            Cancel ->
+                { model | imageSelected = False, edits = UndoList.reset model.edits }
+                    => []
+
             KeyboardMsg keyMsg ->
                 let
                     ( keyboardState, maybeKeyChange ) =
@@ -543,7 +548,13 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
             SelectImage image ->
                 case model.images of
                     Just images ->
-                        { model | images = List.Zipper.find ((==) image.url << .url) images, imageSelected = True }
+                        { model
+                            | images =
+                                images
+                                    |> List.Zipper.first
+                                    |> List.Zipper.find ((==) image.url << .url)
+                            , imageSelected = True
+                        }
                             => []
 
                     Nothing ->
@@ -1407,26 +1418,39 @@ view model =
             if model.imageSelected then
                 viewImageAnnotator model <| List.Zipper.current images
             else
-                viewImageSelector model images
+                viewImageSelector images
 
 
-viewImageSelector : Model -> Zipper Image -> Html Msg
-viewImageSelector model images =
+viewImageSelector : Zipper Image -> Html Msg
+viewImageSelector images =
     images
         |> List.Zipper.toList
-        |> List.map (viewImageOption images (List.Zipper.current images))
+        |> List.map (viewImageOption images)
         |> div [ Html.class "image-selector" ]
 
 
-viewImageOption : Zipper Image -> Image -> Image -> Html Msg
-viewImageOption zipper highlightedImage image =
-    div
+viewImageOption : Zipper Image -> Image -> Html Msg
+viewImageOption zipper image =
+    button
         [ Html.class "image-option"
         , Html.width <| round image.width
         , Html.height <| round image.height
         , onClick <| SelectImage image
         ]
         [ Html.img [ src image.url, Html.height <| round image.height, Html.width <| round image.width ] []
+        , Html.div [ onClick <| SelectImage image, Html.class "image-edit-pencil" ]
+            [ viewPencilIcon
+            ]
+        ]
+
+
+viewPencilIcon : Html msg
+viewPencilIcon =
+    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 500 500" ]
+        [ Svg.path [ fill "#555", d "M492.8,58L442,7.2c-9.6-9.6-25.3-9.6-34.8,0l-17.6,17.6l-1.5,1.5L377.4,37l85.5,85.5l10.8-10.8l1.5-1.5l17.6-17.6C502.4,83.2,502.4,67.6,492.8,58z" ] []
+        , Svg.path [ fill "#555", d "M51.7,362.4l85.5,85.5l308.5-308.5l-85.5-85.5L51.7,362.4z M395.2,148.7L146.4,397.3l-9.3-9.3l248.8-248.8L395.2,148.7z M111.7,362.6l-9.3-9.3l248.7-248.8l9.3,9.3L111.7,362.6z" ] []
+        , Svg.polygon [ fill "#555", points "36.4,377.9 14.1,452.9 47.1,485.9 122.1,463.6 79.3,420.7" ] []
+        , Svg.polygon [ fill "#555", points "0,500 36,489.2 10.8,464" ] []
         ]
 
 
@@ -1445,7 +1469,10 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
         div
             [ Html.class "annotation-app" ]
             [ div [ Html.class "controls" ]
-                [ button [ onClick Export, Html.class "save-button" ] [ Html.text "Save" ]
+                [ div [ Html.class "columns" ]
+                    [ button [ onClick Cancel, Html.class "cancel-button" ] [ Html.text "Cancel" ]
+                    , button [ onClick Export, Html.class "save-button" ] [ Html.text "Save" ]
+                    ]
                 , viewHistoryControls edits
                 , div [ Html.class "columns" ]
                     (List.map (viewDrawingButton editMode toDropdownMenu) drawingOptions
