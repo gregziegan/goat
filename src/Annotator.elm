@@ -36,60 +36,19 @@ type alias EndPosition =
     Position
 
 
-type ArrowMode
-    = DrawingArrow StartPosition
-    | DrawingDiscreteArrow StartPosition
-
-
-type RectMode
-    = DrawingRect StartPosition
-    | DrawingSquare StartPosition
-
-
-type RoundedRectMode
-    = DrawingRoundedRect StartPosition
-    | DrawingRoundedSquare StartPosition
-
-
-type EllipseMode
-    = DrawingOval StartPosition
-    | DrawingCircle StartPosition
+type ShapeMode
+    = DrawingShape
+    | DrawingEqualizedShape
 
 
 type LineMode
-    = DrawingLine StartPosition
-    | DrawingDiscreteLine StartPosition
+    = DrawingLine
+    | DrawingDiscreteLine
 
 
 type Drawing
-    = DrawArrow ArrowMode
-    | DrawRect RectMode
-    | DrawRoundedRect RoundedRectMode
-    | DrawEllipse EllipseMode
-    | DrawTextBox StartPosition
-    | DrawLine LineMode
-    | DrawSpotlightRect RoundedRectMode
-
-
-type EditMode
-    = EditRect
-    | EditRoundedRect
-    | EditEllipse
-    | EditArrow
-    | EditLine
-    | EditTextBox
-    | EditSpotlightRect
-
-
-type alias Rect =
-    { start : Position
-    , end : Position
-    , fill : Fill
-    , strokeColor : Color
-    , stroke : LineStroke
-    , strokeStyle : StrokeStyle
-    , rounded : Bool
-    }
+    = DrawLine LineType LineMode
+    | DrawShape ShapeType ShapeMode
 
 
 type Fill
@@ -99,34 +58,45 @@ type Fill
     | SpotlightFill
 
 
-type alias Ellipse =
-    { start : Position
-    , end : Position
-    , fill : Fill
-    , strokeColor : Color
-    , stroke : LineStroke
-    , strokeStyle : StrokeStyle
-    }
+type StrokeWidth
+    = Thin
+    | Medium
+    | Thick
 
 
-type alias TextBox =
-    { start : Position
-    , end : Position
-    , text : String
-    , fill : Color
-    , stroke : LineStroke
-    , fontSize : Float
-    , angle : Float
-    , autoexpand : AutoExpand.State
-    }
+type StrokeStyle
+    = Solid
+    | Dotted
+    | Dashed
 
 
 type alias Line =
     { start : Position
     , end : Position
-    , fill : Color
-    , stroke : LineStroke
+    , strokeColor : Color
+    , strokeWidth : StrokeWidth
     , strokeStyle : StrokeStyle
+    }
+
+
+type alias Shape =
+    { start : Position
+    , end : Position
+    , fill : Fill
+    , strokeColor : Color
+    , strokeWidth : StrokeWidth
+    , strokeStyle : StrokeStyle
+    }
+
+
+type alias TextArea =
+    { start : Position
+    , end : Position
+    , fill : Color
+    , fontSize : Float
+    , text : String
+    , angle : Float
+    , autoexpand : AutoExpand.State
     }
 
 
@@ -139,45 +109,30 @@ type alias Image =
     }
 
 
-type LineStroke
-    = VeryThin
-    | Thin
-    | Medium
-    | Thick
-    | VeryThick
-
-
-type StrokeStyle
-    = Solid
-    | Dotted
-    | Dashed
-
-
-type EditOption
+type AttributeDropdown
     = Fonts
     | Fills
     | StrokeColors
     | Strokes
 
 
+type LineType
+    = Arrow
+    | StraightLine
+
+
+type ShapeType
+    = Rect
+    | RoundedRect
+    | Ellipse
+    | SpotlightRect
+    | TextBorder
+
+
 type Annotation
-    = Arrow_ Line
-    | Rect_ Rect
-    | Ellipse_ Ellipse
-    | TextBox_ TextBox
-    | Line_ Line
-
-
-type alias EditState =
-    { annotations : Array ( Annotation, SelectState )
-    , drawing : Maybe Drawing
-    }
-
-
-type SelectState
-    = Selected
-    | NotSelected
-    | SelectedWithVertices
+    = Lines LineType Line
+    | Shapes ShapeType Shape
+    | TextBox TextArea
 
 
 type Vertex
@@ -192,32 +147,43 @@ type OperatingSystem
     | Windows
 
 
-type MovementState
+type AnnotationState
     = ReadyToDraw
-    | DrawingAnnotation
-    | HoveringOverAnnotation
-    | HoveringOverSelectedAnnotation
-    | HoveringOverVertex
-    | OutsideSelectedAnnotation
+    | DrawingAnnotation StartPosition
+    | SelectedAnnotation Int Annotation
     | MovingAnnotation Int Annotation StartPosition
     | ResizingAnnotation Int Annotation StartPosition Vertex
     | EditingATextBox Int
 
 
+type SelectState
+    = Selected
+    | SelectedWithVertices
+    | NotSelected
+
+
 type alias Model =
-    { edits : UndoList EditState
+    { edits : UndoList (Array Annotation)
+    , annotationState :
+        AnnotationState
+        -- annotation attributes
     , fill : Fill
     , strokeColor : Color
-    , stroke : LineStroke
+    , strokeWidth : StrokeWidth
     , strokeStyle : StrokeStyle
-    , fontSize : Float
-    , editMode : EditMode
+    , fontSize :
+        Float
+        -- Important I/O device info
     , mouse : Mouse.Position
-    , keyboardState : Keyboard.State
+    , keyboardState :
+        Keyboard.State
+        -- Image selection fields
     , images : Maybe (Zipper Image)
-    , imageSelected : Bool
-    , currentDropdown : Maybe EditOption
-    , movementState : MovementState
+    , imageSelected :
+        Bool
+        -- Control Interface
+    , currentDropdown : Maybe AttributeDropdown
+    , drawing : Drawing
     , operatingSystem : OperatingSystem
     }
 
@@ -251,13 +217,11 @@ fillOptions =
     ]
 
 
-lineStrokeOptions : List LineStroke
+lineStrokeOptions : List StrokeWidth
 lineStrokeOptions =
-    [ VeryThin
-    , Thin
+    [ Thin
     , Medium
     , Thick
-    , VeryThick
     ]
 
 
@@ -269,16 +233,26 @@ strokeStyles =
     ]
 
 
-drawingOptions : List EditMode
-drawingOptions =
-    [ EditArrow
-    , EditLine
-    , EditRect
-    , EditRoundedRect
-    , EditEllipse
-    , EditTextBox
-    , EditSpotlightRect
-    ]
+drawingOptions : Bool -> List Drawing
+drawingOptions shiftPressed =
+    if shiftPressed then
+        [ DrawLine Arrow DrawingDiscreteLine
+        , DrawLine StraightLine DrawingDiscreteLine
+        , DrawShape Rect DrawingEqualizedShape
+        , DrawShape RoundedRect DrawingEqualizedShape
+        , DrawShape Ellipse DrawingEqualizedShape
+        , DrawShape TextBorder DrawingEqualizedShape
+        , DrawShape SpotlightRect DrawingEqualizedShape
+        ]
+    else
+        [ DrawLine Arrow DrawingLine
+        , DrawLine StraightLine DrawingLine
+        , DrawShape Rect DrawingShape
+        , DrawShape RoundedRect DrawingShape
+        , DrawShape Ellipse DrawingShape
+        , DrawShape TextBorder DrawingShape
+        , DrawShape SpotlightRect DrawingShape
+        ]
 
 
 fontSizes : List Float
@@ -292,28 +266,21 @@ fontSizes =
     ]
 
 
-initialEditState : EditState
-initialEditState =
-    { annotations = Array.empty
-    , drawing = Nothing
-    }
-
-
 init : Flags -> ( Model, List (Cmd Msg) )
 init flags =
-    { edits = UndoList.fresh initialEditState
+    { edits = UndoList.fresh Array.empty
     , fill = EmptyFill
     , strokeColor = Color.red
-    , stroke = Medium
+    , strokeWidth = Medium
     , strokeStyle = Solid
     , fontSize = 14
-    , editMode = EditArrow
     , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.initialState
     , images = List.Zipper.fromList []
     , imageSelected = False
     , currentDropdown = Nothing
-    , movementState = ReadyToDraw
+    , drawing = DrawLine Arrow DrawingLine
+    , annotationState = ReadyToDraw
     , operatingSystem =
         if flags.isMac then
             MacOS
@@ -328,43 +295,25 @@ init flags =
 
 
 type Msg
-    = -- Line Updates
-      StartLine StartPosition
-    | AddLine StartPosition EndPosition
-    | StartArrow StartPosition
-    | AddArrow StartPosition EndPosition
-      -- Shape Updates
-    | StartRect StartPosition
-    | AddRect StartPosition EndPosition
-    | StartRoundedRect StartPosition
-    | AddRoundedRect StartPosition EndPosition
-    | StartEllipse StartPosition
-    | AddEllipse StartPosition EndPosition
-      -- TextBox Updates
-    | StartTextBox StartPosition
-    | AddTextBox StartPosition EndPosition
-    | StartEditingText Int TextBox
+    = StartDrawing StartPosition
+    | FinishDrawing StartPosition EndPosition
+      -- TextArea Updates
+    | StartEditingText Int TextArea
     | SwitchToEditingText Int
     | FinishEditingText Int
-    | SetText Int TextBox String
+    | SetText Int TextArea String
     | AutoExpandInput Int { textValue : String, state : AutoExpand.State }
-      -- Spotlight Updates
-    | StartSpotlightRect StartPosition
-    | AddSpotlightRect StartPosition EndPosition
-    | ChangeEditMode EditMode
       -- Annotation Attribute updates
     | SelectFill Fill
     | SelectStrokeColor Color
-    | SelectLineStroke LineStroke
+    | SelectLineStroke StrokeWidth
     | SelectStrokeStyle StrokeStyle
     | SelectFontSize Float
       -- Control UI updates
-    | ToggleDropdown EditOption
+    | ToggleDropdown AttributeDropdown
+    | ChangeDrawing Drawing
     | CloseDropdown
       -- Selection Updates
-    | HoverOverAnnotation
-    | LeaveAnnotation
-    | ShowResizeIcon
     | ResetToReadyToDraw
     | SelectAnnotation Int Annotation StartPosition
       -- Move updates
@@ -379,7 +328,7 @@ type Msg
       -- History updates
     | Undo
     | Redo
-    | Export
+    | Save
       -- Image Selection updates
     | SelectImage Image
     | SetImages (List Image)
@@ -389,9 +338,9 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, images, keyboardState, editMode } as model) =
+update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mouse, images, keyboardState, drawing } as model) =
     let
-        editState =
+        annotations =
             edits.present
 
         ( width, height ) =
@@ -403,69 +352,42 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     ( 0, 0 )
     in
         case msg of
-            StartRect pos ->
-                editState
-                    |> startAnnotation pos editMode images model
+            StartDrawing pos ->
+                model
+                    |> startAnnotation pos images
                     => []
 
-            AddRect start end ->
-                editState
-                    |> addAnnotation ( (Rect_ <| Rect start end fill strokeColor stroke strokeStyle False), NotSelected ) model
-                    => []
-
-            StartRoundedRect pos ->
-                editState
-                    |> startAnnotation pos editMode images model
-                    => []
-
-            AddRoundedRect start end ->
-                editState
-                    |> addAnnotation ( (Rect_ <| Rect start end fill strokeColor stroke strokeStyle True), NotSelected ) model
-                    => []
-
-            StartArrow pos ->
-                editState
-                    |> startAnnotation pos editMode images model
-                    => []
-
-            AddArrow startPos endPos ->
-                editState
-                    |> addAnnotation ( (Arrow_ <| Line startPos endPos strokeColor stroke strokeStyle), NotSelected ) model
-                    => []
-
-            StartEllipse pos ->
-                editState
-                    |> startAnnotation pos editMode images model
-                    => []
-
-            AddEllipse startPos endPos ->
-                editState
-                    |> addAnnotation ( (Ellipse_ <| Ellipse startPos endPos fill strokeColor stroke strokeStyle), NotSelected ) model
-                    => []
-
-            StartTextBox pos ->
-                editState
-                    |> startAnnotation pos editMode images model
-                    => []
-
-            AddTextBox start end ->
+            FinishDrawing start end ->
                 let
                     numAnnotations =
-                        Array.length editState.annotations
+                        Array.length model.edits.present
 
                     initialTextBox =
-                        TextBox_ <| TextBox start end "Text" strokeColor stroke fontSize 0 (AutoExpand.initState (config numAnnotations fontSize Selected))
+                        TextBox <| TextArea start end strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize))
                 in
-                    editState
-                        |> addAnnotation ( initialTextBox, Selected ) model
-                        => [ "text-box-edit--"
-                                ++ toString numAnnotations
-                                |> Dom.focus
-                                |> Task.attempt (tryToEdit numAnnotations)
-                           ]
+                    case model.drawing of
+                        DrawLine lineType lineMode ->
+                            model
+                                |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) strokeColor strokeWidth strokeStyle))
+                                => []
 
-            StartEditingText index textBox ->
-                { editState | annotations = Array.set index ( (TextBox_ textBox), Selected ) editState.annotations }
+                        DrawShape shapeType shapeMode ->
+                            model
+                                |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeWidth strokeStyle))
+                                => case shapeType of
+                                    TextBorder ->
+                                        [ "text-box-edit--"
+                                            ++ toString numAnnotations
+                                            |> Dom.focus
+                                            |> Task.attempt (tryToEdit numAnnotations)
+                                        ]
+
+                                    _ ->
+                                        []
+
+            StartEditingText index textArea ->
+                annotations
+                    |> Array.set index (TextBox textArea)
                     |> logChange model
                     => [ "text-box-edit--"
                             ++ toString index
@@ -474,18 +396,19 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                        ]
 
             SwitchToEditingText index ->
-                editState
-                    |> startEditingText index model
+                model
+                    |> startEditingText index
                     => []
 
             SetText index textBox newText ->
-                { editState | annotations = Array.set index ( TextBox_ { textBox | text = newText }, Selected ) editState.annotations }
+                annotations
+                    |> Array.set index (TextBox { textBox | text = newText })
                     |> skipChange model
                     => []
 
             FinishEditingText index ->
-                editState
-                    |> finishEditingText index model
+                model
+                    |> finishEditingText index
                     => [ "text-box-edit--"
                             ++ toString index
                             |> Dom.blur
@@ -493,39 +416,15 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                        ]
 
             AutoExpandInput index { state, textValue } ->
-                { editState
-                    | annotations =
-                        editState.annotations
-                            |> Array.get index
-                            |> Maybe.map (\ann -> Array.set index (autoExpandAnnotation state textValue ann) editState.annotations)
-                            |> Maybe.withDefault editState.annotations
-                }
+                annotations
+                    |> Array.get index
+                    |> Maybe.map (\ann -> Array.set index (autoExpandAnnotation state textValue ann) annotations)
+                    |> Maybe.withDefault annotations
                     |> skipChange model
-                    => []
-
-            StartLine pos ->
-                editState
-                    |> startAnnotation pos editMode images model
-                    => []
-
-            AddLine startPos endPos ->
-                editState
-                    |> addAnnotation ( (Line_ <| Line startPos endPos strokeColor stroke strokeStyle), NotSelected ) model
-                    => []
-
-            StartSpotlightRect pos ->
-                editState
-                    |> startAnnotation pos editMode images model
-                    => []
-
-            AddSpotlightRect startPos endPos ->
-                editState
-                    |> addAnnotation ( (Rect_ <| Rect startPos endPos SpotlightFill strokeColor stroke strokeStyle True), NotSelected ) model
                     => []
 
             ResizeDrawing { width, height } pos ->
-                editState
-                    |> skipChange model
+                model
                     |> setMouse pos
                     => []
 
@@ -560,47 +459,42 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     Nothing ->
                         model => []
 
-            ChangeEditMode editMode ->
-                { model | editMode = editMode }
+            ChangeDrawing drawing ->
+                { model | drawing = drawing }
                     |> closeDropdown
                     => []
 
             SelectFill fill ->
-                editState
+                model
                     |> updateAnySelectedAnnotations (updateFill fill)
-                    |> logChange model
                     |> setFill fill
                     |> closeDropdown
                     => []
 
             SelectStrokeColor strokeColor ->
-                editState
+                model
                     |> updateAnySelectedAnnotations (updateStrokeColor strokeColor)
-                    |> logChange model
                     |> setStrokeColor strokeColor
                     |> closeDropdown
                     => []
 
             SelectLineStroke lineStroke ->
-                editState
+                model
                     |> updateAnySelectedAnnotations (updateLineStroke lineStroke)
-                    |> logChange model
-                    |> setLineStroke lineStroke
+                    |> setStrokeWidth lineStroke
                     |> closeDropdown
                     => []
 
             SelectStrokeStyle strokeStyle ->
-                editState
+                model
                     |> updateAnySelectedAnnotations (updateStrokeStyle strokeStyle)
-                    |> logChange model
                     |> setStrokeStyle strokeStyle
                     |> closeDropdown
                     => []
 
             SelectFontSize fontSize ->
-                editState
-                    |> updateSelectedAnnotations (updateFontSize fontSize)
-                    |> logChange model
+                model
+                    |> updateAnySelectedAnnotations (updateFontSize fontSize)
                     |> setFontSize fontSize
                     |> closeDropdown
                     => []
@@ -615,47 +509,9 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     |> closeDropdown
                     => []
 
-            HoverOverAnnotation ->
-                { model
-                    | movementState =
-                        case model.movementState of
-                            ReadyToDraw ->
-                                HoveringOverAnnotation
-
-                            OutsideSelectedAnnotation ->
-                                HoveringOverSelectedAnnotation
-
-                            _ ->
-                                model.movementState
-                }
-                    => []
-
-            LeaveAnnotation ->
-                { model
-                    | movementState =
-                        case model.movementState of
-                            HoveringOverAnnotation ->
-                                ReadyToDraw
-
-                            HoveringOverSelectedAnnotation ->
-                                OutsideSelectedAnnotation
-
-                            HoveringOverVertex ->
-                                OutsideSelectedAnnotation
-
-                            _ ->
-                                model.movementState
-                }
-                    => []
-
-            ShowResizeIcon ->
-                { model | movementState = HoveringOverVertex }
-                    => []
-
             SelectAnnotation index annotation startPos ->
-                editState
-                    |> showVertices index annotation
-                    |> skipChange model
+                model
+                    |> selectAnnotation index annotation
                     |> startMovingAnnotation index annotation startPos
                     => []
 
@@ -665,45 +521,36 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                     => []
 
             StartMovingAnnotation index annotation startPos ->
-                editState
-                    |> removeAllVertices
-                    |> showVertices index annotation
-                    |> logChange model
+                model
+                    |> selectAnnotation index annotation
                     |> startMovingAnnotation index annotation startPos
                     => []
 
             MoveAnnotation index annotation oldPos newPos ->
-                editState
+                model
                     |> moveAnnotation index annotation oldPos newPos
-                    |> skipChange model
                     => []
 
             FinishMovingAnnotation index annotation startPos endPos ->
-                editState
+                model
                     |> moveAnnotation index annotation startPos endPos
-                    |> skipChange model
-                    |> hoverOverSelectedAnnotation
                     => []
 
             StartResizingAnnotation index annotation vertex startPos ->
-                editState
-                    |> showVertices index annotation
-                    |> logChange model
+                model
+                    |> selectAnnotation index annotation
                     |> startResizingAnnotation index annotation vertex startPos
                     => []
 
             ResizeAnnotation index annotation vertex startPos endPos ->
-                editState
+                model
                     |> resizeAnnotation index annotation vertex startPos endPos
-                    |> skipChange model
                     => []
 
             FinishResizingAnnotation index annotation vertex startPos endPos ->
-                editState
+                model
                     |> resizeAnnotation index annotation vertex startPos endPos
-                    |> showVertices index (resize startPos endPos vertex annotation)
-                    |> skipChange model
-                    |> hoverOverSelectedAnnotation
+                    |> selectAnnotation index annotation
                     => []
 
             Undo ->
@@ -714,7 +561,7 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
                 { model | edits = UndoList.redo model.edits }
                     => []
 
-            Export ->
+            Save ->
                 model
                     => [ case model.images of
                             Just images ->
@@ -727,248 +574,141 @@ update msg ({ edits, fill, fontSize, stroke, strokeColor, strokeStyle, mouse, im
 
 {-| Add this editState change to app history
 -}
-logChange : Model -> EditState -> Model
+logChange : Model -> Array Annotation -> Model
 logChange model editState =
     { model | edits = UndoList.new editState model.edits }
 
 
 {-| Do not add this editState change to app history
 -}
-skipChange : Model -> EditState -> Model
+skipChange : Model -> Array Annotation -> Model
 skipChange model editState =
     { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
-startAnnotation : Position -> EditMode -> Maybe (Zipper Image) -> Model -> EditState -> Model
-startAnnotation startPos editMode images model editState =
-    { editState | drawing = Just <| drawingFromEditMode startPos editMode model.keyboardState }
-        |> removeAllVertices
-        |> logChange model
-        |> startDrawing
+startAnnotation : Position -> Maybe (Zipper Image) -> Model -> Model
+startAnnotation startPos images model =
+    model
+        |> startDrawing startPos
         |> updateMouse images startPos
 
 
-startDrawing : Model -> Model
-startDrawing model =
-    { model | movementState = DrawingAnnotation }
+resetSelection : Model -> Model
+resetSelection model =
+    { model | annotationState = ReadyToDraw }
 
 
-changeDrawing : Drawing -> EditState -> EditState
-changeDrawing drawing editState =
-    { editState | drawing = Just drawing }
+startDrawing : StartPosition -> Model -> Model
+startDrawing startPos model =
+    { model | annotationState = DrawingAnnotation startPos }
 
 
-autoExpandAnnotation : AutoExpand.State -> String -> ( Annotation, SelectState ) -> ( Annotation, SelectState )
-autoExpandAnnotation state textValue ( annotation, selection ) =
+resetToReadyToDraw : Model -> Model
+resetToReadyToDraw model =
+    { model | annotationState = ReadyToDraw }
+
+
+updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
+updateAnySelectedAnnotations fn model =
+    case model.annotationState of
+        SelectedAnnotation index annotation ->
+            { model | edits = UndoList.new (Array.set index (fn annotation) model.edits.present) model.edits }
+
+        _ ->
+            model
+
+
+autoExpandAnnotation : AutoExpand.State -> String -> Annotation -> Annotation
+autoExpandAnnotation state textValue annotation =
     case annotation of
-        TextBox_ textBox ->
-            ( TextBox_ { textBox | autoexpand = state, text = textValue }, Selected )
+        TextBox textBox ->
+            TextBox { textBox | autoexpand = state, text = textValue }
 
         _ ->
-            ( annotation, selection )
+            annotation
 
 
-roundedRectDrawing : Bool -> StartPosition -> RoundedRectMode
-roundedRectDrawing shiftPressed startPos =
-    if shiftPressed then
-        DrawingRoundedSquare startPos
-    else
-        DrawingRoundedRect startPos
+selectAnnotation : Int -> Annotation -> Model -> Model
+selectAnnotation index annotation model =
+    { model | annotationState = SelectedAnnotation index annotation }
 
 
-drawingFromEditMode : Position -> EditMode -> Keyboard.State -> Drawing
-drawingFromEditMode startPos editMode keyboardState =
-    let
-        shiftPressed =
-            isPressed Shift keyboardState
-    in
-        case editMode of
-            EditRect ->
-                DrawRect <|
-                    if shiftPressed then
-                        DrawingSquare startPos
-                    else
-                        DrawingRect startPos
-
-            EditRoundedRect ->
-                DrawRoundedRect <| roundedRectDrawing shiftPressed startPos
-
-            EditEllipse ->
-                DrawEllipse <|
-                    if shiftPressed then
-                        DrawingCircle startPos
-                    else
-                        DrawingOval startPos
-
-            EditArrow ->
-                DrawArrow <|
-                    if shiftPressed then
-                        DrawingDiscreteArrow startPos
-                    else
-                        DrawingArrow startPos
-
-            EditLine ->
-                DrawLine <|
-                    if shiftPressed then
-                        DrawingDiscreteLine startPos
-                    else
-                        DrawingLine startPos
-
-            EditTextBox ->
-                DrawTextBox startPos
-
-            EditSpotlightRect ->
-                DrawSpotlightRect <| roundedRectDrawing shiftPressed startPos
+addAnnotation : Annotation -> Model -> Model
+addAnnotation annotation model =
+    { model | edits = UndoList.mapPresent (Array.push annotation) model.edits }
+        |> finishDrawing
 
 
-addAnnotation : ( Annotation, SelectState ) -> Model -> EditState -> Model
-addAnnotation annotation model editState =
-    { editState
-        | annotations = Array.push annotation editState.annotations
-        , drawing = Nothing
-    }
-        |> skipChange model
-        |> hoverOverAnnotation
+finishDrawing : Model -> Model
+finishDrawing model =
+    { model | annotationState = ReadyToDraw }
 
 
-startEditingTextBox : Int -> EditState -> EditState
-startEditingTextBox index editState =
-    { editState
-        | annotations =
-            case Array.get index editState.annotations of
-                Just ( textbox, _ ) ->
-                    Array.set index ( textbox, Selected ) editState.annotations
-
-                Nothing ->
-                    editState.annotations
-    }
-
-
-startEditingText : Int -> Model -> EditState -> Model
-startEditingText index model editState =
-    { model
-        | edits = UndoList.new (startEditingTextBox index editState) model.edits
-        , movementState = EditingATextBox index
-    }
-
-
-updateSelectedAnnotations : (Annotation -> Annotation) -> EditState -> EditState
-updateSelectedAnnotations fn editState =
-    { editState | annotations = Array.map (updateSelectedAnnotation fn) editState.annotations }
-
-
-updateAnySelectedAnnotations : (Annotation -> Annotation) -> EditState -> EditState
-updateAnySelectedAnnotations fn editState =
-    { editState | annotations = Array.map (updateAnySelectedAnnotation fn) editState.annotations }
-
-
-updateAnySelectedAnnotation : (Annotation -> Annotation) -> ( Annotation, SelectState ) -> ( Annotation, SelectState )
-updateAnySelectedAnnotation fn ( annotation, selectState ) =
-    if isSelected selectState then
-        ( fn annotation, selectState )
-    else
-        ( annotation, selectState )
-
-
-updateSelectedAnnotation : (Annotation -> Annotation) -> ( Annotation, SelectState ) -> ( Annotation, SelectState )
-updateSelectedAnnotation updateAnno ( annotation, selectState ) =
-    case selectState of
-        Selected ->
-            ( updateAnno annotation, selectState )
-
-        _ ->
-            ( annotation, selectState )
+startEditingText : Int -> Model -> Model
+startEditingText index model =
+    { model | annotationState = EditingATextBox index }
 
 
 updateStrokeColor : Color -> Annotation -> Annotation
 updateStrokeColor strokeColor annotation =
     case annotation of
-        Arrow_ line ->
-            Arrow_ { line | fill = strokeColor }
+        Lines lineType line ->
+            Lines lineType { line | strokeColor = strokeColor }
 
-        Rect_ rect ->
-            Rect_ { rect | strokeColor = strokeColor }
+        Shapes shapeType shape ->
+            Shapes shapeType { shape | strokeColor = strokeColor }
 
-        Ellipse_ ellipse ->
-            Ellipse_ { ellipse | strokeColor = strokeColor }
-
-        TextBox_ textBox ->
-            TextBox_ { textBox | fill = strokeColor }
-
-        Line_ line ->
-            Line_ { line | fill = strokeColor }
+        TextBox textBox ->
+            TextBox { textBox | fill = strokeColor }
 
 
 updateFill : Fill -> Annotation -> Annotation
 updateFill fill annotation =
     case annotation of
-        Arrow_ _ ->
+        Lines _ _ ->
             annotation
 
-        Rect_ rect ->
-            Rect_ { rect | fill = fill }
+        Shapes shapeType shape ->
+            Shapes shapeType { shape | fill = fill }
 
-        Ellipse_ ellipse ->
-            Ellipse_ { ellipse | fill = fill }
-
-        TextBox_ textBox ->
-            annotation
-
-        Line_ _ ->
+        TextBox textBox ->
             annotation
 
 
-updateLineStroke : LineStroke -> Annotation -> Annotation
-updateLineStroke lineStroke annotation =
+updateLineStroke : StrokeWidth -> Annotation -> Annotation
+updateLineStroke strokeWidth annotation =
     case annotation of
-        Arrow_ line ->
-            Arrow_ { line | stroke = lineStroke }
+        Lines lineType line ->
+            Lines lineType { line | strokeWidth = strokeWidth }
 
-        Rect_ rect ->
-            Rect_ { rect | stroke = lineStroke }
+        Shapes shapeType shape ->
+            Shapes shapeType { shape | strokeWidth = strokeWidth }
 
-        Ellipse_ ellipse ->
-            Ellipse_ { ellipse | stroke = lineStroke }
-
-        TextBox_ textBox ->
+        TextBox textBox ->
             annotation
-
-        Line_ line ->
-            Line_ { line | stroke = lineStroke }
 
 
 updateStrokeStyle : StrokeStyle -> Annotation -> Annotation
 updateStrokeStyle strokeStyle annotation =
     case annotation of
-        Arrow_ line ->
-            Arrow_ { line | strokeStyle = strokeStyle }
+        Lines lineType line ->
+            Lines lineType { line | strokeStyle = strokeStyle }
 
-        Rect_ rect ->
-            Rect_ { rect | strokeStyle = strokeStyle }
+        Shapes shapeType shape ->
+            Shapes shapeType { shape | strokeStyle = strokeStyle }
 
-        Ellipse_ ellipse ->
-            Ellipse_ { ellipse | strokeStyle = strokeStyle }
-
-        TextBox_ textBox ->
+        TextBox textBox ->
             annotation
-
-        Line_ line ->
-            Line_ { line | strokeStyle = strokeStyle }
 
 
 updateFontSize : Float -> Annotation -> Annotation
 updateFontSize fontSize annotation =
     case annotation of
-        TextBox_ textBox ->
-            TextBox_ { textBox | fontSize = fontSize }
+        TextBox textBox ->
+            TextBox { textBox | fontSize = fontSize }
 
         _ ->
             annotation
-
-
-verticesAreShown : Model -> Model
-verticesAreShown model =
-    { model | movementState = HoveringOverSelectedAnnotation }
 
 
 setFill : Fill -> Model -> Model
@@ -981,9 +721,9 @@ setFontSize fontSize model =
     { model | fontSize = fontSize }
 
 
-setLineStroke : LineStroke -> Model -> Model
-setLineStroke lineStroke model =
-    { model | stroke = lineStroke }
+setStrokeWidth : StrokeWidth -> Model -> Model
+setStrokeWidth strokeWidth model =
+    { model | strokeWidth = strokeWidth }
 
 
 setStrokeStyle : StrokeStyle -> Model -> Model
@@ -996,39 +736,24 @@ setStrokeColor strokeColor model =
     { model | strokeColor = strokeColor }
 
 
-showVertices : Int -> Annotation -> EditState -> EditState
-showVertices index annotation editState =
-    { editState | annotations = Array.set index ( annotation, SelectedWithVertices ) editState.annotations }
-
-
-removeAllVertices : EditState -> EditState
-removeAllVertices editState =
-    { editState | annotations = Array.map (Tuple.mapSecond (always NotSelected)) editState.annotations }
-
-
-removeVertices : ( Annotation, SelectState ) -> ( Annotation, SelectState )
-removeVertices ( annotation, selectState ) =
-    ( annotation, NotSelected )
-
-
 startMovingAnnotation : Int -> Annotation -> StartPosition -> Model -> Model
 startMovingAnnotation index annotation startPos model =
-    { model | movementState = MovingAnnotation index annotation startPos }
+    { model | annotationState = MovingAnnotation index annotation startPos }
 
 
-moveAnnotation : Int -> Annotation -> StartPosition -> EndPosition -> EditState -> EditState
-moveAnnotation index annotation oldPos newPos editState =
-    { editState | annotations = Array.set index ( move oldPos newPos annotation, SelectedWithVertices ) editState.annotations }
+moveAnnotation : Int -> Annotation -> StartPosition -> EndPosition -> Model -> Model
+moveAnnotation index annotation oldPos newPos model =
+    { model | edits = UndoList.mapPresent (Array.set index (move oldPos newPos annotation)) model.edits }
 
 
 startResizingAnnotation : Int -> Annotation -> Vertex -> StartPosition -> Model -> Model
 startResizingAnnotation index annotation vertex startPos model =
-    { model | movementState = ResizingAnnotation index annotation startPos vertex }
+    { model | annotationState = ResizingAnnotation index annotation startPos vertex }
 
 
-resizeAnnotation : Int -> Annotation -> Vertex -> StartPosition -> EndPosition -> EditState -> EditState
-resizeAnnotation index annotation vertex oldPos newPos editState =
-    { editState | annotations = Array.set index ( resize oldPos newPos vertex annotation, SelectedWithVertices ) editState.annotations }
+resizeAnnotation : Int -> Annotation -> Vertex -> StartPosition -> EndPosition -> Model -> Model
+resizeAnnotation index annotation vertex oldPos newPos model =
+    { model | edits = UndoList.mapPresent (Array.set index (resize oldPos newPos vertex annotation)) model.edits }
 
 
 resizeVertices : Position -> Vertex -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
@@ -1050,20 +775,14 @@ resizeVertices pos vertex annotation =
 resize : StartPosition -> EndPosition -> Vertex -> Annotation -> Annotation
 resize start end vertex annotation =
     case annotation of
-        Arrow_ arrow ->
-            Arrow_ <| resizeVertices end vertex arrow
+        Lines lineType line ->
+            Lines lineType (resizeVertices end vertex line)
 
-        Rect_ rect ->
-            Rect_ <| resizeVertices end vertex rect
+        Shapes shapeType shape ->
+            Shapes shapeType (resizeVertices end vertex shape)
 
-        Ellipse_ ellipse ->
-            Ellipse_ <| resizeVertices end vertex ellipse
-
-        TextBox_ textBox ->
-            TextBox_ <| resizeVertices end vertex textBox
-
-        Line_ line ->
-            Line_ <| resizeVertices end vertex line
+        TextBox textArea ->
+            TextBox (resizeVertices end vertex textArea)
 
 
 move : StartPosition -> EndPosition -> Annotation -> Annotation
@@ -1074,22 +793,19 @@ move oldPos newPos annotation =
 
         dY =
             newPos.y - oldPos.y
+
+        shift drawing =
+            { drawing | start = shiftPosition dX dY drawing.start, end = shiftPosition dX dY drawing.end }
     in
         case annotation of
-            Arrow_ arrow ->
-                Arrow_ { arrow | start = shiftPosition dX dY arrow.start, end = shiftPosition dX dY arrow.end }
+            Lines lineType line ->
+                Lines lineType (shift line)
 
-            Rect_ rect ->
-                Rect_ { rect | start = shiftPosition dX dY rect.start, end = shiftPosition dX dY rect.end }
+            Shapes shapeType shape ->
+                Shapes shapeType (shift shape)
 
-            Ellipse_ ellipse ->
-                Ellipse_ { ellipse | start = shiftPosition dX dY ellipse.start, end = shiftPosition dX dY ellipse.end }
-
-            TextBox_ textBox ->
-                TextBox_ { textBox | start = shiftPosition dX dY textBox.start, end = shiftPosition dX dY textBox.end }
-
-            Line_ line ->
-                Line_ { line | start = shiftPosition dX dY line.start, end = shiftPosition dX dY line.end }
+            TextBox textArea ->
+                TextBox (shift textArea)
 
 
 shiftPosition : Int -> Int -> Mouse.Position -> Mouse.Position
@@ -1097,22 +813,12 @@ shiftPosition dx dy pos =
     { pos | x = pos.x + dx, y = pos.y + dy }
 
 
-hoverOverAnnotation : Model -> Model
-hoverOverAnnotation model =
-    { model | movementState = HoveringOverAnnotation }
-
-
-hoverOverSelectedAnnotation : Model -> Model
-hoverOverSelectedAnnotation model =
-    { model | movementState = HoveringOverSelectedAnnotation }
-
-
 closeDropdown : Model -> Model
 closeDropdown model =
     { model | currentDropdown = Nothing }
 
 
-toggleDropdown : EditOption -> Model -> Model
+toggleDropdown : AttributeDropdown -> Model -> Model
 toggleDropdown editOption model =
     { model
         | currentDropdown =
@@ -1125,14 +831,23 @@ toggleDropdown editOption model =
 
                 Nothing ->
                     Just editOption
-        , editMode =
+        , drawing =
             case editOption of
                 Fonts ->
-                    EditTextBox
+                    selectShape TextBorder model.keyboardState
 
                 _ ->
-                    model.editMode
+                    model.drawing
     }
+
+
+selectShape : ShapeType -> Keyboard.State -> Drawing
+selectShape shapeType keyboardState =
+    DrawShape shapeType <|
+        if isPressed Shift keyboardState then
+            DrawingEqualizedShape
+        else
+            DrawingShape
 
 
 updateMouse : Maybe (Zipper Image) -> Position -> Model -> Model
@@ -1154,147 +869,39 @@ setMouse mouse model =
     { model | mouse = mouse }
 
 
-updateDrawing : EditState -> Drawing -> EditState
-updateDrawing editState drawing =
-    { editState | drawing = Just drawing }
-
-
 transitionOnShift : Drawing -> Drawing
 transitionOnShift drawing =
     case drawing of
-        DrawRect rectMode ->
-            DrawRect <|
-                case rectMode of
-                    DrawingRect start ->
-                        DrawingSquare start
+        DrawLine lineType lineMode ->
+            case lineMode of
+                DrawingLine ->
+                    DrawLine lineType DrawingDiscreteLine
 
-                    DrawingSquare start ->
-                        DrawingRect start
+                DrawingDiscreteLine ->
+                    DrawLine lineType DrawingLine
 
-        DrawRoundedRect roundedRectMode ->
-            DrawRoundedRect <| toggleRoundedSquare roundedRectMode
+        DrawShape shapeType shapeMode ->
+            case shapeMode of
+                DrawingShape ->
+                    DrawShape shapeType DrawingEqualizedShape
 
-        DrawArrow arrowMode ->
-            DrawArrow <|
-                case arrowMode of
-                    DrawingArrow startPos ->
-                        DrawingDiscreteArrow startPos
-
-                    DrawingDiscreteArrow startPos ->
-                        DrawingArrow startPos
-
-        DrawEllipse ellipseMode ->
-            DrawEllipse <|
-                case ellipseMode of
-                    DrawingOval startPos ->
-                        DrawingCircle startPos
-
-                    DrawingCircle startPos ->
-                        DrawingOval startPos
-
-        DrawLine lineMode ->
-            DrawLine <|
-                case lineMode of
-                    DrawingLine startPos ->
-                        DrawingDiscreteLine startPos
-
-                    DrawingDiscreteLine startPos ->
-                        DrawingLine startPos
-
-        DrawTextBox _ ->
-            drawing
-
-        DrawSpotlightRect roundedRectMode ->
-            DrawSpotlightRect <| toggleRoundedSquare roundedRectMode
+                DrawingEqualizedShape ->
+                    DrawShape shapeType DrawingShape
 
 
-toggleRoundedSquare : RoundedRectMode -> RoundedRectMode
-toggleRoundedSquare roundedRectMode =
-    case roundedRectMode of
-        DrawingRoundedRect start ->
-            DrawingRoundedSquare start
-
-        DrawingRoundedSquare start ->
-            DrawingRoundedRect start
+cancelDrawing : Model -> Model
+cancelDrawing model =
+    { model | annotationState = ReadyToDraw }
 
 
-updateDrawingsOnShift : EditState -> EditState
-updateDrawingsOnShift editState =
-    case editState.drawing of
-        Just drawing ->
-            transitionOnShift drawing
-                |> updateDrawing editState
-
-        Nothing ->
-            editState
-
-
-cancelDrawing : EditState -> EditState
-cancelDrawing editState =
-    { editState | drawing = Nothing }
-
-
-deleteSelectedDrawings : EditState -> EditState
-deleteSelectedDrawings editState =
-    { editState | annotations = Array.filter (not << isSelected << Tuple.second) editState.annotations }
-
-
-isSelected : SelectState -> Bool
-isSelected selectState =
-    case selectState of
-        Selected ->
-            True
-
-        NotSelected ->
-            False
-
-        SelectedWithVertices ->
-            True
-
-
-finishEditingTextHelper : Int -> EditState -> EditState
-finishEditingTextHelper index editState =
-    { editState
-        | annotations =
-            case Array.get index editState.annotations of
-                Just ( annotation, _ ) ->
-                    Array.set index ( annotation, NotSelected ) editState.annotations
-
-                Nothing ->
-                    editState.annotations
-    }
-
-
-finishEditingText : Int -> Model -> EditState -> Model
-finishEditingText index model editState =
-    { model
-        | edits = UndoList.new (finishEditingTextHelper index editState) model.edits
-        , movementState = ReadyToDraw
-    }
-
-
-resetToReadyToDraw : Model -> Model
-resetToReadyToDraw model =
-    { model
-        | movementState =
-            case model.movementState of
-                OutsideSelectedAnnotation ->
-                    OutsideSelectedAnnotation
-
-                MovingAnnotation _ _ _ ->
-                    OutsideSelectedAnnotation
-
-                ResizingAnnotation _ _ _ _ ->
-                    OutsideSelectedAnnotation
-
-                _ ->
-                    ReadyToDraw
-    }
+finishEditingText : Int -> Model -> Model
+finishEditingText index model =
+    { model | annotationState = ReadyToDraw }
 
 
 alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
 alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
-    case model.movementState of
+    case model.annotationState of
         EditingATextBox index ->
             alterTextBoxDrawing maybeKeyChange index model
 
@@ -1311,8 +918,7 @@ alterTextBoxDrawing maybeKeyChange index model =
                 KeyDown key ->
                     case key of
                         Escape ->
-                            model.edits.present
-                                |> finishEditingText index model
+                            finishEditingText index model
                                 => [ "text-box-edit--"
                                         ++ toString index
                                         |> Dom.blur
@@ -1327,6 +933,16 @@ alterTextBoxDrawing maybeKeyChange index model =
 
         Nothing ->
             model => []
+
+
+deleteSelectedDrawing : Array Annotation -> Array Annotation
+deleteSelectedDrawing editState =
+    editState
+
+
+changeDrawing : Drawing -> Model -> Model
+changeDrawing drawing model =
+    { model | drawing = drawing }
 
 
 alterDrawing : Maybe KeyChange -> Model -> Model
@@ -1346,21 +962,21 @@ alterDrawing maybeKeyChange ({ keyboardState } as model) =
                     KeyDown key ->
                         case key of
                             Shift ->
-                                { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
+                                changeDrawing (transitionOnShift model.drawing) model
 
                             Escape ->
-                                { model | edits = UndoList.mapPresent cancelDrawing model.edits }
+                                cancelDrawing model
 
                             Delete ->
                                 { model
-                                    | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
-                                    , movementState = ReadyToDraw
+                                    | edits = UndoList.new (deleteSelectedDrawing model.edits.present) model.edits
+                                    , annotationState = ReadyToDraw
                                 }
 
                             BackSpace ->
                                 { model
-                                    | edits = UndoList.new (deleteSelectedDrawings model.edits.present) model.edits
-                                    , movementState = ReadyToDraw
+                                    | edits = UndoList.new (deleteSelectedDrawing model.edits.present) model.edits
+                                    , annotationState = ReadyToDraw
                                 }
 
                             CharZ ->
@@ -1397,7 +1013,7 @@ alterDrawing maybeKeyChange ({ keyboardState } as model) =
                     KeyUp key ->
                         case key of
                             Shift ->
-                                { model | edits = UndoList.mapPresent updateDrawingsOnShift model.edits }
+                                changeDrawing (transitionOnShift model.drawing) model
 
                             _ ->
                                 model
@@ -1463,21 +1079,24 @@ viewInfoScreen =
 
 
 viewImageAnnotator : Model -> Image -> Html Msg
-viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDropdown, editMode } as model) selectedImage =
+viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDropdown, drawing } as model) selectedImage =
     let
         toDropdownMenu =
-            viewDropdownMenu currentDropdown editMode model
+            viewDropdownMenu currentDropdown drawing model
+
+        shiftPressed =
+            isPressed Shift keyboardState
     in
         div
             [ Html.class "annotation-app" ]
             [ div [ Html.class "controls" ]
                 [ div [ Html.class "columns" ]
                     [ button [ onClick Cancel, Html.class "cancel-button" ] [ Html.text "Cancel" ]
-                    , button [ onClick Export, Html.class "save-button" ] [ Html.text "Save" ]
+                    , button [ onClick Save, Html.class "save-button" ] [ Html.text "Save" ]
                     ]
                 , viewHistoryControls edits
                 , div [ Html.class "columns" ]
-                    (List.map (viewDrawingButton editMode toDropdownMenu) drawingOptions
+                    (List.map (viewDrawingButton drawing toDropdownMenu) (drawingOptions shiftPressed)
                         ++ [ viewFillDropdown toDropdownMenu fill
                            , viewStrokeColorDropdown toDropdownMenu strokeColor
                            , viewLineStrokeDropdown toDropdownMenu
@@ -1488,21 +1107,50 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
             ]
 
 
-viewDrawingButton : EditMode -> (EditOption -> Html Msg) -> EditMode -> Html Msg
-viewDrawingButton selectedEditMode toDropdownMenu editMode =
-    case editMode of
-        EditTextBox ->
-            viewTextSizeDropdown selectedEditMode toDropdownMenu
+drawingsAreEqual : Drawing -> Drawing -> Bool
+drawingsAreEqual drawing drawing2 =
+    case drawing of
+        DrawLine lineType _ ->
+            case drawing2 of
+                DrawLine lineType2 _ ->
+                    lineType == lineType2
 
-        _ ->
+                _ ->
+                    False
+
+        DrawShape shapeType _ ->
+            case drawing2 of
+                DrawShape shapeType2 _ ->
+                    shapeType == shapeType2
+
+                _ ->
+                    False
+
+
+viewDrawingButton : Drawing -> (AttributeDropdown -> Html Msg) -> Drawing -> Html Msg
+viewDrawingButton selectedDrawing toDropdownMenu drawing =
+    case drawing of
+        DrawLine lineType lineMode ->
             button
-                [ Html.classList [ "drawing-button" => True, "drawing-button--selected" => selectedEditMode == editMode ]
-                , onClick <| ChangeEditMode editMode
+                [ Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing ]
+                , onClick <| ChangeDrawing drawing
                 ]
-                [ viewShapeSvg editMode ]
+                [ viewShapeSvg drawing ]
+
+        DrawShape shapeType shapeMode ->
+            case shapeType of
+                TextBorder ->
+                    viewTextSizeDropdown selectedDrawing toDropdownMenu
+
+                _ ->
+                    button
+                        [ Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing ]
+                        , onClick <| ChangeDrawing drawing
+                        ]
+                        [ viewShapeSvg drawing ]
 
 
-viewHistoryControls : UndoList EditState -> Html Msg
+viewHistoryControls : UndoList (Array Annotation) -> Html Msg
 viewHistoryControls edits =
     div [ Html.class "history-controls" ]
         [ button [ onClick Undo, Html.class "history-button", disabled <| not <| UndoList.hasPast edits ] [ viewUndoArrow ]
@@ -1510,12 +1158,12 @@ viewHistoryControls edits =
         ]
 
 
-viewTextSizeDropdown : EditMode -> (EditOption -> Html Msg) -> Html Msg
-viewTextSizeDropdown editMode toDropdownMenu =
+viewTextSizeDropdown : Drawing -> (AttributeDropdown -> Html Msg) -> Html Msg
+viewTextSizeDropdown drawing toDropdownMenu =
     div [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
-            , Html.classList [ "drawing-button" => True, "drawing-button--selected" => editMode == EditTextBox ]
+            , Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual drawing (DrawShape TextBorder DrawingShape) ]
             ]
             [ viewTextIcon ]
         , toDropdownMenu Fonts
@@ -1579,7 +1227,7 @@ viewFontSizeOption selectedFontSize fontSize =
         [ Html.text <| toString <| fontSize ]
 
 
-viewLineStrokeDropdown : (EditOption -> Html Msg) -> Html Msg
+viewLineStrokeDropdown : (AttributeDropdown -> Html Msg) -> Html Msg
 viewLineStrokeDropdown toDropdownMenu =
     div
         [ Html.class "dropdown-things" ]
@@ -1593,7 +1241,7 @@ viewLineStrokeDropdown toDropdownMenu =
         ]
 
 
-viewFillDropdown : (EditOption -> Html Msg) -> Fill -> Html Msg
+viewFillDropdown : (AttributeDropdown -> Html Msg) -> Fill -> Html Msg
 viewFillDropdown toDropdownMenu fill =
     div
         [ Html.class "dropdown-things" ]
@@ -1607,7 +1255,7 @@ viewFillDropdown toDropdownMenu fill =
         ]
 
 
-viewStrokeColorDropdown : (EditOption -> Html Msg) -> Color -> Html Msg
+viewStrokeColorDropdown : (AttributeDropdown -> Html Msg) -> Color -> Html Msg
 viewStrokeColorDropdown toDropdownMenu strokeColor =
     div
         [ Html.class "dropdown-things" ]
@@ -1621,13 +1269,13 @@ viewStrokeColorDropdown toDropdownMenu strokeColor =
         ]
 
 
-viewDropdownMenu : Maybe EditOption -> EditMode -> Model -> EditOption -> Html Msg
-viewDropdownMenu maybeDropdown curEditMode model selectedOption =
-    Maybe.map (viewDropdownOptions curEditMode model selectedOption) maybeDropdown
+viewDropdownMenu : Maybe AttributeDropdown -> Drawing -> Model -> AttributeDropdown -> Html Msg
+viewDropdownMenu maybeDropdown drawing model selectedOption =
+    Maybe.map (viewDropdownOptions drawing model selectedOption) maybeDropdown
         |> Maybe.withDefault (Html.text "")
 
 
-viewDropdownOptions : EditMode -> Model -> EditOption -> EditOption -> Html Msg
+viewDropdownOptions : Drawing -> Model -> AttributeDropdown -> AttributeDropdown -> Html Msg
 viewDropdownOptions curEditMode model selectedOption editOption =
     if selectedOption /= editOption then
         Html.text ""
@@ -1643,35 +1291,39 @@ viewDropdownOptions curEditMode model selectedOption editOption =
                 viewStrokeColorOptions model.strokeColor
 
             Strokes ->
-                viewLineStrokeOptions model.stroke model.strokeStyle
+                viewLineStrokeOptions model.strokeWidth model.strokeStyle
 
 
-viewShapeSvg : EditMode -> Html Msg
-viewShapeSvg editMode =
-    case editMode of
-        EditRect ->
-            viewRectangleIcon
+viewShapeSvg : Drawing -> Html Msg
+viewShapeSvg drawing =
+    case drawing of
+        DrawLine lineType _ ->
+            case lineType of
+                StraightLine ->
+                    viewLineIcon
 
-        EditRoundedRect ->
-            viewRoundedRectangleIcon
+                Arrow ->
+                    viewArrowIcon
 
-        EditEllipse ->
-            viewEllipseIcon
+        DrawShape shapeType _ ->
+            case shapeType of
+                Rect ->
+                    viewRectangleIcon
 
-        EditArrow ->
-            viewArrowIcon
+                RoundedRect ->
+                    viewRoundedRectangleIcon
 
-        EditLine ->
-            viewLineIcon
+                Ellipse ->
+                    viewEllipseIcon
 
-        EditTextBox ->
-            viewTextIcon
+                TextBorder ->
+                    viewTextIcon
 
-        EditSpotlightRect ->
-            viewSpotlightIcon
+                SpotlightRect ->
+                    viewSpotlightIcon
 
 
-viewLineStrokeOptions : LineStroke -> StrokeStyle -> Html Msg
+viewLineStrokeOptions : StrokeWidth -> StrokeStyle -> Html Msg
 viewLineStrokeOptions strokeWidth strokeStyle =
     [ List.map (viewLineStrokeOption strokeWidth) lineStrokeOptions
     , List.map (viewStrokeStyleOption strokeStyle) strokeStyles
@@ -1701,7 +1353,7 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         ]
 
 
-viewLineStrokeOption : LineStroke -> LineStroke -> Html Msg
+viewLineStrokeOption : StrokeWidth -> StrokeWidth -> Html Msg
 viewLineStrokeOption selectedStroke stroke =
     button
         [ Html.classList
@@ -1713,95 +1365,41 @@ viewLineStrokeOption selectedStroke stroke =
         [ viewLineStroke (strokeToWidth stroke) [] ]
 
 
-drawingStateEvents : EditMode -> Maybe Drawing -> Position -> List (Html.Attribute Msg)
-drawingStateEvents editMode maybeDrawing mouse =
-    case maybeDrawing of
-        Just drawing ->
-            drawingEvents drawing mouse
+drawingStateEvents : Drawing -> AnnotationState -> Position -> List (Html.Attribute Msg)
+drawingStateEvents drawing annotationState mouse =
+    case annotationState of
+        ReadyToDraw ->
+            [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position ]
 
-        Nothing ->
-            case editMode of
-                EditArrow ->
-                    [ onMouseDown <| Json.map (StartArrow << toDrawingPosition) Mouse.position ]
+        DrawingAnnotation startPos ->
+            drawingEvents drawing mouse startPos
 
-                EditLine ->
-                    [ onMouseDown <| Json.map (StartLine << toDrawingPosition) Mouse.position ]
+        MovingAnnotation index annotation startPos ->
+            [ Html.Events.onMouseLeave ResetToReadyToDraw
+            , SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
+            ]
 
-                EditRect ->
-                    [ onMouseDown <| Json.map (StartRect << toDrawingPosition) Mouse.position ]
+        ResizingAnnotation index annotation startPos vertex ->
+            [ Html.Events.onMouseLeave ResetToReadyToDraw
+            , SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
+            ]
 
-                EditRoundedRect ->
-                    [ onMouseDown <| Json.map (StartRoundedRect << toDrawingPosition) Mouse.position ]
+        SelectedAnnotation index annotation ->
+            []
 
-                EditEllipse ->
-                    [ onMouseDown <| Json.map (StartEllipse << toDrawingPosition) Mouse.position ]
-
-                EditTextBox ->
-                    [ onMouseDown <| Json.map (StartTextBox << toDrawingPosition) Mouse.position ]
-
-                EditSpotlightRect ->
-                    [ onMouseDown <| Json.map (StartSpotlightRect << toDrawingPosition) Mouse.position ]
+        EditingATextBox index ->
+            [ SE.onClick <| FinishEditingText index ]
 
 
-drawingEvents : Drawing -> Mouse.Position -> List (Html.Attribute Msg)
-drawingEvents drawing curMouse =
-    case drawing of
-        DrawRect rectMode ->
-            case rectMode of
-                DrawingRect startPos ->
-                    onMouseUpOrLeave <| Json.map (AddRect startPos << toDrawingPosition) Mouse.position
-
-                DrawingSquare startPos ->
-                    onMouseUpOrLeave <| Json.map (AddRect startPos << equalXandY startPos << toDrawingPosition) Mouse.position
-
-        DrawRoundedRect rectMode ->
-            case rectMode of
-                DrawingRoundedRect startPos ->
-                    onMouseUpOrLeave <| Json.map (AddRoundedRect startPos << toDrawingPosition) Mouse.position
-
-                DrawingRoundedSquare startPos ->
-                    onMouseUpOrLeave <| Json.map (AddRoundedRect startPos << equalXandY startPos << toDrawingPosition) Mouse.position
-
-        DrawArrow arrowMode ->
-            case arrowMode of
-                DrawingArrow startPos ->
-                    onMouseUpOrLeave <| Json.map (AddArrow startPos << toDrawingPosition) Mouse.position
-
-                DrawingDiscreteArrow startPos ->
-                    onMouseUpOrLeave <| Json.map (AddArrow startPos << stepMouse startPos << toDrawingPosition) Mouse.position
-
-        DrawEllipse ellipseDrawing ->
-            case ellipseDrawing of
-                DrawingOval startPos ->
-                    onMouseUpOrLeave <| Json.map (AddEllipse startPos << toDrawingPosition) Mouse.position
-
-                DrawingCircle startPos ->
-                    onMouseUpOrLeave <| Json.map (AddEllipse startPos << equalXandY startPos << toDrawingPosition) Mouse.position
-
-        DrawTextBox start ->
-            onMouseUpOrLeave (Json.map (AddTextBox start << toDrawingPosition) Mouse.position)
-
-        DrawLine lineDrawing ->
-            case lineDrawing of
-                DrawingLine startPos ->
-                    onMouseUpOrLeave (Json.map (AddLine startPos << toDrawingPosition) Mouse.position)
-
-                DrawingDiscreteLine startPos ->
-                    onMouseUpOrLeave <| Json.map (AddLine startPos << stepMouse startPos << toDrawingPosition) Mouse.position
-
-        DrawSpotlightRect roundedRectMode ->
-            case roundedRectMode of
-                DrawingRoundedRect startPos ->
-                    onMouseUpOrLeave <| Json.map (AddSpotlightRect startPos << toDrawingPosition) Mouse.position
-
-                DrawingRoundedSquare startPos ->
-                    onMouseUpOrLeave <| Json.map (AddSpotlightRect startPos << equalXandY startPos << toDrawingPosition) Mouse.position
+drawingEvents : Drawing -> StartPosition -> Mouse.Position -> List (Html.Attribute Msg)
+drawingEvents drawing startPos curMouse =
+    onMouseUpOrLeave <| Json.map (FinishDrawing startPos << toDrawingPosition) Mouse.position
 
 
 viewCanvas : Model -> Image -> Html Msg
 viewCanvas model image =
     let
-        editState =
+        annotations =
             model.edits.present
 
         attrs =
@@ -1810,72 +1408,31 @@ viewCanvas model image =
             , Html.style
                 [ "width" => toString (round image.width) ++ "px"
                 , "height" => toString (round image.height) ++ "px"
-                , "cursor" => movementStateToCursor model.movementState
+                , "cursor" => annotationStateToCursor model.annotationState
                 ]
             ]
-                ++ case model.movementState of
-                    ReadyToDraw ->
-                        drawingStateEvents model.editMode editState.drawing model.mouse
+                ++ drawingStateEvents model.drawing model.annotationState model.mouse
 
-                    DrawingAnnotation ->
-                        drawingStateEvents model.editMode editState.drawing model.mouse
-
-                    HoveringOverAnnotation ->
-                        [ Html.Events.onMouseLeave ResetToReadyToDraw ]
-
-                    HoveringOverSelectedAnnotation ->
-                        [ Html.Events.onMouseLeave ResetToReadyToDraw ]
-
-                    HoveringOverVertex ->
-                        [ Html.Events.onMouseLeave ResetToReadyToDraw ]
-
-                    OutsideSelectedAnnotation ->
-                        drawingStateEvents model.editMode editState.drawing model.mouse
-
-                    MovingAnnotation index annotation startPos ->
-                        [ Html.Events.onMouseLeave ResetToReadyToDraw
-                        , SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
-                        ]
-
-                    ResizingAnnotation index annotation startPos vertex ->
-                        [ Html.Events.onMouseLeave ResetToReadyToDraw
-                        , SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
-                        ]
-
-                    EditingATextBox index ->
-                        drawingStateEvents model.editMode editState.drawing model.mouse ++ [ SE.onClick <| FinishEditingText index ]
-
-        toDrawing =
-            case editState.drawing of
-                Just drawing ->
-                    viewDrawing image.width image.height drawing model
-
-                Nothing ->
-                    always (Svg.text "")
-
-        annotations =
-            editState.annotations
+        normalAnnotations =
+            annotations
                 |> Array.toList
-                |> List.indexedMap (viewAnnotation image.width image.height model.movementState)
+                |> List.indexedMap (viewAnnotation image.width image.height model.annotationState)
                 |> List.concat
 
         spotlights =
-            editState.annotations
-                |> Array.filter (isSpotlightShape << Tuple.first)
-                |> Array.map (Tuple.mapFirst spotlightFillToMaskFill)
+            annotations
+                |> Array.filter isSpotlightShape
+                |> Array.map spotlightFillToMaskFill
                 |> Array.toList
-                |> List.indexedMap (viewAnnotation image.width image.height model.movementState)
+                |> List.indexedMap (viewAnnotation image.width image.height model.annotationState)
                 |> List.concat
 
-        cutOuts =
-            if isDrawingSpotlight editState.drawing then
-                spotlights ++ [ toDrawing True ]
-            else
-                spotlights
+        toDrawing start isInMask =
+            viewDrawing image.width image.height start model isInMask
 
-        definitions =
+        definitions cutOuts =
             List.map viewArrowHeadDefinition strokeColorOptions
-                |> (::) (viewMask model.movementState image.width image.height cutOuts)
+                |> (::) (viewMask model.annotationState image.width image.height cutOuts)
                 |> (::) viewSvgFilters
                 |> defs []
                 |> List.singleton
@@ -1884,30 +1441,61 @@ viewCanvas model image =
             [ rect [ x "0", y "0", Attr.height <| toString image.height, Attr.width <| toString image.width, Attr.mask "url(#Mask)", Attr.style "pointer-events: none;" ] [] ]
 
         firstSpotlightIndex =
-            editState.annotations
+            annotations
                 |> Array.toList
-                |> List.Extra.findIndex (isSpotlightShape << Tuple.first)
+                |> List.Extra.findIndex isSpotlightShape
                 |> Maybe.withDefault 0
 
-        svgChildren =
-            if List.isEmpty spotlights && not (isDrawingSpotlight editState.drawing) then
-                annotations ++ definitions ++ [ toDrawing False ]
-            else if isDrawingSpotlight editState.drawing then
-                definitions ++ (List.take firstSpotlightIndex annotations) ++ mask ++ (List.drop firstSpotlightIndex annotations) ++ [ toDrawing False ]
-            else
-                definitions ++ (List.take firstSpotlightIndex annotations) ++ mask ++ (List.drop firstSpotlightIndex annotations) ++ [ toDrawing False ]
+        annotationsWithMask =
+            (List.take firstSpotlightIndex normalAnnotations) ++ mask ++ (List.drop firstSpotlightIndex normalAnnotations)
 
-        svgs =
-            svg
+        allAnnotations =
+            if List.isEmpty spotlights then
+                normalAnnotations
+            else
+                annotationsWithMask
+
+        svgs svgChildren =
+            [ svg
                 [ Attr.id "drawing"
                 , Attr.class "drawing"
-                , Attr.width <| toString <| image.width
-                , Attr.height <| toString <| image.height
+                , Attr.width <| toString <| round image.width
+                , Attr.height <| toString <| round image.height
                 , Html.attribute "xmlns" "http://www.w3.org/2000/svg"
                 ]
                 svgChildren
+            ]
     in
-        div attrs [ svgs, viewImage model.movementState image ]
+        div attrs <|
+            List.append [ viewImage image ] <|
+                case model.annotationState of
+                    ReadyToDraw ->
+                        svgs <| definitions spotlights ++ allAnnotations
+
+                    DrawingAnnotation start ->
+                        case model.drawing of
+                            DrawShape shapeType _ ->
+                                case shapeType of
+                                    SpotlightRect ->
+                                        svgs (definitions (spotlights ++ [ toDrawing start True ]) ++ allAnnotations ++ [ toDrawing start False ])
+
+                                    _ ->
+                                        svgs <| (definitions spotlights) ++ allAnnotations ++ [ toDrawing start False ]
+
+                            _ ->
+                                svgs <| (definitions spotlights) ++ allAnnotations ++ [ toDrawing start False ]
+
+                    SelectedAnnotation int annotation ->
+                        svgs <| definitions spotlights ++ allAnnotations
+
+                    MovingAnnotation int annotation startPosition ->
+                        svgs <| definitions spotlights ++ allAnnotations
+
+                    ResizingAnnotation int annotation startPosition vertex ->
+                        svgs <| definitions spotlights ++ allAnnotations
+
+                    EditingATextBox int ->
+                        svgs <| definitions spotlights ++ allAnnotations
 
 
 viewSvgFilters : Svg Msg
@@ -1929,31 +1517,11 @@ viewArrowHeadDefinition color =
         ]
 
 
-isDrawingSpotlight : Maybe Drawing -> Bool
-isDrawingSpotlight maybeDrawing =
-    case maybeDrawing of
-        Just drawing ->
-            case drawing of
-                DrawSpotlightRect roundedRectMode ->
-                    True
-
-                _ ->
-                    False
-
-        Nothing ->
-            False
-
-
 isSpotlightShape : Annotation -> Bool
 isSpotlightShape annotation =
     case annotation of
-        Rect_ rect ->
-            case rect.fill of
-                SpotlightFill ->
-                    True
-
-                _ ->
-                    False
+        Shapes shapeType _ ->
+            shapeType == SpotlightRect
 
         _ ->
             False
@@ -1962,10 +1530,10 @@ isSpotlightShape annotation =
 spotlightFillToMaskFill : Annotation -> Annotation
 spotlightFillToMaskFill annotation =
     case annotation of
-        Rect_ rect ->
-            case rect.fill of
-                SpotlightFill ->
-                    Rect_ { rect | fill = MaskFill }
+        Shapes shapeType shape ->
+            case shapeType of
+                SpotlightRect ->
+                    Shapes Rect { shape | fill = MaskFill }
 
                 _ ->
                     annotation
@@ -1974,97 +1542,102 @@ spotlightFillToMaskFill annotation =
             annotation
 
 
-movementStateEvents : Int -> Annotation -> MovementState -> List (Svg.Attribute Msg)
-movementStateEvents index annotation movementState =
-    case movementState of
+annotationStateEvents : Int -> Annotation -> AnnotationState -> List (Svg.Attribute Msg)
+annotationStateEvents index annotation annotationState =
+    case annotationState of
+        ReadyToDraw ->
+            [ SE.on "mousedown" <| Json.map (SelectAnnotation index annotation << toDrawingPosition) Mouse.position
+            ]
+
+        DrawingAnnotation start ->
+            []
+
+        SelectedAnnotation start annotation ->
+            []
+
         MovingAnnotation index annotation startPos ->
             [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
             ]
 
-        ReadyToDraw ->
-            [ SE.onMouseOver HoverOverAnnotation ]
-
-        DrawingAnnotation ->
-            []
-
-        HoveringOverAnnotation ->
-            [ SE.onMouseOver HoverOverAnnotation
-            , SE.onMouseOut LeaveAnnotation
-            , onMouseDown <| Json.map (SelectAnnotation index annotation << toDrawingPosition) Mouse.position
-            ]
-
-        OutsideSelectedAnnotation ->
-            [ SE.onMouseOver HoverOverAnnotation ]
-
-        HoveringOverSelectedAnnotation ->
-            [ SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
-            , SE.onMouseOut LeaveAnnotation
-            ]
-
-        HoveringOverVertex ->
-            []
-
+        -- [ SE.on "mousedown" <| Json.map (StartMovingAnnotation index << toDrawingPosition) Mouse.position
         ResizingAnnotation _ _ _ _ ->
             []
 
         EditingATextBox index ->
-            [ SE.onMouseOver HoverOverAnnotation
-            , SE.onMouseOut LeaveAnnotation
-            ]
-
-
-viewAnnotation : Float -> Float -> MovementState -> Int -> ( Annotation, SelectState ) -> List (Svg Msg)
-viewAnnotation width height movementState index ( annotation, selectState ) =
-    let
-        movementEvents =
-            movementStateEvents index annotation movementState
-
-        toVertexEvents =
-            movementStateVertexEvents index annotation movementState
-    in
-        case annotation of
-            Arrow_ arrow ->
-                viewArrow movementEvents toVertexEvents arrow selectState
-
-            Rect_ rect ->
-                viewRect movementEvents toVertexEvents rect selectState
-
-            Ellipse_ ellipse ->
-                viewEllipse movementEvents toVertexEvents ellipse selectState
-
-            Line_ line ->
-                viewLine movementEvents toVertexEvents line selectState
-
-            TextBox_ textBox ->
-                viewTextBox movementEvents toVertexEvents movementState index textBox selectState
-
-
-movementStateVertexEvents : Int -> Annotation -> MovementState -> Vertex -> List (Svg.Attribute Msg)
-movementStateVertexEvents index annotation movementState vertex =
-    case movementState of
-        HoveringOverSelectedAnnotation ->
-            [ SE.onMouseOver ShowResizeIcon
-            , SE.onMouseOut LeaveAnnotation
-            ]
-
-        HoveringOverVertex ->
-            [ SE.on "mousedown" <| Json.map (StartResizingAnnotation index annotation vertex << toDrawingPosition) Mouse.position
-            , SE.onMouseOut LeaveAnnotation
-            ]
-
-        ResizingAnnotation int annotation startPos vertex ->
-            [ SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
-            ]
-
-        OutsideSelectedAnnotation ->
-            [ SE.onMouseOver ShowResizeIcon ]
-
-        _ ->
             []
 
 
-viewMask : MovementState -> Float -> Float -> List (Svg Msg) -> Svg Msg
-viewMask movementState width height shapes =
+getSelectState : Int -> AnnotationState -> SelectState
+getSelectState index annotationState =
+    case annotationState of
+        SelectedAnnotation int annotation ->
+            if index == int then
+                SelectedWithVertices
+            else
+                NotSelected
+
+        MovingAnnotation int annotation startPosition ->
+            if index == int then
+                SelectedWithVertices
+            else
+                NotSelected
+
+        ResizingAnnotation int annotation startPosition vertex ->
+            if index == int then
+                SelectedWithVertices
+            else
+                NotSelected
+
+        EditingATextBox int ->
+            if index == int then
+                Selected
+            else
+                NotSelected
+
+        _ ->
+            NotSelected
+
+
+viewAnnotation : Float -> Float -> AnnotationState -> Int -> Annotation -> List (Svg Msg)
+viewAnnotation width height annotationState index annotation =
+    let
+        selectState =
+            getSelectState index annotationState
+
+        movementEvents =
+            annotationStateEvents index annotation annotationState
+
+        toVertexEvents =
+            annotationStateVertexEvents index annotation annotationState
+
+        vertices { start, end } =
+            viewVertices start end toVertexEvents selectState
+    in
+        case annotation of
+            Lines lineType line ->
+                viewLine movementEvents (vertices line) lineType line
+
+            Shapes shapeType shape ->
+                viewShape movementEvents (vertices shape) shapeType shape
+
+            TextBox textBox ->
+                viewTextBox movementEvents (vertices textBox) annotationState selectState index textBox
+
+
+annotationStateVertexEvents : Int -> Annotation -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
+annotationStateVertexEvents index annotation annotationState vertex =
+    [ SE.on "mousedown" <| Json.map (StartResizingAnnotation index annotation vertex << toDrawingPosition) Mouse.position
+    ]
+        ++ case annotationState of
+            ResizingAnnotation int annotation start vertex ->
+                [ SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex start << toDrawingPosition) Mouse.position ]
+
+            _ ->
+                []
+
+
+viewMask : AnnotationState -> Float -> Float -> List (Svg Msg) -> Svg Msg
+viewMask annotationState width height shapes =
     rect
         ([ x "0"
          , y "0"
@@ -2073,98 +1646,90 @@ viewMask movementState width height shapes =
          , opacity "0.5"
          , fill "white"
          ]
-         -- ++ case movementState of
-         --     HoveringOverAnnotation ->
-         --         [ onMouseEnter LeaveAnnotation ]
-         --
-         --     _ ->
-         --         []
         )
         []
         :: shapes
         |> Svg.mask [ Attr.id "Mask" ]
 
 
-viewDrawing : Float -> Float -> Drawing -> Model -> Bool -> Svg Msg
-viewDrawing width height drawing model isInMask =
+viewDrawing : Float -> Float -> StartPosition -> Model -> Bool -> Svg Msg
+viewDrawing width height start model isInMask =
+    viewDrawingHelper width height start (modelAccountingForMask isInMask model)
+
+
+modelAccountingForMask : Bool -> Model -> Model
+modelAccountingForMask isInMask model =
+    case model.drawing of
+        DrawLine lineType lineMode ->
+            model
+
+        DrawShape shapeType shapeMode ->
+            case shapeType of
+                SpotlightRect ->
+                    if isInMask then
+                        { model | fill = MaskFill, strokeColor = Color.white }
+                    else
+                        { model | fill = EmptyFill }
+
+                _ ->
+                    model
+
+
+calcShapePos : StartPosition -> EndPosition -> ShapeMode -> EndPosition
+calcShapePos start end shapeMode =
+    case shapeMode of
+        DrawingShape ->
+            end
+
+        DrawingEqualizedShape ->
+            equalXandY start end
+
+
+calcLinePos : StartPosition -> EndPosition -> LineMode -> EndPosition
+calcLinePos start end lineMode =
+    case lineMode of
+        DrawingLine ->
+            start
+
+        DrawingDiscreteLine ->
+            stepMouse start end
+
+
+viewDrawingHelper : Float -> Float -> StartPosition -> Model -> Svg Msg
+viewDrawingHelper width height pos { drawing, fill, strokeColor, strokeWidth, strokeStyle, fontSize, mouse, keyboardState } =
     let
-        modelAccountingForMask =
-            if model.editMode == EditSpotlightRect && isInMask then
-                { model | fill = MaskFill, strokeColor = Color.white }
-            else if model.editMode == EditSpotlightRect then
-                { model | fill = EmptyFill }
-            else
-                model
+        shapeAttrs shapeType shapeMode =
+            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) fill strokeColor strokeWidth strokeStyle
+
+        lineAttrs lineType lineMode =
+            lineAttributes lineType <| Line pos (calcLinePos pos mouse lineMode) strokeColor strokeWidth strokeStyle
     in
-        viewDrawingHelper width height drawing modelAccountingForMask
+        case drawing of
+            DrawLine lineType lineMode ->
+                case lineType of
+                    Arrow ->
+                        Svg.path (lineAttrs lineType lineMode) []
 
+                    StraightLine ->
+                        Svg.path (lineAttrs lineType lineMode) []
 
-viewDrawingHelper : Float -> Float -> Drawing -> Model -> Svg Msg
-viewDrawingHelper width height drawing { fill, strokeColor, stroke, strokeStyle, fontSize, mouse, keyboardState } =
-    case drawing of
-        DrawRect rectMode ->
-            case rectMode of
-                DrawingRect startPos ->
-                    Rect startPos mouse fill strokeColor stroke strokeStyle False
-                        |> viewRectDrawing
+            DrawShape shapeType shapeMode ->
+                case shapeType of
+                    Rect ->
+                        Svg.rect (shapeAttrs shapeType shapeMode) []
 
-                DrawingSquare startPos ->
-                    Rect startPos (equalXandY startPos mouse) fill strokeColor stroke strokeStyle False
-                        |> viewRectDrawing
+                    RoundedRect ->
+                        Svg.rect (shapeAttrs shapeType shapeMode) []
 
-        DrawRoundedRect rectMode ->
-            case rectMode of
-                DrawingRoundedRect startPos ->
-                    Rect startPos mouse fill strokeColor stroke strokeStyle True
-                        |> viewRectDrawing
+                    Ellipse ->
+                        Svg.ellipse (shapeAttrs shapeType shapeMode) []
 
-                DrawingRoundedSquare startPos ->
-                    Rect startPos (equalXandY startPos mouse) fill strokeColor stroke strokeStyle True
-                        |> viewRectDrawing
+                    TextBorder ->
+                        TextArea pos (calcShapePos pos mouse shapeMode) strokeColor fontSize "" 0 (AutoExpand.initState (config 0 fontSize))
+                            |> viewTextBoxWithBorder
 
-        DrawArrow arrowDrawing ->
-            case arrowDrawing of
-                DrawingArrow pos ->
-                    Line pos mouse strokeColor stroke strokeStyle
-                        |> viewArrowDrawing
-
-                DrawingDiscreteArrow pos ->
-                    Line pos (stepMouse pos mouse) strokeColor stroke strokeStyle
-                        |> viewArrowDrawing
-
-        DrawEllipse ellipseDrawing ->
-            case ellipseDrawing of
-                DrawingOval pos ->
-                    Ellipse pos mouse fill strokeColor stroke strokeStyle
-                        |> viewEllipseDrawing
-
-                DrawingCircle pos ->
-                    Ellipse pos (equalXandY pos mouse) fill strokeColor stroke strokeStyle
-                        |> viewEllipseDrawing
-
-        DrawTextBox startPos ->
-            TextBox startPos mouse "" strokeColor stroke fontSize 0 (AutoExpand.initState (config 0 fontSize NotSelected))
-                |> viewTextBoxWithBorder
-
-        DrawLine lineMode ->
-            case lineMode of
-                DrawingLine pos ->
-                    Line pos mouse strokeColor stroke strokeStyle
-                        |> viewLineDrawing
-
-                DrawingDiscreteLine pos ->
-                    Line pos (stepMouse pos mouse) strokeColor stroke strokeStyle
-                        |> viewLineDrawing
-
-        DrawSpotlightRect rectMode ->
-            case rectMode of
-                DrawingRoundedRect startPos ->
-                    Rect startPos mouse fill strokeColor stroke strokeStyle True
-                        |> viewRectDrawing
-
-                DrawingRoundedSquare startPos ->
-                    Rect startPos (equalXandY startPos mouse) fill strokeColor stroke strokeStyle True
-                        |> viewRectDrawing
+                    SpotlightRect ->
+                        Svg.rect (shapeAttrs shapeType shapeMode) []
 
 
 fillStyle : Fill -> List (Svg.Attribute Msg)
@@ -2199,48 +1764,92 @@ pointerEvents fill =
             "pointer-events: visibleStroke;"
 
 
-viewRect : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Rect -> SelectState -> List (Svg Msg)
-viewRect attrs toVertexEvents rect selectState =
-    [ Svg.rect
-        (rectAttributes rect ++ attrs)
-        []
-    ]
-        ++ if selectState == SelectedWithVertices then
-            rectVertices toVertexEvents rect.start rect.end
-           else
-            []
-
-
-viewRectDrawing : Rect -> Svg Msg
-viewRectDrawing rect =
-    Svg.rect (rectAttributes rect) []
-
-
-rectAttributes : Rect -> List (Svg.Attribute Msg)
-rectAttributes { start, end, fill, strokeColor, stroke, strokeStyle, rounded } =
+viewShape : List (Svg.Attribute Msg) -> List (Svg Msg) -> ShapeType -> Shape -> List (Svg Msg)
+viewShape attrs vertices shapeType shape =
     let
-        strokeStyles =
-            [ toLineStyle strokeStyle ]
-                ++ if rounded then
-                    [ rx "15", ry "15" ]
-                   else
-                    []
+        allAttrs =
+            shapeAttributes shapeType shape ++ attrs
     in
-        [ Attr.width <| toString <| abs <| end.x - start.x
-        , Attr.height <| toString <| abs <| end.y - start.y
-        , x <| toString <| Basics.min start.x end.x
-        , y <| toString <| Basics.min start.y end.y
-        , strokeWidth <| toString <| strokeToWidth stroke
-        , Attr.stroke <| Color.Convert.colorToHex strokeColor
-        , Attr.style <| pointerEvents fill
-          -- , Attr.filter "url(#dropShadow)"
-        ]
-            ++ strokeStyles
-            ++ fillStyle fill
+        List.append vertices <|
+            case shapeType of
+                Rect ->
+                    [ Svg.rect allAttrs [] ]
+
+                RoundedRect ->
+                    [ Svg.rect allAttrs [] ]
+
+                Ellipse ->
+                    [ Svg.ellipse allAttrs [] ]
+
+                SpotlightRect ->
+                    [ Svg.rect allAttrs [] ]
+
+                TextBorder ->
+                    [ Svg.rect allAttrs [] ]
 
 
-rectVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
-rectVertices toVertexEvents start end =
+viewVertices : StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
+viewVertices start end toVertexEvents selectState =
+    if selectState == SelectedWithVertices then
+        shapeVertices toVertexEvents start end
+    else
+        []
+
+
+shapeAttrs : Shape -> List (Svg.Attribute Msg)
+shapeAttrs ({ strokeStyle, strokeColor, strokeWidth, fill } as shape) =
+    (Attr.style <| pointerEvents fill) :: strokeAttrs strokeStyle strokeColor strokeWidth
+
+
+strokeAttrs : StrokeStyle -> Color -> StrokeWidth -> List (Svg.Attribute Msg)
+strokeAttrs strokeStyle strokeColor strokeWidth =
+    [ Attr.strokeWidth <| toString <| strokeToWidth strokeWidth
+    , Attr.stroke <| Color.Convert.colorToHex strokeColor
+    , toLineStyle strokeStyle
+    ]
+
+
+rectAttrs : Shape -> List (Svg.Attribute Msg)
+rectAttrs { start, end } =
+    [ Attr.width <| toString <| abs <| end.x - start.x
+    , Attr.height <| toString <| abs <| end.y - start.y
+    , x <| toString <| Basics.min start.x end.x
+    , y <| toString <| Basics.min start.y end.y
+    ]
+
+
+ellipseAttributes : Shape -> List (Svg.Attribute Msg)
+ellipseAttributes { start, end } =
+    [ rx <| toString <| abs <| end.x - start.x
+    , ry <| toString <| abs <| end.y - start.y
+    , cx <| toString <| start.x
+    , cy <| toString <| start.y
+      -- , Attr.filter "url(#dropShadow)"
+    ]
+
+
+shapeAttributes : ShapeType -> Shape -> List (Svg.Attribute Msg)
+shapeAttributes shapeType shape =
+    List.append (fillStyle shape.fill) <|
+        case shapeType of
+            Rect ->
+                shapeAttrs shape ++ rectAttrs shape
+
+            RoundedRect ->
+                shapeAttrs shape ++ rectAttrs shape ++ [ rx "15", ry "15" ]
+
+            Ellipse ->
+                shapeAttrs shape ++ ellipseAttributes shape
+
+            TextBorder ->
+                shapeAttrs shape ++ rectAttrs shape
+
+            SpotlightRect ->
+                shapeAttrs shape ++ rectAttrs shape
+
+
+shapeVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
+shapeVertices toVertexEvents start end =
     [ viewVertex (toVertexEvents Start) start.x start.y
     , viewVertex (toVertexEvents StartPlusX) end.x start.y
     , viewVertex (toVertexEvents StartPlusY) start.x end.y
@@ -2259,33 +1868,6 @@ viewVertex vertexEvents x y =
             ++ vertexEvents
         )
         []
-
-
-viewArrow : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Line -> SelectState -> List (Svg Msg)
-viewArrow attrs toVertexEvents line selectState =
-    [ Svg.path
-        (arrowAttributes line
-            ++ lineAttributes line
-            ++ attrs
-        )
-        []
-    ]
-        ++ if selectState == SelectedWithVertices then
-            arrowVertices toVertexEvents line.start line.end
-           else
-            []
-
-
-viewArrowDrawing : Line -> Svg Msg
-viewArrowDrawing line =
-    Svg.path
-        (arrowAttributes line ++ lineAttributes line)
-        []
-
-
-arrowAttributes : Line -> List (Svg.Attribute Msg)
-arrowAttributes line =
-    [ markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex line.fill ++ ")" ]
 
 
 arrowVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
@@ -2307,39 +1889,10 @@ ellipseVertices toVertexEvents start end =
         rectStart =
             Position (start.x - dX) (end.y - 2 * dY)
     in
-        rectVertices toVertexEvents rectStart end
+        shapeVertices toVertexEvents rectStart end
 
 
-viewEllipse : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Ellipse -> SelectState -> List (Svg Msg)
-viewEllipse attrs toVertexEvents ellipse selectState =
-    [ Svg.ellipse (ellipseAttributes ellipse ++ attrs) [] ]
-        ++ if selectState == SelectedWithVertices then
-            ellipseVertices toVertexEvents ellipse.start ellipse.end
-           else
-            []
-
-
-viewEllipseDrawing : Ellipse -> Svg Msg
-viewEllipseDrawing ellipse =
-    Svg.ellipse (ellipseAttributes ellipse) []
-
-
-ellipseAttributes : Ellipse -> List (Svg.Attribute Msg)
-ellipseAttributes { start, end, fill, strokeColor, stroke, strokeStyle } =
-    [ rx <| toString <| abs <| end.x - start.x
-    , ry <| toString <| abs <| end.y - start.y
-    , cx <| toString <| start.x
-    , cy <| toString <| start.y
-    , Attr.strokeWidth <| toString <| strokeToWidth stroke
-    , Attr.stroke <| Color.Convert.colorToHex strokeColor
-    , toLineStyle strokeStyle
-    , Attr.style <| pointerEvents fill
-      -- , Attr.filter "url(#dropShadow)"
-    ]
-        ++ fillStyle fill
-
-
-viewTextArea : Int -> SelectState -> TextBox -> Svg Msg
+viewTextArea : Int -> SelectState -> TextArea -> Svg Msg
 viewTextArea index selectState { start, end, text, fill, fontSize, angle, autoexpand } =
     foreignObject
         []
@@ -2353,21 +1906,19 @@ viewTextArea index selectState { start, end, text, fill, fontSize, angle, autoex
                 , "color" => Color.Convert.colorToHex fill
                 ]
             , Html.attribute "onclick" "event.stopPropagation();"
-            , Html.Events.onMouseOver HoverOverAnnotation
-            , Html.Events.onMouseOut LeaveAnnotation
             ]
-            [ AutoExpand.view (config index fontSize selectState) autoexpand text
+            [ AutoExpand.view (config index fontSize) autoexpand text
             ]
         ]
 
 
-viewTextBox : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> MovementState -> Int -> TextBox -> SelectState -> List (Svg Msg)
-viewTextBox attrs toVertexEvents movementState index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) selectState =
+viewTextBox : List (Svg.Attribute Msg) -> List (Svg Msg) -> AnnotationState -> SelectState -> Int -> TextArea -> List (Svg Msg)
+viewTextBox attrs vertices annotationState selectState index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) =
     case selectState of
         Selected ->
             (viewTextArea index selectState textBox)
                 |> List.singleton
-                |> flip List.append (viewRect ([ Attr.style "opacity: 0;" ] ++ attrs) toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) selectState)
+                |> flip List.append (viewShape ([ Attr.style "opacity: 0;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black Thin Solid))
 
         NotSelected ->
             textBox.text
@@ -2375,7 +1926,7 @@ viewTextBox attrs toVertexEvents movementState index ({ start, end, text, fill, 
                 |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x ] << List.singleton << Svg.text)
                 |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
                 |> List.singleton
-                |> flip List.append (viewRect ([ Attr.style "stroke: transparent; pointer-events: auto; cursor: pointer;" ] ++ attrs) toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) selectState)
+                |> flip List.append (viewShape ([ Attr.style "stroke: transparent; pointer-events: auto; cursor: pointer;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black Thin Solid))
 
         SelectedWithVertices ->
             textBox.text
@@ -2384,58 +1935,65 @@ viewTextBox attrs toVertexEvents movementState index ({ start, end, text, fill, 
                 |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
                 |> List.singleton
                 |> flip List.append
-                    (viewRect attrs toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) NotSelected
-                        ++ viewRect (attrs ++ [ SE.onMouseDown <| StartEditingText index textBox, Attr.style "pointer-events: fill; cursor: pointer;" ]) toVertexEvents (Rect start end EmptyFill Color.black Thin Solid False) selectState
+                    (viewShape attrs vertices Rect (Shape start end EmptyFill Color.black Thin Solid)
+                        ++ viewShape (attrs ++ [ SE.onMouseDown <| StartEditingText index textBox, Attr.style "pointer-events: fill; cursor: pointer;" ]) vertices Rect (Shape start end EmptyFill Color.black Thin Solid)
                     )
 
 
-viewTextBoxWithBorder : TextBox -> Svg Msg
+viewTextBoxWithBorder : TextArea -> Svg Msg
 viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
     Svg.g []
-        [ viewRectDrawing (Rect start end EmptyFill Color.black Thin Solid False)
+        [ Svg.rect (shapeAttributes Rect (Shape start end EmptyFill Color.black Thin Solid)) []
         ]
 
 
-viewLine : List (Svg.Attribute Msg) -> (Vertex -> List (Svg.Attribute Msg)) -> Line -> SelectState -> List (Svg Msg)
-viewLine attrs toVertexEvents line selectState =
-    [ Svg.path (lineAttributes line ++ attrs) [] ]
-        ++ if selectState == SelectedWithVertices then
-            arrowVertices toVertexEvents line.start line.end
-           else
-            []
+viewLine : List (Svg.Attribute Msg) -> List (Svg Msg) -> LineType -> Line -> List (Svg Msg)
+viewLine attrs vertices lineType line =
+    let
+        allAttrs =
+            lineAttributes lineType line ++ attrs
+    in
+        List.append vertices <|
+            case lineType of
+                StraightLine ->
+                    [ Svg.path allAttrs [] ]
+
+                Arrow ->
+                    [ Svg.path allAttrs [] ]
 
 
-viewLineDrawing : Line -> Svg Msg
-viewLineDrawing line =
-    Svg.path (lineAttributes line) []
+simpleLineAttrs : Line -> List (Svg.Attribute Msg)
+simpleLineAttrs ({ start, end } as line) =
+    []
+        ++ [ Attr.fill "none"
+           , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+             -- , Attr.filter "url(#dropShadow)"
+           ]
 
 
-lineAttributes : Line -> List (Svg.Attribute Msg)
-lineAttributes { start, end, fill, stroke, strokeStyle } =
-    [ strokeWidth <| toString <| strokeToWidth stroke
-    , Attr.fill "none"
-    , Attr.stroke <| Color.Convert.colorToHex fill
-    , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
-    , toLineStyle strokeStyle
-      -- , Attr.filter "url(#dropShadow)"
-    ]
+arrowAttributes : Line -> List (Svg.Attribute Msg)
+arrowAttributes line =
+    [ markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex line.strokeColor ++ ")" ]
 
 
-viewImage : MovementState -> Image -> Html Msg
-viewImage movementState { width, height, url } =
+lineAttributes : LineType -> Line -> List (Svg.Attribute Msg)
+lineAttributes lineType line =
+    case lineType of
+        Arrow ->
+            arrowAttributes line
+
+        StraightLine ->
+            simpleLineAttrs line
+
+
+viewImage : Image -> Html Msg
+viewImage { width, height, url } =
     Html.img
-        ([ Html.class "image-to-annotate"
-         , Html.width (round width)
-         , Html.height (round height)
-         , src url
-         ]
-            ++ case movementState of
-                HoveringOverAnnotation ->
-                    [ onMouseEnter LeaveAnnotation ]
-
-                _ ->
-                    []
-        )
+        [ Html.class "image-to-annotate"
+        , Html.width (round width)
+        , Html.height (round height)
+        , src url
+        ]
         []
 
 
@@ -2695,12 +2253,9 @@ equalXandY a b =
         Position b.x (a.y + abs b.x - a.x)
 
 
-strokeToWidth : LineStroke -> Int
+strokeToWidth : StrokeWidth -> Int
 strokeToWidth stroke =
     case stroke of
-        VeryThin ->
-            2
-
         Thin ->
             4
 
@@ -2709,9 +2264,6 @@ strokeToWidth stroke =
 
         Thick ->
             8
-
-        VeryThick ->
-            10
 
 
 toLineStyle : StrokeStyle -> Svg.Attribute Msg
@@ -2732,25 +2284,13 @@ toDrawingPosition mouse =
     { mouse | x = mouse.x - 72, y = mouse.y }
 
 
-movementStateToCursor : MovementState -> String
-movementStateToCursor movementState =
-    case movementState of
+annotationStateToCursor : AnnotationState -> String
+annotationStateToCursor annotationState =
+    case annotationState of
         ReadyToDraw ->
             "crosshair"
 
-        DrawingAnnotation ->
-            "crosshair"
-
-        HoveringOverAnnotation ->
-            "move"
-
-        HoveringOverSelectedAnnotation ->
-            "move"
-
-        HoveringOverVertex ->
-            "nesw-resize"
-
-        OutsideSelectedAnnotation ->
+        DrawingAnnotation _ ->
             "crosshair"
 
         MovingAnnotation _ _ _ ->
@@ -2762,13 +2302,16 @@ movementStateToCursor movementState =
         EditingATextBox _ ->
             "default"
 
+        _ ->
+            "crosshair"
+
 
 
 -- Configuration
 
 
-config : Int -> Float -> SelectState -> AutoExpand.Config Msg
-config index fontSize selectState =
+config : Int -> Float -> AutoExpand.Config Msg
+config index fontSize =
     AutoExpand.config
         { onInput = AutoExpandInput index
         , padding = 2
@@ -2777,9 +2320,8 @@ config index fontSize selectState =
         , maxRows = 4
         , attributes =
             [ Html.id <| "text-box-edit--" ++ toString index
-            , Html.classList [ "text-box-textarea" => True, "text-box-textarea--unselected" => selectState /= Selected ]
+            , Html.class "text-box-textarea"
             , Html.style [ "font-size" => toPx fontSize ]
-            , Html.readonly <| selectState /= Selected
             ]
         }
 
@@ -2806,14 +2348,15 @@ subscriptions model =
                 [ setImages SetImages ]
 
             Just images ->
-                if model.edits.present.drawing /= Nothing then
-                    [ Mouse.moves (ResizeDrawing (List.Zipper.current images) << toDrawingPosition)
-                    , Sub.map KeyboardMsg Keyboard.subscriptions
-                    ]
-                else if not model.imageSelected then
+                if not model.imageSelected then
                     []
                 else
-                    case model.movementState of
+                    case model.annotationState of
+                        DrawingAnnotation drawing ->
+                            [ Mouse.moves (ResizeDrawing (List.Zipper.current images) << toDrawingPosition)
+                            , Sub.map KeyboardMsg Keyboard.subscriptions
+                            ]
+
                         ResizingAnnotation index annotation startPos vertex ->
                             [ Mouse.moves (ResizeAnnotation index annotation vertex startPos << toDrawingPosition)
                             , Sub.map KeyboardMsg Keyboard.subscriptions
