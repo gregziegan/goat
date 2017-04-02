@@ -46,6 +46,10 @@ button:active, button:focus, button:hover {
   border: 1px solid rgb(230, 230, 230);
 }
 
+.drawing-button--alternate {
+  border: 1px solid rgb(250, 111, 199);
+}
+
 .offscreen-canvas {
   display: none;
 }

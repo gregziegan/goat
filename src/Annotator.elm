@@ -1126,7 +1126,7 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
                     ]
                 , viewHistoryControls edits
                 , div [ Html.class "columns" ]
-                    (List.map (viewDrawingButton drawing toDropdownMenu) (drawingOptions shiftPressed)
+                    (List.map (viewDrawingButton keyboardState drawing toDropdownMenu) (drawingOptions shiftPressed)
                         ++ [ viewFillDropdown toDropdownMenu fill
                            , viewStrokeColorDropdown toDropdownMenu strokeColor
                            , viewLineStrokeDropdown toDropdownMenu
@@ -1157,15 +1157,24 @@ drawingsAreEqual drawing drawing2 =
                     False
 
 
-viewDrawingButton : Drawing -> (AttributeDropdown -> Html Msg) -> Drawing -> Html Msg
-viewDrawingButton selectedDrawing toDropdownMenu drawing =
+viewVanillaDrawingButton : Keyboard.State -> Drawing -> Drawing -> Html Msg
+viewVanillaDrawingButton keyboardState selectedDrawing drawing =
+    button
+        [ Html.classList
+            [ "drawing-button" => True
+            , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
+            , "drawing-button--alternate" => drawingsAreEqual selectedDrawing drawing && isPressed Shift keyboardState
+            ]
+        , onClick <| ChangeDrawing drawing
+        ]
+        [ viewShapeSvg drawing ]
+
+
+viewDrawingButton : Keyboard.State -> Drawing -> (AttributeDropdown -> Html Msg) -> Drawing -> Html Msg
+viewDrawingButton keyboardState selectedDrawing toDropdownMenu drawing =
     case drawing of
         DrawLine lineType lineMode ->
-            button
-                [ Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing ]
-                , onClick <| ChangeDrawing drawing
-                ]
-                [ viewShapeSvg drawing ]
+            viewVanillaDrawingButton keyboardState selectedDrawing drawing
 
         DrawShape shapeType shapeMode ->
             case shapeType of
@@ -1173,11 +1182,7 @@ viewDrawingButton selectedDrawing toDropdownMenu drawing =
                     viewTextSizeDropdown selectedDrawing toDropdownMenu
 
                 _ ->
-                    button
-                        [ Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing ]
-                        , onClick <| ChangeDrawing drawing
-                        ]
-                        [ viewShapeSvg drawing ]
+                    viewVanillaDrawingButton keyboardState selectedDrawing drawing
 
 
 viewHistoryControls : UndoList (Array Annotation) -> Html Msg
