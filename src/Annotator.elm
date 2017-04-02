@@ -319,9 +319,9 @@ type Msg
       -- Move updates
     | StartMovingAnnotation Int Annotation StartPosition
     | MoveAnnotation Int Annotation StartPosition EndPosition
+    | FinishMovingAnnotation Int Annotation StartPosition EndPosition
       -- Resize updates
     | ResizeDrawing Image Mouse.Position
-    | FinishMovingAnnotation Int Annotation StartPosition EndPosition
     | StartResizingAnnotation Int Annotation Vertex StartPosition
     | ResizeAnnotation Int Annotation Vertex StartPosition EndPosition
     | FinishResizingAnnotation Int Annotation Vertex StartPosition EndPosition
@@ -534,6 +534,7 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
             FinishMovingAnnotation index annotation startPos endPos ->
                 model
                     |> moveAnnotation index annotation startPos endPos
+                    |> finishMovingAnnotation index annotation
                     => []
 
             StartResizingAnnotation index annotation vertex startPos ->
@@ -606,6 +607,11 @@ startDrawing startPos model =
 resetToReadyToDraw : Model -> Model
 resetToReadyToDraw model =
     { model | annotationState = ReadyToDraw }
+
+
+finishMovingAnnotation : Int -> Annotation -> Model -> Model
+finishMovingAnnotation index annotation model =
+    { model | annotationState = SelectedAnnotation index annotation }
 
 
 updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
@@ -935,9 +941,22 @@ alterTextBoxDrawing maybeKeyChange index model =
             model => []
 
 
-deleteSelectedDrawing : Array Annotation -> Array Annotation
-deleteSelectedDrawing editState =
-    editState
+deleteSelectedDrawing : Model -> Model
+deleteSelectedDrawing model =
+    case model.annotationState of
+        SelectedAnnotation index _ ->
+            { model
+                | edits = UndoList.new (removeItem index model.edits.present) model.edits
+                , annotationState = ReadyToDraw
+            }
+
+        _ ->
+            model
+
+
+removeItem : Int -> Array a -> Array a
+removeItem index arr =
+    Array.append (Array.slice 0 index arr) (Array.slice (index + 1) (Array.length arr) arr)
 
 
 changeDrawing : Drawing -> Model -> Model
@@ -968,16 +987,10 @@ alterDrawing maybeKeyChange ({ keyboardState } as model) =
                                 cancelDrawing model
 
                             Delete ->
-                                { model
-                                    | edits = UndoList.new (deleteSelectedDrawing model.edits.present) model.edits
-                                    , annotationState = ReadyToDraw
-                                }
+                                deleteSelectedDrawing model
 
                             BackSpace ->
-                                { model
-                                    | edits = UndoList.new (deleteSelectedDrawing model.edits.present) model.edits
-                                    , annotationState = ReadyToDraw
-                                }
+                                deleteSelectedDrawing model
 
                             CharZ ->
                                 if isPressed Shift keyboardState && isPressed controlKey keyboardState then
@@ -1369,7 +1382,8 @@ drawingStateEvents : Drawing -> AnnotationState -> List (Html.Attribute Msg)
 drawingStateEvents drawing annotationState =
     case annotationState of
         ReadyToDraw ->
-            [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position ]
+            [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
+            ]
 
         DrawingAnnotation startPos ->
             onMouseUpOrLeave <| Json.map (FinishDrawing startPos << toDrawingPosition) Mouse.position
@@ -1385,7 +1399,7 @@ drawingStateEvents drawing annotationState =
             ]
 
         SelectedAnnotation index annotation ->
-            []
+            [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position ]
 
         EditingATextBox index ->
             [ SE.onClick <| FinishEditingText index ]
@@ -1453,12 +1467,12 @@ getFirstSpotlightIndex annotations =
 
 
 getAnnotations : Image -> Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Bool -> List (Svg Msg)
-getAnnotations image annotations spotlights nonSpotlights isDrawing =
+getAnnotations image annotations spotlights nonSpotlights isDrawingSpotlight =
     let
         firstSpotlightIndex =
             getFirstSpotlightIndex annotations
     in
-        if isDrawing && List.isEmpty spotlights then
+        if isDrawingSpotlight && List.isEmpty spotlights then
             spotlights ++ [ viewMask image.width image.height ]
         else if List.isEmpty spotlights then
             nonSpotlights
@@ -1482,7 +1496,7 @@ viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing
             definitions spotlights ++ toAnnotations False
 
         nonSpotlightDrawingAndAnnotations start =
-            definitions spotlights ++ toAnnotations True ++ [ toDrawing start False ]
+            definitions spotlights ++ toAnnotations False ++ [ toDrawing start False ]
 
         spotlightDrawingAndAnnotations start =
             definitions (spotlights ++ [ toDrawing start True ]) ++ toAnnotations True ++ [ toDrawing start False ]
@@ -1554,7 +1568,15 @@ viewSvgFilters =
 
 viewArrowHeadDefinition : Color -> Svg Msg
 viewArrowHeadDefinition color =
-    marker [ Attr.id <| "arrow-head--" ++ Color.Convert.colorToHex color, orient "auto", markerWidth "2", markerHeight "4", refX "0.1", refY "2" ]
+    marker
+        [ Attr.id <| "arrow-head--" ++ Color.Convert.colorToHex color
+        , orient "auto"
+        , markerWidth "2"
+        , markerHeight "4"
+        , refX "0.1"
+        , refY "2"
+        , Attr.style "cursor: pointer;"
+        ]
         [ Svg.path [ d "M0,0 V4 L2,2 Z", Attr.fill <| Color.Convert.colorToHex color ] []
         ]
 
@@ -1589,24 +1611,26 @@ annotationStateEvents index annotation annotationState =
     case annotationState of
         ReadyToDraw ->
             [ SE.on "mousedown" <| Json.map (SelectAnnotation index annotation << toDrawingPosition) Mouse.position
+            , Attr.style "cursor: pointer;"
+            , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
 
         DrawingAnnotation start ->
-            []
+            [ Attr.style "cursor: crosshair;" ]
 
         SelectedAnnotation start annotation ->
-            []
+            [ Attr.style "cursor: move;" ]
 
         MovingAnnotation index annotation startPos ->
             [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
+            , Attr.style "cursor: move;"
             ]
 
-        -- [ SE.on "mousedown" <| Json.map (StartMovingAnnotation index << toDrawingPosition) Mouse.position
         ResizingAnnotation _ _ _ _ ->
-            []
+            [ Attr.style "cursor: nesw-resize;" ]
 
         EditingATextBox index ->
-            []
+            [ Attr.style "cursor: crosshair;" ]
 
 
 getSelectState : Int -> AnnotationState -> SelectState
