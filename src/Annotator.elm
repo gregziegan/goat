@@ -129,6 +129,12 @@ type ShapeType
     | TextBorder
 
 
+type Vertices
+    = Rectangular
+    | Elliptical
+    | Linear
+
+
 type Annotation
     = Lines LineType Line
     | Shapes ShapeType Shape
@@ -1578,9 +1584,12 @@ viewCanvas model image =
 
 viewSvgFilters : Svg Msg
 viewSvgFilters =
-    Svg.filter [ Attr.id "dropShadow" ]
-        [ Svg.feGaussianBlur [ Attr.in_ "SourceAlpha", Attr.stdDeviation "3" ] []
-        , Svg.feOffset [ Attr.dx "2", Attr.dy "4" ] []
+    Svg.filter [ Attr.id "dropShadow", Attr.x "-20%", Attr.y "-20%", Attr.width "200%", Attr.height "200%" ]
+        [ Svg.feGaussianBlur [ Attr.in_ "SourceAlpha", Attr.stdDeviation "2.2" ] []
+        , Svg.feOffset [ Attr.dx "2", Attr.dy "2", Attr.result "offsetblur" ] []
+        , Svg.feComponentTransfer []
+            [ Svg.feFuncA [ Attr.type_ "linear", Attr.slope "0.2" ] []
+            ]
         , Svg.feMerge []
             [ Svg.feMergeNode [] []
             , Svg.feMergeNode [ Attr.in_ "SourceGraphic" ] []
@@ -1701,18 +1710,23 @@ viewAnnotation annotationState index annotation =
         toVertexEvents =
             annotationStateVertexEvents index annotation annotationState
 
-        vertices { start, end } =
-            viewVertices start end toVertexEvents selectState
+        vertices verticesType { start, end } =
+            viewVertices verticesType start end toVertexEvents selectState
     in
         case annotation of
             Lines lineType line ->
-                viewLine movementEvents (vertices line) lineType line
+                viewLine movementEvents (vertices Linear line) lineType line
 
             Shapes shapeType shape ->
-                viewShape movementEvents (vertices shape) shapeType shape
+                case shapeType of
+                    Ellipse ->
+                        viewShape movementEvents (vertices Elliptical shape) shapeType shape
+
+                    _ ->
+                        viewShape movementEvents (vertices Rectangular shape) shapeType shape
 
             TextBox textBox ->
-                viewTextBox movementEvents (vertices textBox) annotationState selectState index textBox
+                viewTextBox movementEvents (vertices Rectangular textBox) annotationState selectState index textBox
 
 
 annotationStateVertexEvents : Int -> Annotation -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
@@ -1864,12 +1878,24 @@ viewShape attrs vertices shapeType shape =
                     [ Svg.rect allAttrs [] ]
 
 
-viewVertices : StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
-viewVertices start end toVertexEvents selectState =
-    if selectState == SelectedWithVertices then
-        shapeVertices toVertexEvents start end
-    else
-        []
+viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
+viewVertices vertices start end toVertexEvents selectState =
+    let
+        toVertices =
+            case vertices of
+                Rectangular ->
+                    shapeVertices
+
+                Elliptical ->
+                    ellipseVertices
+
+                Linear ->
+                    lineVertices
+    in
+        if selectState == SelectedWithVertices then
+            toVertices toVertexEvents start end
+        else
+            []
 
 
 shapeAttrs : Shape -> List (Svg.Attribute Msg)
@@ -1891,6 +1917,7 @@ rectAttrs { start, end } =
     , Attr.height <| toString <| abs <| end.y - start.y
     , x <| toString <| Basics.min start.x end.x
     , y <| toString <| Basics.min start.y end.y
+    , Attr.filter "url(#dropShadow)"
     ]
 
 
@@ -1900,7 +1927,7 @@ ellipseAttributes { start, end } =
     , ry <| toString <| abs <| end.y - start.y
     , cx <| toString <| start.x
     , cy <| toString <| start.y
-      -- , Attr.filter "url(#dropShadow)"
+    , Attr.filter "url(#dropShadow)"
     ]
 
 
@@ -1909,7 +1936,7 @@ shapeAttributes shapeType shape =
     List.append (fillStyle shape.fill) <|
         case shapeType of
             Rect ->
-                Debug.log "shape!" <| shapeAttrs shape ++ rectAttrs shape
+                shapeAttrs shape ++ rectAttrs shape
 
             RoundedRect ->
                 shapeAttrs shape ++ rectAttrs shape ++ [ rx "15", ry "15" ]
@@ -1933,13 +1960,23 @@ shapeVertices toVertexEvents start end =
     ]
 
 
+lineVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
+lineVertices toVertexEvents start end =
+    [ viewVertex (toVertexEvents Start) start.x start.y
+    , viewVertex (toVertexEvents End) end.x end.y
+    ]
+
+
 viewVertex : List (Svg.Attribute Msg) -> Int -> Int -> Svg Msg
 viewVertex vertexEvents x y =
     circle
         ([ cx <| toString x
          , cy <| toString y
-         , r "7"
+         , r "5"
          , fill <| Color.Convert.colorToHex Color.blue
+         , Attr.stroke "white"
+         , Attr.strokeWidth "2"
+         , Attr.filter "url(#dropShadow)"
          ]
             ++ vertexEvents
         )
@@ -2029,7 +2066,7 @@ viewLine attrs vertices lineType line =
         allAttrs =
             lineAttributes lineType line ++ attrs
     in
-        List.append vertices <|
+        flip List.append vertices <|
             case lineType of
                 StraightLine ->
                     [ Svg.path allAttrs [] ]
@@ -2043,7 +2080,7 @@ simpleLineAttrs ({ start, end } as line) =
     []
         ++ [ Attr.fill "none"
            , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
-             -- , Attr.filter "url(#dropShadow)"
+             --  , Attr.filter "url(#dropShadow)"
            ]
 
 
