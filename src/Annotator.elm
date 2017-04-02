@@ -194,6 +194,11 @@ type alias Model =
     }
 
 
+controlUIWidth : number
+controlUIWidth =
+    72
+
+
 strokeColorOptions : List Color
 strokeColorOptions =
     [ Color.red
@@ -2394,7 +2399,7 @@ toLineStyle strokeStyle =
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
 toDrawingPosition mouse =
-    { mouse | x = mouse.x - 72, y = mouse.y }
+    { mouse | x = mouse.x - controlUIWidth, y = mouse.y }
 
 
 annotationStateToCursor : AnnotationState -> String
