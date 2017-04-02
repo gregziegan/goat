@@ -60,7 +60,7 @@
       }
 
       let imageObjects;
-      const client = ZAFClient.init()
+      const client = window.ZAFClient ? ZAFClient.init() : null;
       if (client) {
         client.invoke('resize', { height: 320, width: 1000})
         client.on('pane.activated', readInImages)

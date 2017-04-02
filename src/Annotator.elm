@@ -296,6 +296,7 @@ init flags =
 
 type Msg
     = StartDrawing StartPosition
+    | ContinueDrawing StartPosition
     | FinishDrawing StartPosition EndPosition
       -- TextArea Updates
     | StartEditingText Int TextArea
@@ -321,7 +322,6 @@ type Msg
     | MoveAnnotation Int Annotation StartPosition EndPosition
     | FinishMovingAnnotation Int Annotation StartPosition EndPosition
       -- Resize updates
-    | ResizeDrawing Image Mouse.Position
     | StartResizingAnnotation Int Annotation Vertex StartPosition
     | ResizeAnnotation Int Annotation Vertex StartPosition EndPosition
     | FinishResizingAnnotation Int Annotation Vertex StartPosition EndPosition
@@ -423,7 +423,7 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
                     |> skipChange model
                     => []
 
-            ResizeDrawing { width, height } pos ->
+            ContinueDrawing pos ->
                 model
                     |> setMouse pos
                     => []
@@ -1473,7 +1473,7 @@ getAnnotations image annotations spotlights nonSpotlights isDrawingSpotlight =
             getFirstSpotlightIndex annotations
     in
         if isDrawingSpotlight && List.isEmpty spotlights then
-            spotlights ++ [ viewMask image.width image.height ]
+            nonSpotlights ++ [ viewMask image.width image.height ]
         else if List.isEmpty spotlights then
             nonSpotlights
         else
@@ -1693,6 +1693,8 @@ viewAnnotation annotationState index annotation =
 annotationStateVertexEvents : Int -> Annotation -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
 annotationStateVertexEvents index annotation annotationState vertex =
     [ SE.on "mousedown" <| Json.map (StartResizingAnnotation index annotation vertex << toDrawingPosition) Mouse.position
+    , Attr.style "cursor: nesw-resize;"
+    , Html.attribute "onmousedown" "event.stopPropagation();"
     ]
         ++ case annotationState of
             ResizingAnnotation int annotation start vertex ->
@@ -1819,7 +1821,7 @@ viewShape attrs vertices shapeType shape =
         allAttrs =
             shapeAttributes shapeType shape ++ attrs
     in
-        List.append vertices <|
+        flip List.append vertices <|
             case shapeType of
                 Rect ->
                     [ Svg.rect allAttrs [] ]
@@ -2402,7 +2404,7 @@ subscriptions model =
                 else
                     case model.annotationState of
                         DrawingAnnotation drawing ->
-                            [ Mouse.moves (ResizeDrawing (List.Zipper.current images) << toDrawingPosition)
+                            [ Mouse.moves (ContinueDrawing << toDrawingPosition)
                             , Sub.map KeyboardMsg Keyboard.subscriptions
                             ]
 
