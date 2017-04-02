@@ -635,7 +635,7 @@ selectAnnotation index annotation model =
 
 addAnnotation : Annotation -> Model -> Model
 addAnnotation annotation model =
-    { model | edits = UndoList.mapPresent (Array.push <| Debug.log "anno" annotation) model.edits }
+    { model | edits = UndoList.new (Array.push annotation model.edits.present) model.edits }
         |> finishDrawing
 
 
@@ -1365,14 +1365,14 @@ viewLineStrokeOption selectedStroke stroke =
         [ viewLineStroke (strokeToWidth stroke) [] ]
 
 
-drawingStateEvents : Drawing -> AnnotationState -> Position -> List (Html.Attribute Msg)
-drawingStateEvents drawing annotationState mouse =
+drawingStateEvents : Drawing -> AnnotationState -> List (Html.Attribute Msg)
+drawingStateEvents drawing annotationState =
     case annotationState of
         ReadyToDraw ->
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position ]
 
         DrawingAnnotation startPos ->
-            drawingEvents drawing startPos
+            onMouseUpOrLeave <| Json.map (FinishDrawing startPos << toDrawingPosition) Mouse.position
 
         MovingAnnotation index annotation startPos ->
             [ Html.Events.onMouseLeave ResetToReadyToDraw
@@ -1391,9 +1391,118 @@ drawingStateEvents drawing annotationState mouse =
             [ SE.onClick <| FinishEditingText index ]
 
 
-drawingEvents : Drawing -> StartPosition -> List (Html.Attribute Msg)
-drawingEvents drawing startPos =
-    onMouseUpOrLeave <| Json.map (FinishDrawing startPos << toDrawingPosition) Mouse.position
+viewMask : Float -> Float -> Svg msg
+viewMask width height =
+    rect
+        [ x "0"
+        , y "0"
+        , Attr.height <| toString height
+        , Attr.width <| toString width
+        , Attr.mask "url(#Mask)"
+        , Attr.style "pointer-events: none;"
+        ]
+        []
+
+
+viewSpotlights : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewSpotlights annotationState annotations =
+    annotations
+        |> Array.filter isSpotlightShape
+        |> Array.map spotlightFillToMaskFill
+        |> Array.toList
+        |> List.indexedMap (viewAnnotation annotationState)
+        |> List.concat
+
+
+canvasAttributes : Image -> Drawing -> AnnotationState -> List (Svg.Attribute Msg)
+canvasAttributes image drawing annotationState =
+    [ Html.id "canvas"
+    , Html.class "image-edit"
+    , Html.style
+        [ "width" => toString (round image.width) ++ "px"
+        , "height" => toString (round image.height) ++ "px"
+        , "cursor" => annotationStateToCursor annotationState
+        ]
+    ]
+        ++ drawingStateEvents drawing annotationState
+
+
+viewNonSpotlightAnnotations : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewNonSpotlightAnnotations annotationState annotations =
+    annotations
+        |> Array.toList
+        |> List.indexedMap (viewAnnotation annotationState)
+        |> List.concat
+
+
+viewDefinitions : Float -> Float -> AnnotationState -> List (Svg Msg) -> List (Svg Msg)
+viewDefinitions width height annotationState cutOuts =
+    List.map viewArrowHeadDefinition strokeColorOptions
+        |> (::) (maskDefinition annotationState width height cutOuts)
+        |> (::) viewSvgFilters
+        |> defs []
+        |> List.singleton
+
+
+getFirstSpotlightIndex : Array Annotation -> Int
+getFirstSpotlightIndex annotations =
+    annotations
+        |> Array.toList
+        |> List.Extra.findIndex isSpotlightShape
+        |> Maybe.withDefault 0
+
+
+getAnnotations : Image -> Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Bool -> List (Svg Msg)
+getAnnotations image annotations spotlights nonSpotlights isDrawing =
+    let
+        firstSpotlightIndex =
+            getFirstSpotlightIndex annotations
+    in
+        if isDrawing && List.isEmpty spotlights then
+            spotlights ++ [ viewMask image.width image.height ]
+        else if List.isEmpty spotlights then
+            nonSpotlights
+        else
+            List.take (firstSpotlightIndex) nonSpotlights
+                ++ [ viewMask image.width image.height ]
+                ++ List.drop firstSpotlightIndex nonSpotlights
+
+
+viewDrawingAndAnnotations :
+    (List (Svg Msg) -> List (Svg Msg))
+    -> List (Svg Msg)
+    -> (Bool -> List (Svg Msg))
+    -> (StartPosition -> Bool -> Svg Msg)
+    -> Drawing
+    -> AnnotationState
+    -> List (Svg Msg)
+viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing annotationState =
+    let
+        justAnnotations =
+            definitions spotlights ++ toAnnotations False
+
+        nonSpotlightDrawingAndAnnotations start =
+            definitions spotlights ++ toAnnotations True ++ [ toDrawing start False ]
+
+        spotlightDrawingAndAnnotations start =
+            definitions (spotlights ++ [ toDrawing start True ]) ++ toAnnotations True ++ [ toDrawing start False ]
+    in
+        case annotationState of
+            DrawingAnnotation start ->
+                case drawing of
+                    DrawShape shapeType _ ->
+                        case shapeType of
+                            SpotlightRect ->
+                                spotlightDrawingAndAnnotations start
+
+                            _ ->
+                                nonSpotlightDrawingAndAnnotations start
+
+                    _ ->
+                        nonSpotlightDrawingAndAnnotations start
+
+            _ ->
+                justAnnotations
 
 
 viewCanvas : Model -> Image -> Html Msg
@@ -1402,100 +1511,33 @@ viewCanvas model image =
         annotations =
             model.edits.present
 
-        attrs =
-            [ Html.id "canvas"
-            , Html.class "image-edit"
-            , Html.style
-                [ "width" => toString (round image.width) ++ "px"
-                , "height" => toString (round image.height) ++ "px"
-                , "cursor" => annotationStateToCursor model.annotationState
-                ]
-            ]
-                ++ drawingStateEvents model.drawing model.annotationState model.mouse
-
-        normalAnnotations =
-            annotations
-                |> Array.toList
-                |> List.indexedMap (viewAnnotation image.width image.height model.annotationState)
-                |> List.concat
+        toDrawing start isInMask =
+            viewDrawing model start isInMask
 
         spotlights =
-            annotations
-                |> Array.filter isSpotlightShape
-                |> Array.map spotlightFillToMaskFill
-                |> Array.toList
-                |> List.indexedMap (viewAnnotation image.width image.height model.annotationState)
-                |> List.concat
+            viewSpotlights model.annotationState annotations
 
-        toDrawing start isInMask =
-            viewDrawing image.width image.height start model isInMask
+        nonSpotlights =
+            viewNonSpotlightAnnotations model.annotationState annotations
 
-        definitions cutOuts =
-            List.map viewArrowHeadDefinition strokeColorOptions
-                |> (::) (viewMask model.annotationState image.width image.height cutOuts)
-                |> (::) viewSvgFilters
-                |> defs []
-                |> List.singleton
+        definitions =
+            viewDefinitions image.width image.height model.annotationState
 
-        mask =
-            [ rect [ x "0", y "0", Attr.height <| toString image.height, Attr.width <| toString image.width, Attr.mask "url(#Mask)", Attr.style "pointer-events: none;" ] [] ]
-
-        firstSpotlightIndex =
-            annotations
-                |> Array.toList
-                |> List.Extra.findIndex isSpotlightShape
-                |> Maybe.withDefault 0
-
-        annotationsWithMask =
-            (List.take firstSpotlightIndex normalAnnotations) ++ mask ++ (List.drop firstSpotlightIndex normalAnnotations)
-
-        allAnnotations =
-            if List.isEmpty spotlights then
-                normalAnnotations
-            else
-                annotationsWithMask
-
-        svgs svgChildren =
-            [ svg
-                [ Attr.id "drawing"
-                , Attr.class "drawing"
-                , Attr.width <| toString <| round image.width
-                , Attr.height <| toString <| round image.height
-                , Html.attribute "xmlns" "http://www.w3.org/2000/svg"
-                ]
-                svgChildren
-            ]
+        toAnnotations =
+            getAnnotations image annotations spotlights nonSpotlights
     in
-        div attrs <|
-            List.append [ viewImage image ] <|
-                case model.annotationState of
-                    ReadyToDraw ->
-                        svgs <| definitions spotlights ++ allAnnotations
-
-                    DrawingAnnotation start ->
-                        case model.drawing of
-                            DrawShape shapeType _ ->
-                                case shapeType of
-                                    SpotlightRect ->
-                                        svgs (definitions (spotlights ++ [ toDrawing start True ]) ++ allAnnotations ++ [ toDrawing start False ])
-
-                                    _ ->
-                                        svgs <| (definitions spotlights) ++ allAnnotations ++ [ toDrawing start False ]
-
-                            _ ->
-                                svgs <| (definitions spotlights) ++ allAnnotations ++ [ toDrawing start False ]
-
-                    SelectedAnnotation int annotation ->
-                        svgs <| definitions spotlights ++ allAnnotations
-
-                    MovingAnnotation int annotation startPosition ->
-                        svgs <| definitions spotlights ++ allAnnotations
-
-                    ResizingAnnotation int annotation startPosition vertex ->
-                        svgs <| definitions spotlights ++ allAnnotations
-
-                    EditingATextBox int ->
-                        svgs <| definitions spotlights ++ allAnnotations
+        div (canvasAttributes image model.drawing model.annotationState)
+            (viewImage image
+                :: [ svg
+                        [ Attr.id "drawing"
+                        , Attr.class "drawing"
+                        , Attr.width <| toString <| round image.width
+                        , Attr.height <| toString <| round image.height
+                        , Html.attribute "xmlns" "http://www.w3.org/2000/svg"
+                        ]
+                        (viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing model.drawing model.annotationState)
+                   ]
+            )
 
 
 viewSvgFilters : Svg Msg
@@ -1598,8 +1640,8 @@ getSelectState index annotationState =
             NotSelected
 
 
-viewAnnotation : Float -> Float -> AnnotationState -> Int -> Annotation -> List (Svg Msg)
-viewAnnotation width height annotationState index annotation =
+viewAnnotation : AnnotationState -> Int -> Annotation -> List (Svg Msg)
+viewAnnotation annotationState index annotation =
     let
         selectState =
             getSelectState index annotationState
@@ -1636,8 +1678,8 @@ annotationStateVertexEvents index annotation annotationState vertex =
                 []
 
 
-viewMask : AnnotationState -> Float -> Float -> List (Svg Msg) -> Svg Msg
-viewMask annotationState width height shapes =
+maskDefinition : AnnotationState -> Float -> Float -> List (Svg Msg) -> Svg Msg
+maskDefinition annotationState width height shapes =
     rect
         ([ x "0"
          , y "0"
@@ -1650,29 +1692,6 @@ viewMask annotationState width height shapes =
         []
         :: shapes
         |> Svg.mask [ Attr.id "Mask" ]
-
-
-viewDrawing : Float -> Float -> StartPosition -> Model -> Bool -> Svg Msg
-viewDrawing width height start model isInMask =
-    viewDrawingHelper width height start (modelAccountingForMask isInMask model)
-
-
-modelAccountingForMask : Bool -> Model -> Model
-modelAccountingForMask isInMask model =
-    case model.drawing of
-        DrawLine lineType lineMode ->
-            model
-
-        DrawShape shapeType shapeMode ->
-            case shapeType of
-                SpotlightRect ->
-                    if isInMask then
-                        { model | fill = MaskFill, strokeColor = Color.white }
-                    else
-                        { model | fill = EmptyFill }
-
-                _ ->
-                    model
 
 
 calcShapePos : StartPosition -> EndPosition -> ShapeMode -> EndPosition
@@ -1695,14 +1714,17 @@ calcLinePos start end lineMode =
             stepMouse start end
 
 
-viewDrawingHelper : Float -> Float -> StartPosition -> Model -> Svg Msg
-viewDrawingHelper width height pos { drawing, fill, strokeColor, strokeWidth, strokeStyle, fontSize, mouse, keyboardState } =
+viewDrawing : Model -> StartPosition -> Bool -> Svg Msg
+viewDrawing { drawing, fill, strokeColor, strokeWidth, strokeStyle, fontSize, mouse, keyboardState } pos isInMask =
     let
         lineAttrs lineType lineMode =
             lineAttributes lineType <| Line pos (calcLinePos pos mouse lineMode) strokeColor strokeWidth strokeStyle
 
         shapeAttrs shapeType shapeMode =
             shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) fill strokeColor strokeWidth strokeStyle
+
+        spotlightAttrs shapeType shapeMode spotlightFill spotlightColor =
+            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) spotlightFill spotlightColor strokeWidth strokeStyle
     in
         case drawing of
             DrawLine lineType lineMode ->
@@ -1729,7 +1751,10 @@ viewDrawingHelper width height pos { drawing, fill, strokeColor, strokeWidth, st
                             |> viewTextBoxWithBorder
 
                     SpotlightRect ->
-                        Svg.rect (shapeAttrs shapeType shapeMode) []
+                        if isInMask then
+                            Svg.rect (spotlightAttrs shapeType shapeMode MaskFill Color.white) []
+                        else
+                            Svg.rect (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
 
 
 fillStyle : Fill -> List (Svg.Attribute Msg)
