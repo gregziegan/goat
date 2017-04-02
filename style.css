@@ -212,3 +212,19 @@ button:active, button:focus, button:hover {
   overflow: hidden;
   color: currentColor;
 }
+
+.pointerCursor {
+  cursor: pointer;
+}
+
+.crosshairCursor {
+  cursor: crosshair;
+}
+
+.resizeCursor {
+  cursor: nwse-resize;
+}
+
+.moveCursor {
+  cursor: move;
+}

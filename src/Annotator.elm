@@ -358,32 +358,7 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
                     => []
 
             FinishDrawing start end ->
-                let
-                    numAnnotations =
-                        Array.length model.edits.present
-
-                    initialTextBox =
-                        TextBox <| TextArea start end strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize))
-                in
-                    case model.drawing of
-                        DrawLine lineType lineMode ->
-                            model
-                                |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) strokeColor strokeWidth strokeStyle))
-                                => []
-
-                        DrawShape shapeType shapeMode ->
-                            model
-                                |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeWidth strokeStyle))
-                                => case shapeType of
-                                    TextBorder ->
-                                        [ "text-box-edit--"
-                                            ++ toString numAnnotations
-                                            |> Dom.focus
-                                            |> Task.attempt (tryToEdit numAnnotations)
-                                        ]
-
-                                    _ ->
-                                        []
+                finishDrawing start end model
 
             StartEditingText index textArea ->
                 annotations
@@ -619,7 +594,10 @@ updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
 updateAnySelectedAnnotations fn model =
     case model.annotationState of
         SelectedAnnotation index annotation ->
-            { model | edits = UndoList.new (Array.set index (fn annotation) model.edits.present) model.edits }
+            { model
+                | edits = UndoList.new (Array.set index (fn annotation) model.edits.present) model.edits
+                , annotationState = SelectedAnnotation index (fn annotation)
+            }
 
         _ ->
             model
@@ -642,13 +620,47 @@ selectAnnotation index annotation model =
 
 addAnnotation : Annotation -> Model -> Model
 addAnnotation annotation model =
-    { model | edits = UndoList.new (Array.push annotation model.edits.present) model.edits }
-        |> finishDrawing
+    { model
+        | edits = UndoList.new (Array.push annotation model.edits.present) model.edits
+        , annotationState = ReadyToDraw
+    }
 
 
-finishDrawing : Model -> Model
-finishDrawing model =
-    { model | annotationState = ReadyToDraw }
+finishDrawing : StartPosition -> EndPosition -> Model -> ( Model, List (Cmd Msg) )
+finishDrawing start end ({ fill, strokeColor, strokeWidth, strokeStyle, fontSize } as model) =
+    let
+        numAnnotations =
+            Array.length model.edits.present
+
+        initialTextBox =
+            TextBox <| TextArea start end strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize))
+    in
+        case model.drawing of
+            DrawLine lineType lineMode ->
+                model
+                    |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) strokeColor strokeWidth strokeStyle))
+                    => []
+
+            DrawShape shapeType shapeMode ->
+                case shapeType of
+                    SpotlightRect ->
+                        model
+                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill strokeColor strokeWidth strokeStyle))
+                            => []
+
+                    TextBorder ->
+                        model
+                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeWidth strokeStyle))
+                            => [ "text-box-edit--"
+                                    ++ toString numAnnotations
+                                    |> Dom.focus
+                                    |> Task.attempt (tryToEdit numAnnotations)
+                               ]
+
+                    _ ->
+                        model
+                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeWidth strokeStyle))
+                            => []
 
 
 startEditingText : Int -> Model -> Model
@@ -1580,7 +1592,7 @@ viewArrowHeadDefinition color =
         , markerHeight "4"
         , refX "0.1"
         , refY "2"
-        , Attr.style "cursor: pointer;"
+        , Attr.class "pointerCursor"
         ]
         [ Svg.path [ d "M0,0 V4 L2,2 Z", Attr.fill <| Color.Convert.colorToHex color ] []
         ]
@@ -1616,29 +1628,29 @@ annotationStateEvents index annotation annotationState =
     case annotationState of
         ReadyToDraw ->
             [ SE.on "mousedown" <| Json.map (SelectAnnotation index annotation << toDrawingPosition) Mouse.position
-            , Attr.style "cursor: pointer;"
+            , Attr.class "pointerCursor"
             , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
 
         DrawingAnnotation start ->
-            [ Attr.style "cursor: crosshair;" ]
+            [ Attr.class "crosshairCursor" ]
 
         SelectedAnnotation start annotation ->
-            [ Attr.style "cursor: move;"
+            [ Attr.class "moveCursor"
             , SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
             , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
 
         MovingAnnotation index annotation startPos ->
             [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
-            , Attr.style "cursor: move;"
+            , Attr.class "moveCursor"
             ]
 
         ResizingAnnotation _ _ _ _ ->
-            [ Attr.style "cursor: nesw-resize;" ]
+            [ Attr.class "resizeCursor" ]
 
         EditingATextBox index ->
-            [ Attr.style "cursor: crosshair;" ]
+            [ Attr.class "crosshairCursor" ]
 
 
 getSelectState : Int -> AnnotationState -> SelectState
@@ -1701,7 +1713,7 @@ viewAnnotation annotationState index annotation =
 annotationStateVertexEvents : Int -> Annotation -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
 annotationStateVertexEvents index annotation annotationState vertex =
     [ SE.on "mousedown" <| Json.map (StartResizingAnnotation index annotation vertex << toDrawingPosition) Mouse.position
-    , Attr.style "cursor: nesw-resize;"
+    , Attr.class "resizeCursor"
     , Html.attribute "onmousedown" "event.stopPropagation();"
     ]
         ++ case annotationState of
@@ -1892,7 +1904,7 @@ shapeAttributes shapeType shape =
     List.append (fillStyle shape.fill) <|
         case shapeType of
             Rect ->
-                shapeAttrs shape ++ rectAttrs shape
+                Debug.log "shape!" <| shapeAttrs shape ++ rectAttrs shape
 
             RoundedRect ->
                 shapeAttrs shape ++ rectAttrs shape ++ [ rx "15", ry "15" ]
