@@ -635,7 +635,7 @@ selectAnnotation index annotation model =
 
 addAnnotation : Annotation -> Model -> Model
 addAnnotation annotation model =
-    { model | edits = UndoList.mapPresent (Array.push annotation) model.edits }
+    { model | edits = UndoList.mapPresent (Array.push <| Debug.log "anno" annotation) model.edits }
         |> finishDrawing
 
 
@@ -1372,7 +1372,7 @@ drawingStateEvents drawing annotationState mouse =
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position ]
 
         DrawingAnnotation startPos ->
-            drawingEvents drawing mouse startPos
+            drawingEvents drawing startPos
 
         MovingAnnotation index annotation startPos ->
             [ Html.Events.onMouseLeave ResetToReadyToDraw
@@ -1391,8 +1391,8 @@ drawingStateEvents drawing annotationState mouse =
             [ SE.onClick <| FinishEditingText index ]
 
 
-drawingEvents : Drawing -> StartPosition -> Mouse.Position -> List (Html.Attribute Msg)
-drawingEvents drawing startPos curMouse =
+drawingEvents : Drawing -> StartPosition -> List (Html.Attribute Msg)
+drawingEvents drawing startPos =
     onMouseUpOrLeave <| Json.map (FinishDrawing startPos << toDrawingPosition) Mouse.position
 
 
@@ -1689,7 +1689,7 @@ calcLinePos : StartPosition -> EndPosition -> LineMode -> EndPosition
 calcLinePos start end lineMode =
     case lineMode of
         DrawingLine ->
-            start
+            end
 
         DrawingDiscreteLine ->
             stepMouse start end
@@ -1698,11 +1698,11 @@ calcLinePos start end lineMode =
 viewDrawingHelper : Float -> Float -> StartPosition -> Model -> Svg Msg
 viewDrawingHelper width height pos { drawing, fill, strokeColor, strokeWidth, strokeStyle, fontSize, mouse, keyboardState } =
     let
-        shapeAttrs shapeType shapeMode =
-            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) fill strokeColor strokeWidth strokeStyle
-
         lineAttrs lineType lineMode =
             lineAttributes lineType <| Line pos (calcLinePos pos mouse lineMode) strokeColor strokeWidth strokeStyle
+
+        shapeAttrs shapeType shapeMode =
+            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) fill strokeColor strokeWidth strokeStyle
     in
         case drawing of
             DrawLine lineType lineMode ->
@@ -1980,10 +1980,10 @@ lineAttributes : LineType -> Line -> List (Svg.Attribute Msg)
 lineAttributes lineType line =
     case lineType of
         Arrow ->
-            arrowAttributes line
+            arrowAttributes line ++ simpleLineAttrs line ++ strokeAttrs line.strokeStyle line.strokeColor line.strokeWidth
 
         StraightLine ->
-            simpleLineAttrs line
+            simpleLineAttrs line ++ strokeAttrs line.strokeStyle line.strokeColor line.strokeWidth
 
 
 viewImage : Image -> Html Msg
