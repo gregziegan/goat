@@ -522,6 +522,7 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
 
             StartMovingAnnotation index annotation startPos ->
                 model
+                    |> setMouse startPos
                     |> selectAnnotation index annotation
                     |> startMovingAnnotation index annotation startPos
                     => []
@@ -534,7 +535,7 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
             FinishMovingAnnotation index annotation startPos endPos ->
                 model
                     |> moveAnnotation index annotation startPos endPos
-                    |> finishMovingAnnotation index annotation
+                    |> finishMovingAnnotation index (move startPos endPos annotation)
                     => []
 
             StartResizingAnnotation index annotation vertex startPos ->
@@ -551,7 +552,7 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
             FinishResizingAnnotation index annotation vertex startPos endPos ->
                 model
                     |> resizeAnnotation index annotation vertex startPos endPos
-                    |> selectAnnotation index annotation
+                    |> selectAnnotation index (resize startPos endPos vertex annotation)
                     => []
 
             Undo ->
@@ -749,7 +750,9 @@ startMovingAnnotation index annotation startPos model =
 
 moveAnnotation : Int -> Annotation -> StartPosition -> EndPosition -> Model -> Model
 moveAnnotation index annotation oldPos newPos model =
-    { model | edits = UndoList.mapPresent (Array.set index (move oldPos newPos annotation)) model.edits }
+    { model
+        | edits = UndoList.mapPresent (Array.set index (move oldPos newPos annotation)) model.edits
+    }
 
 
 startResizingAnnotation : Int -> Annotation -> Vertex -> StartPosition -> Model -> Model
@@ -759,7 +762,9 @@ startResizingAnnotation index annotation vertex startPos model =
 
 resizeAnnotation : Int -> Annotation -> Vertex -> StartPosition -> EndPosition -> Model -> Model
 resizeAnnotation index annotation vertex oldPos newPos model =
-    { model | edits = UndoList.mapPresent (Array.set index (resize oldPos newPos vertex annotation)) model.edits }
+    { model
+        | edits = UndoList.mapPresent (Array.set index (resize oldPos newPos vertex annotation)) model.edits
+    }
 
 
 resizeVertices : Position -> Vertex -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
@@ -1619,7 +1624,10 @@ annotationStateEvents index annotation annotationState =
             [ Attr.style "cursor: crosshair;" ]
 
         SelectedAnnotation start annotation ->
-            [ Attr.style "cursor: move;" ]
+            [ Attr.style "cursor: move;"
+            , SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
+            , Html.attribute "onmousedown" "event.stopPropagation();"
+            ]
 
         MovingAnnotation index annotation startPos ->
             [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
