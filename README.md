@@ -1,7 +1,9 @@
-# Image Annotation App
+# G.O.A.T. ![Travis](https://travis-ci.org/thebritican/annotation-editor.svg?branch=master)
+### Graphics Oriented Annotation Tool
+### a.k.a. Greatest Of All Time
 
-![Travis](https://travis-ci.org/thebritican/annotation-editor.svg?branch=master)
-![Example](https://cloud.githubusercontent.com/assets/3099999/23642939/5134b788-02b3-11e7-9b38-8b73e5a22b71.png)
+![demo](https://cloud.githubusercontent.com/assets/3099999/24594663/4055c25e-17e4-11e7-8844-a63a395db5f1.gif)
+
 
 Minimally annotate images with common features like:
 
