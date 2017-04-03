@@ -620,6 +620,12 @@ addAnnotation annotation model =
     }
 
 
+finishLineDrawing : StartPosition -> EndPosition -> LineType -> LineMode -> Model -> Model
+finishLineDrawing start end lineType lineMode model =
+    model
+        |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) model.strokeColor model.strokeStyle))
+
+
 finishDrawing : StartPosition -> EndPosition -> Model -> ( Model, List (Cmd Msg) )
 finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) =
     let
@@ -631,8 +637,7 @@ finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) 
     in
         case model.drawing of
             DrawLine lineType lineMode ->
-                model
-                    |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) strokeColor strokeStyle))
+                finishLineDrawing start end lineType lineMode model
                     => []
 
             DrawShape shapeType shapeMode ->
