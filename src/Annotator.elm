@@ -2062,9 +2062,14 @@ simpleLineAttrs : Line -> List (Svg.Attribute Msg)
 simpleLineAttrs ({ start, end } as line) =
     []
         ++ [ Attr.fill "none"
-           , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+           , d <| linePath start end
              --  , Attr.filter "url(#dropShadow)"
            ]
+
+
+linePath : StartPosition -> EndPosition -> String
+linePath start end =
+    "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
 
 
 arrowAttributes : Line -> List (Svg.Attribute Msg)

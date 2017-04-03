@@ -11,7 +11,13 @@ import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
 import Test exposing (..)
+import Test.Html.Query as Query
+import Test.Html.Selector as HtmlSelector exposing (Selector, text, tag, attribute, all)
 import UndoList
+import Svg exposing (svg)
+import Svg.Attributes as Attr
+import Html
+import Html.Attributes as Html
 
 
 goat : Image
@@ -22,6 +28,16 @@ goat =
     , originalWidth = 200.0
     , originalHeight = 200.0
     }
+
+
+svgDrawspace =
+    svg
+        [ Attr.id "drawing"
+        , Attr.class "drawing"
+        , Attr.width <| toString <| round goat.width
+        , Attr.height <| toString <| round goat.height
+        , Html.attribute "xmlns" "http://www.w3.org/2000/svg"
+        ]
 
 
 model : Model
@@ -68,6 +84,18 @@ position =
         (\{ x, y } -> Shrink.map Position (Shrink.int x) |> Shrink.andMap (Shrink.int y))
 
 
+aLine =
+    Line start end model.strokeColor model.strokeStyle
+
+
+lineSelector : Line -> Selector
+lineSelector line =
+    HtmlSelector.all
+        [ attribute "fill" "none"
+        , attribute "d" (linePath line.start line.end)
+        ]
+
+
 all : Test
 all =
     describe "Annotation App Suite"
@@ -101,6 +129,17 @@ all =
                         |> getFirstAnnotation
                         |> Maybe.map (Expect.equal (Shapes SpotlightRect <| Shape start end SpotlightFill model.strokeColor model.strokeStyle))
                         |> Maybe.withDefault (Expect.fail "Array missing spotlight rect annotation")
+            ]
+        , describe "annotations"
+            [ test "A straight line has the appropriate view attributes" <|
+                \() ->
+                    aLine
+                        |> Lines StraightLine
+                        |> viewAnnotation ReadyToDraw 0
+                        |> svgDrawspace
+                        |> Query.fromHtml
+                        |> Query.find [ tag "path" ]
+                        |> Query.has [ lineSelector aLine ]
             ]
         , describe "Utils"
             [ fuzz2 position position "mouse step function works properly" <|
