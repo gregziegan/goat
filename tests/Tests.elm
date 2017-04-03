@@ -110,6 +110,17 @@ strokeSelectors strokeWidth dashArray strokeColor =
     ]
 
 
+ellipseSelector : Shape -> Selector
+ellipseSelector shape =
+    [ attribute "rx" <| toString <| abs end.x - start.x
+    , attribute "ry" <| toString <| abs end.y - start.y
+    , attribute "cx" <| toString start.x
+    , attribute "cy" <| toString start.y
+    ]
+        ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
+        |> HtmlSelector.all
+
+
 fillSelectors : Fill -> List Selector
 fillSelectors fill =
     let
@@ -191,6 +202,15 @@ all =
                         |> Query.fromHtml
                         |> Query.find [ tag "rect" ]
                         |> Query.has [ rectSelector aShape ]
+            , test "An ellipse has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Shapes Ellipse
+                        |> viewAnnotation ReadyToDraw 0
+                        |> svgDrawspace
+                        |> Query.fromHtml
+                        |> Query.find [ tag "ellipse" ]
+                        |> Query.has [ ellipseSelector aShape ]
             ]
         , describe "Utils"
             [ fuzz2 position position "mouse step function works properly" <|

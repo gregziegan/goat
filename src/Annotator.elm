@@ -1921,10 +1921,10 @@ rectAttrs { start, end } =
 
 ellipseAttributes : Shape -> List (Svg.Attribute Msg)
 ellipseAttributes { start, end } =
-    [ rx <| toString <| abs <| end.x - start.x
-    , ry <| toString <| abs <| end.y - start.y
-    , cx <| toString <| start.x
-    , cy <| toString <| start.y
+    [ rx <| toString <| abs end.x - start.x
+    , ry <| toString <| abs end.y - start.y
+    , cx <| toString start.x
+    , cy <| toString start.y
     , Attr.filter "url(#dropShadow)"
     ]
 
