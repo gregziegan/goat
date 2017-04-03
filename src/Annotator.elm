@@ -2300,10 +2300,10 @@ positionMapY fn pos =
 
 equalXandY : StartPosition -> EndPosition -> EndPosition
 equalXandY a b =
-    if b.y < a.y then
-        Position b.x (a.y - abs b.x - a.x)
+    if b.y - a.y < 0 then
+        Position b.x (a.y - (Basics.max (b.x - a.x) (a.x - b.x)))
     else
-        Position b.x (a.y + abs b.x - a.x)
+        Position b.x (a.y + (Basics.max (b.x - a.x) (a.x - b.x)))
 
 
 toLineStyle : StrokeStyle -> List (Svg.Attribute Msg)
