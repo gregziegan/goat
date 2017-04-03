@@ -1819,20 +1819,20 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboard
                 Svg.rect ((shapeAttributes Rect <| Shape pos mouse EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
 
 
-fillStyle : Fill -> List (Svg.Attribute Msg)
+fillStyle : Fill -> ( String, Bool )
 fillStyle fill =
     case fill of
         SolidFill color ->
-            [ Attr.fill <| Color.Convert.colorToHex color ]
+            Color.Convert.colorToHex color => True
 
         SpotlightFill ->
-            [ Attr.fill "white", fillOpacity "0" ]
+            "white" => False
 
         MaskFill ->
-            [ Attr.fill "black" ]
+            "black" => True
 
         EmptyFill ->
-            [ Attr.fill "white", fillOpacity "0" ]
+            "white" => False
 
 
 pointerEvents : Fill -> String
@@ -1931,19 +1931,29 @@ ellipseAttributes { start, end } =
 
 shapeAttributes : ShapeType -> Shape -> List (Svg.Attribute Msg)
 shapeAttributes shapeType shape =
-    List.append (fillStyle shape.fill) <|
-        case shapeType of
-            Rect ->
-                shapeAttrs shape ++ rectAttrs shape
+    let
+        ( fillColor, isVisible ) =
+            fillStyle shape.fill
 
-            RoundedRect ->
-                shapeAttrs shape ++ rectAttrs shape ++ [ rx "15", ry "15" ]
+        fillStyles =
+            if isVisible then
+                [ Attr.fill fillColor ]
+            else
+                [ Attr.fill fillColor, fillOpacity "0" ]
+    in
+        List.append fillStyles <|
+            case shapeType of
+                Rect ->
+                    shapeAttrs shape ++ rectAttrs shape
 
-            Ellipse ->
-                shapeAttrs shape ++ ellipseAttributes shape
+                RoundedRect ->
+                    shapeAttrs shape ++ rectAttrs shape ++ [ rx "15", ry "15" ]
 
-            SpotlightRect ->
-                shapeAttrs shape ++ rectAttrs shape
+                Ellipse ->
+                    shapeAttrs shape ++ ellipseAttributes shape
+
+                SpotlightRect ->
+                    shapeAttrs shape ++ rectAttrs shape
 
 
 shapeVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)

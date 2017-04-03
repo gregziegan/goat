@@ -89,19 +89,44 @@ aLine =
     Line start end model.strokeColor model.strokeStyle
 
 
+aShape =
+    Shape start end model.fill model.strokeColor model.strokeStyle
+
+
 lineSelector : Line -> Selector
 lineSelector line =
+    [ attribute "fill" "none"
+    , attribute "d" (linePath line.start line.end)
+    ]
+        ++ (uncurry strokeSelectors (toLineStyle line.strokeStyle)) line.strokeColor
+        |> HtmlSelector.all
+
+
+strokeSelectors : String -> String -> Color.Color -> List Selector
+strokeSelectors strokeWidth dashArray strokeColor =
+    [ attribute "stroke" <| Color.Convert.colorToHex strokeColor
+    , attribute "stroke-width" strokeWidth
+    , attribute "stroke-dasharray" dashArray
+    ]
+
+
+fillSelectors : Fill -> List Selector
+fillSelectors fill =
     let
-        ( strokeWidth, dashArray ) =
-            toLineStyle line.strokeStyle
+        ( fillColor, isVisible ) =
+            fillStyle fill
     in
-        HtmlSelector.all
-            [ attribute "fill" "none"
-            , attribute "d" (linePath line.start line.end)
-            , attribute "stroke" <| Color.Convert.colorToHex line.strokeColor
-            , attribute "stroke-width" strokeWidth
-            , attribute "stroke-dasharray" dashArray
-            ]
+        if isVisible then
+            [ attribute "fill" fillColor ]
+        else
+            [ attribute "fill" fillColor, attribute "fill-opacity" "0" ]
+
+
+rectSelector : Shape -> Selector
+rectSelector shape =
+    fillSelectors shape.fill
+        ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
+        |> HtmlSelector.all
 
 
 all : Test
@@ -148,7 +173,7 @@ all =
                         |> Query.fromHtml
                         |> Query.find [ tag "path" ]
                         |> Query.has [ lineSelector aLine ]
-            , test "An arrow line has the appropriate view attributes" <|
+            , test "An arrow has the appropriate view attributes" <|
                 \() ->
                     aLine
                         |> Lines Arrow
@@ -157,6 +182,15 @@ all =
                         |> Query.fromHtml
                         |> Query.find [ tag "path" ]
                         |> Query.has [ lineSelector aLine ]
+            , test "A rectangle has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Shapes Rect
+                        |> viewAnnotation ReadyToDraw 0
+                        |> svgDrawspace
+                        |> Query.fromHtml
+                        |> Query.find [ tag "rect" ]
+                        |> Query.has [ rectSelector aShape ]
             ]
         , describe "Utils"
             [ fuzz2 position position "mouse step function works properly" <|
