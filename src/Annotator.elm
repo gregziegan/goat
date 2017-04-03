@@ -124,6 +124,7 @@ type ShapeType
     | RoundedRect
     | Ellipse
     | SpotlightRect
+    | SpotlightEllipse
 
 
 type Vertices
@@ -247,6 +248,7 @@ drawingOptions shiftPressed =
         , DrawShape Ellipse DrawingEqualizedShape
         , DrawTextBox
         , DrawShape SpotlightRect DrawingEqualizedShape
+        , DrawShape SpotlightEllipse DrawingEqualizedShape
         ]
     else
         [ DrawLine Arrow DrawingLine
@@ -256,6 +258,7 @@ drawingOptions shiftPressed =
         , DrawShape Ellipse DrawingShape
         , DrawTextBox
         , DrawShape SpotlightRect DrawingShape
+        , DrawShape SpotlightEllipse DrawingShape
         ]
 
 
@@ -636,6 +639,11 @@ finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) 
             DrawShape shapeType shapeMode ->
                 case shapeType of
                     SpotlightRect ->
+                        model
+                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill strokeColor strokeStyle))
+                            => []
+
+                    SpotlightEllipse ->
                         model
                             |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill strokeColor strokeStyle))
                             => []
@@ -1338,6 +1346,9 @@ viewShapeSvg drawing =
                 SpotlightRect ->
                     viewSpotlightIcon
 
+                SpotlightEllipse ->
+                    viewSpotlightIcon
+
         DrawTextBox ->
             viewTextIcon
 
@@ -1524,6 +1535,9 @@ viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing
                             SpotlightRect ->
                                 spotlightDrawingAndAnnotations start
 
+                            SpotlightEllipse ->
+                                spotlightDrawingAndAnnotations start
+
                             _ ->
                                 nonSpotlightDrawingAndAnnotations start
 
@@ -1603,7 +1617,7 @@ isSpotlightShape : Annotation -> Bool
 isSpotlightShape annotation =
     case annotation of
         Shapes shapeType _ ->
-            shapeType == SpotlightRect
+            shapeType == SpotlightRect || shapeType == SpotlightEllipse
 
         _ ->
             False
@@ -1616,6 +1630,9 @@ spotlightFillToMaskFill annotation =
             case shapeType of
                 SpotlightRect ->
                     Shapes Rect { shape | fill = MaskFill }
+
+                SpotlightEllipse ->
+                    Shapes Ellipse { shape | fill = MaskFill }
 
                 _ ->
                     annotation
@@ -1707,6 +1724,9 @@ viewAnnotation annotationState index annotation =
             Shapes shapeType shape ->
                 case shapeType of
                     Ellipse ->
+                        viewShape movementEvents (vertices Elliptical shape) shapeType shape
+
+                    SpotlightEllipse ->
                         viewShape movementEvents (vertices Elliptical shape) shapeType shape
 
                     _ ->
@@ -1804,6 +1824,12 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboard
                         else
                             Svg.rect (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
 
+                    SpotlightEllipse ->
+                        if isInMask then
+                            Svg.ellipse (spotlightAttrs shapeType shapeMode MaskFill Color.white) []
+                        else
+                            Svg.ellipse (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
+
             DrawTextBox ->
                 Svg.rect ((shapeAttributes Rect <| Shape pos mouse EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
 
@@ -1859,6 +1885,9 @@ viewShape attrs vertices shapeType shape =
 
                 SpotlightRect ->
                     [ Svg.rect allAttrs [] ]
+
+                SpotlightEllipse ->
+                    [ Svg.ellipse allAttrs [] ]
 
 
 viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
@@ -1928,6 +1957,9 @@ shapeAttributes shapeType shape =
 
             SpotlightRect ->
                 shapeAttrs shape ++ rectAttrs shape
+
+            SpotlightEllipse ->
+                shapeAttrs shape ++ ellipseAttributes shape
 
 
 shapeVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
