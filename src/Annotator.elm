@@ -2100,7 +2100,7 @@ viewUndoArrow =
 viewArrowIcon : Html msg
 viewArrowIcon =
     svg [ Attr.width "20", Attr.height "20", viewBox "0 0 347.341 347.341" ]
-        [ polygon [ points "347.341,107.783 347.339,0 239.559,0.002 282.843,43.285 0,326.128 21.213,347.341 304.056,64.498", fill "grey" ] []
+        [ polygon [ points "347.341,107.783 347.339,0 239.559,0.002 282.843,43.285 0,326.128 21.213,347.341 304.056,64.498", fill "#555" ] []
         ]
 
 
