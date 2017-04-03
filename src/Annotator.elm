@@ -507,8 +507,10 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
 
             StartResizingAnnotation index annotation vertex startPos ->
                 model
+                    |> setMouse startPos
                     |> selectAnnotation index annotation
                     |> startResizingAnnotation index annotation vertex startPos
+                    |> resizeAnnotation index annotation vertex startPos startPos
                     => []
 
             ResizeAnnotation index annotation vertex startPos endPos ->
