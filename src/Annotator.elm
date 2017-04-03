@@ -1805,8 +1805,7 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboard
                             Svg.rect (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
 
             DrawTextBox ->
-                TextArea pos (calcShapePos pos mouse DrawingShape) strokeColor fontSize "" 0 (AutoExpand.initState (config 0 fontSize))
-                    |> viewTextBoxWithBorder
+                Svg.rect ((shapeAttributes Rect <| Shape pos mouse EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
 
 
 fillStyle : Fill -> List (Svg.Attribute Msg)
@@ -2016,7 +2015,7 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
         NotSelected ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
                 |> List.singleton
                 |> flip List.append (viewShape ([ Attr.style "stroke: transparent; pointer-events: auto; cursor: pointer;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black SolidThin))
@@ -2024,20 +2023,13 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
         SelectedWithVertices ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
                 |> List.singleton
                 |> flip List.append
-                    (viewShape attrs vertices Rect (Shape start end EmptyFill Color.black SolidThin)
-                        ++ viewShape (attrs ++ [ SE.onMouseDown <| StartEditingText index textBox, Attr.style "pointer-events: fill; cursor: pointer;" ]) vertices Rect (Shape start end EmptyFill Color.black SolidThin)
+                    (viewShape (Attr.strokeWidth "0.5" :: attrs) vertices Rect (Shape start end EmptyFill Color.white SolidThin)
+                        ++ viewShape (attrs ++ [ Attr.strokeWidth "0.5", SE.onMouseDown <| StartEditingText index textBox, Attr.style "pointer-events: fill; cursor: pointer;" ]) vertices Rect (Shape start end EmptyFill (Color.rgb 230 230 230) SolidThin)
                     )
-
-
-viewTextBoxWithBorder : TextArea -> Svg Msg
-viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
-    Svg.g []
-        [ Svg.rect (shapeAttributes Rect (Shape start end EmptyFill Color.black SolidThin)) []
-        ]
 
 
 viewLine : List (Svg.Attribute Msg) -> List (Svg Msg) -> LineType -> Line -> List (Svg Msg)
