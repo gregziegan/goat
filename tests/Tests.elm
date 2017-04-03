@@ -3,21 +3,22 @@ module Tests exposing (..)
 import Annotator exposing (..)
 import Array exposing (Array)
 import Color
+import Color.Convert
 import Expect
 import Fuzz exposing (Fuzzer)
+import Html
+import Html.Attributes as Html
 import Keyboard.Extra as Keyboard
 import List.Zipper
 import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
-import Test exposing (..)
-import Test.Html.Query as Query
-import Test.Html.Selector as HtmlSelector exposing (Selector, text, tag, attribute, all)
-import UndoList
 import Svg exposing (svg)
 import Svg.Attributes as Attr
-import Html
-import Html.Attributes as Html
+import Test exposing (..)
+import Test.Html.Query as Query
+import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, tag, text)
+import UndoList
 
 
 goat : Image
@@ -90,10 +91,17 @@ aLine =
 
 lineSelector : Line -> Selector
 lineSelector line =
-    HtmlSelector.all
-        [ attribute "fill" "none"
-        , attribute "d" (linePath line.start line.end)
-        ]
+    let
+        ( strokeWidth, dashArray ) =
+            toLineStyle line.strokeStyle
+    in
+        HtmlSelector.all
+            [ attribute "fill" "none"
+            , attribute "d" (linePath line.start line.end)
+            , attribute "stroke" <| Color.Convert.colorToHex line.strokeColor
+            , attribute "stroke-width" strokeWidth
+            , attribute "stroke-dasharray" dashArray
+            ]
 
 
 all : Test
@@ -135,6 +143,15 @@ all =
                 \() ->
                     aLine
                         |> Lines StraightLine
+                        |> viewAnnotation ReadyToDraw 0
+                        |> svgDrawspace
+                        |> Query.fromHtml
+                        |> Query.find [ tag "path" ]
+                        |> Query.has [ lineSelector aLine ]
+            , test "An arrow line has the appropriate view attributes" <|
+                \() ->
+                    aLine
+                        |> Lines Arrow
                         |> viewAnnotation ReadyToDraw 0
                         |> svgDrawspace
                         |> Query.fromHtml

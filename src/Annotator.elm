@@ -1899,9 +1899,14 @@ shapeAttrs ({ strokeStyle, strokeColor, fill } as shape) =
 
 strokeAttrs : StrokeStyle -> Color -> List (Svg.Attribute Msg)
 strokeAttrs strokeStyle strokeColor =
-    [ Attr.stroke <| Color.Convert.colorToHex strokeColor
-    ]
-        ++ toLineStyle strokeStyle
+    let
+        ( strokeWidth, dashArray ) =
+            toLineStyle strokeStyle
+    in
+        [ Attr.stroke <| Color.Convert.colorToHex strokeColor
+        , Attr.strokeWidth strokeWidth
+        , Attr.strokeDasharray dashArray
+        ]
 
 
 rectAttrs : Shape -> List (Svg.Attribute Msg)
@@ -2322,32 +2327,32 @@ equalXandY a b =
         Position b.x (a.y + (Basics.max (b.x - a.x) (a.x - b.x)))
 
 
-toLineStyle : StrokeStyle -> List (Svg.Attribute Msg)
+toLineStyle : StrokeStyle -> ( String, String )
 toLineStyle strokeStyle =
     case strokeStyle of
         SolidThin ->
-            [ strokeWidth "4", strokeDasharray "" ]
+            "4" => ""
 
         SolidMedium ->
-            [ strokeWidth "6", strokeDasharray "" ]
+            "6" => ""
 
         SolidThick ->
-            [ strokeWidth "8", strokeDasharray "" ]
+            "8" => ""
 
         SolidVeryThick ->
-            [ strokeWidth "10", strokeDasharray "" ]
+            "10" => ""
 
         DashedThin ->
-            [ strokeWidth "4", strokeDasharray "10, 5" ]
+            "4" => "10, 5"
 
         DashedMedium ->
-            [ strokeWidth "6", strokeDasharray "10, 5" ]
+            "6" => "10, 5"
 
         DashedThick ->
-            [ strokeWidth "8", strokeDasharray "10, 5" ]
+            "8" => "10, 5"
 
         DashedVeryThick ->
-            [ strokeWidth "10", strokeDasharray "10, 5" ]
+            "10" => "10, 5"
 
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
