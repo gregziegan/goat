@@ -1,5 +1,6 @@
 <!doctype html>
   <link rel="stylesheet" href="style.css" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
   <body>
     <div id="root"></div>
@@ -12,30 +13,30 @@
       app.ports.exportToImage.subscribe(function(image) {
         var canvas = document.createElement('canvas')
         canvas.crossOrigin='anonymous'
+        canvas.width = image.width
+        canvas.height = image.height
+        autoScale(canvas)
         var ctx = canvas.getContext('2d')
         var data = document.getElementById('drawing').outerHTML
         var DOMURL = window.URL || window.webkitURL || window;
-        var img = new Image()
-        img.onload = function() {
-          var drawingImg = new Image()
-          var svg = new Blob([data], {type: 'image/svg+xml'});
-          var url = DOMURL.createObjectURL(svg);
-          drawingImg.onload = function() {
-            canvas.width = image.width
-            canvas.height = image.height
-            ctx.drawImage(img, 0, 0, image.width, image.height)
-            ctx.drawImage(drawingImg, 0, 0, image.width, image.height);
-            DOMURL.revokeObjectURL(url);
-            canvas.toBlob(blob => {
-              var exportImage = new Image()
-              exportImage.id = 'export-image'
-              exportImage.src = DOMURL.createObjectURL(blob)
-              document.body.replaceChild(exportImage, document.getElementById('export-image'))
-            })
-          }
-          drawingImg.src = url
+        var drawingImg = new Image()
+        var svg = new Blob([data], {type: 'image/svg+xml'});
+        var url = DOMURL.createObjectURL(svg);
+        var canvasPadding = 10;
+        drawingImg.onload = function() {
+          ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.originalWidth, image.originalHeight, 0, 0, image.width, Math.round(image.height))
+          ctx.drawImage(drawingImg, -canvasPadding, -canvasPadding, image.width, Math.round(image.height));
+          DOMURL.revokeObjectURL(url);
+          canvas.toBlob(blob => {
+            var exportImage = new Image()
+            exportImage.id = 'export-image'
+            exportImage.src = DOMURL.createObjectURL(blob)
+            exportImage.width = image.width
+            exportImage.height = image.height
+            document.body.replaceChild(exportImage, document.getElementById('export-image'))
+          })
         }
-        img.src = image.url
+        drawingImg.src = url
       });
 
       function getImages(html) {
@@ -56,6 +57,32 @@
           originalHeight: originalHeight,
           width: width,
           height: height
+        }
+      }
+
+      function autoScale(canvas) {
+        // adapted from https://www.html5rocks.com/en/tutorials/canvas/hidpi/
+        var context = canvas.getContext('2d');
+        var devicePixelRatio = window.devicePixelRatio || 1;
+        var backingStoreRatio = context.webkitBackingStorePixelRatio ||
+                              context.mozBackingStorePixelRatio ||
+                              context.msBackingStorePixelRatio ||
+                              context.oBackingStorePixelRatio ||
+                              context.backingStorePixelRatio || 1;
+
+        var ratio = devicePixelRatio / backingStoreRatio;
+
+        if (devicePixelRatio !== backingStoreRatio) {
+            var oldWidth = canvas.width;
+            var oldHeight = canvas.height;
+
+            canvas.width = oldWidth * ratio;
+            canvas.height = oldHeight * ratio;
+
+            canvas.style.width = oldWidth + 'px';
+            canvas.style.height = oldHeight + 'px';
+
+            context.scale(ratio, ratio);
         }
       }
 

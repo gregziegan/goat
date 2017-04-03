@@ -49,6 +49,7 @@ type LineMode
 type Drawing
     = DrawLine LineType LineMode
     | DrawShape ShapeType ShapeMode
+    | DrawTextBox
 
 
 type Fill
@@ -58,23 +59,21 @@ type Fill
     | SpotlightFill
 
 
-type StrokeWidth
-    = Thin
-    | Medium
-    | Thick
-
-
 type StrokeStyle
-    = Solid
-    | Dotted
-    | Dashed
+    = SolidThin
+    | SolidMedium
+    | SolidThick
+    | SolidVeryThick
+    | DashedThin
+    | DashedMedium
+    | DashedThick
+    | DashedVeryThick
 
 
 type alias Line =
     { start : Position
     , end : Position
     , strokeColor : Color
-    , strokeWidth : StrokeWidth
     , strokeStyle : StrokeStyle
     }
 
@@ -84,7 +83,6 @@ type alias Shape =
     , end : Position
     , fill : Fill
     , strokeColor : Color
-    , strokeWidth : StrokeWidth
     , strokeStyle : StrokeStyle
     }
 
@@ -126,7 +124,12 @@ type ShapeType
     | RoundedRect
     | Ellipse
     | SpotlightRect
-    | TextBorder
+
+
+type Vertices
+    = Rectangular
+    | Elliptical
+    | Linear
 
 
 type Annotation
@@ -169,7 +172,6 @@ type alias Model =
         -- annotation attributes
     , fill : Fill
     , strokeColor : Color
-    , strokeWidth : StrokeWidth
     , strokeStyle : StrokeStyle
     , fontSize :
         Float
@@ -186,6 +188,11 @@ type alias Model =
     , drawing : Drawing
     , operatingSystem : OperatingSystem
     }
+
+
+controlUIWidth : number
+controlUIWidth =
+    72
 
 
 strokeColorOptions : List Color
@@ -217,19 +224,16 @@ fillOptions =
     ]
 
 
-lineStrokeOptions : List StrokeWidth
-lineStrokeOptions =
-    [ Thin
-    , Medium
-    , Thick
-    ]
-
-
-strokeStyles : List StrokeStyle
-strokeStyles =
-    [ Solid
-    , Dotted
-    , Dashed
+strokeStyleOptions : List StrokeStyle
+strokeStyleOptions =
+    [ SolidThin
+    , SolidMedium
+    , SolidThick
+    , SolidVeryThick
+    , DashedThin
+    , DashedMedium
+    , DashedThick
+    , DashedVeryThick
     ]
 
 
@@ -241,7 +245,7 @@ drawingOptions shiftPressed =
         , DrawShape Rect DrawingEqualizedShape
         , DrawShape RoundedRect DrawingEqualizedShape
         , DrawShape Ellipse DrawingEqualizedShape
-        , DrawShape TextBorder DrawingEqualizedShape
+        , DrawTextBox
         , DrawShape SpotlightRect DrawingEqualizedShape
         ]
     else
@@ -250,7 +254,7 @@ drawingOptions shiftPressed =
         , DrawShape Rect DrawingShape
         , DrawShape RoundedRect DrawingShape
         , DrawShape Ellipse DrawingShape
-        , DrawShape TextBorder DrawingShape
+        , DrawTextBox
         , DrawShape SpotlightRect DrawingShape
         ]
 
@@ -271,8 +275,7 @@ init flags =
     { edits = UndoList.fresh Array.empty
     , fill = EmptyFill
     , strokeColor = Color.red
-    , strokeWidth = Medium
-    , strokeStyle = Solid
+    , strokeStyle = SolidMedium
     , fontSize = 14
     , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.initialState
@@ -307,7 +310,6 @@ type Msg
       -- Annotation Attribute updates
     | SelectFill Fill
     | SelectStrokeColor Color
-    | SelectLineStroke StrokeWidth
     | SelectStrokeStyle StrokeStyle
     | SelectFontSize Float
       -- Control UI updates
@@ -338,7 +340,7 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mouse, images, keyboardState, drawing } as model) =
+update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, keyboardState, drawing } as model) =
     let
         annotations =
             edits.present
@@ -358,37 +360,13 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
                     => []
 
             FinishDrawing start end ->
-                let
-                    numAnnotations =
-                        Array.length model.edits.present
-
-                    initialTextBox =
-                        TextBox <| TextArea start end strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize))
-                in
-                    case model.drawing of
-                        DrawLine lineType lineMode ->
-                            model
-                                |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) strokeColor strokeWidth strokeStyle))
-                                => []
-
-                        DrawShape shapeType shapeMode ->
-                            model
-                                |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeWidth strokeStyle))
-                                => case shapeType of
-                                    TextBorder ->
-                                        [ "text-box-edit--"
-                                            ++ toString numAnnotations
-                                            |> Dom.focus
-                                            |> Task.attempt (tryToEdit numAnnotations)
-                                        ]
-
-                                    _ ->
-                                        []
+                finishDrawing start end model
 
             StartEditingText index textArea ->
                 annotations
                     |> Array.set index (TextBox textArea)
                     |> logChange model
+                    |> startEditingText index
                     => [ "text-box-edit--"
                             ++ toString index
                             |> Dom.focus
@@ -409,11 +387,7 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
             FinishEditingText index ->
                 model
                     |> finishEditingText index
-                    => [ "text-box-edit--"
-                            ++ toString index
-                            |> Dom.blur
-                            |> Task.attempt tryToBlur
-                       ]
+                    => []
 
             AutoExpandInput index { state, textValue } ->
                 annotations
@@ -475,13 +449,6 @@ update msg ({ edits, fill, fontSize, strokeWidth, strokeColor, strokeStyle, mous
                 model
                     |> updateAnySelectedAnnotations (updateStrokeColor strokeColor)
                     |> setStrokeColor strokeColor
-                    |> closeDropdown
-                    => []
-
-            SelectLineStroke lineStroke ->
-                model
-                    |> updateAnySelectedAnnotations (updateLineStroke lineStroke)
-                    |> setStrokeWidth lineStroke
                     |> closeDropdown
                     => []
 
@@ -619,7 +586,10 @@ updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
 updateAnySelectedAnnotations fn model =
     case model.annotationState of
         SelectedAnnotation index annotation ->
-            { model | edits = UndoList.new (Array.set index (fn annotation) model.edits.present) model.edits }
+            { model
+                | edits = UndoList.new (Array.set index (fn annotation) model.edits.present) model.edits
+                , annotationState = SelectedAnnotation index (fn annotation)
+            }
 
         _ ->
             model
@@ -642,13 +612,48 @@ selectAnnotation index annotation model =
 
 addAnnotation : Annotation -> Model -> Model
 addAnnotation annotation model =
-    { model | edits = UndoList.new (Array.push annotation model.edits.present) model.edits }
-        |> finishDrawing
+    { model
+        | edits = UndoList.new (Array.push annotation model.edits.present) model.edits
+        , annotationState = ReadyToDraw
+    }
 
 
-finishDrawing : Model -> Model
-finishDrawing model =
-    { model | annotationState = ReadyToDraw }
+finishDrawing : StartPosition -> EndPosition -> Model -> ( Model, List (Cmd Msg) )
+finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) =
+    let
+        numAnnotations =
+            Array.length model.edits.present
+
+        initialTextBox =
+            TextBox <| TextArea start end strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize))
+    in
+        case model.drawing of
+            DrawLine lineType lineMode ->
+                model
+                    |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) strokeColor strokeStyle))
+                    => []
+
+            DrawShape shapeType shapeMode ->
+                case shapeType of
+                    SpotlightRect ->
+                        model
+                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill strokeColor strokeStyle))
+                            => []
+
+                    _ ->
+                        model
+                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeStyle))
+                            => []
+
+            DrawTextBox ->
+                model
+                    |> addAnnotation (TextBox <| TextArea start (calcShapePos start end DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize)))
+                    |> startEditingText numAnnotations
+                    => [ "text-box-edit--"
+                            ++ toString numAnnotations
+                            |> Dom.focus
+                            |> Task.attempt (tryToEdit numAnnotations)
+                       ]
 
 
 startEditingText : Int -> Model -> Model
@@ -677,19 +682,6 @@ updateFill fill annotation =
 
         Shapes shapeType shape ->
             Shapes shapeType { shape | fill = fill }
-
-        TextBox textBox ->
-            annotation
-
-
-updateLineStroke : StrokeWidth -> Annotation -> Annotation
-updateLineStroke strokeWidth annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType { line | strokeWidth = strokeWidth }
-
-        Shapes shapeType shape ->
-            Shapes shapeType { shape | strokeWidth = strokeWidth }
 
         TextBox textBox ->
             annotation
@@ -726,11 +718,6 @@ setFill fill model =
 setFontSize : Float -> Model -> Model
 setFontSize fontSize model =
     { model | fontSize = fontSize }
-
-
-setStrokeWidth : StrokeWidth -> Model -> Model
-setStrokeWidth strokeWidth model =
-    { model | strokeWidth = strokeWidth }
 
 
 setStrokeStyle : StrokeStyle -> Model -> Model
@@ -845,7 +832,7 @@ toggleDropdown editOption model =
         , drawing =
             case editOption of
                 Fonts ->
-                    selectShape TextBorder model.keyboardState
+                    DrawTextBox
 
                 _ ->
                     model.drawing
@@ -898,6 +885,9 @@ transitionOnShift drawing =
 
                 DrawingEqualizedShape ->
                     DrawShape shapeType DrawingShape
+
+        DrawTextBox ->
+            drawing
 
 
 cancelDrawing : Model -> Model
@@ -1114,9 +1104,9 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
                     ]
                 , viewHistoryControls edits
                 , div [ Html.class "columns" ]
-                    (List.map (viewDrawingButton drawing toDropdownMenu) (drawingOptions shiftPressed)
-                        ++ [ viewFillDropdown toDropdownMenu fill
-                           , viewStrokeColorDropdown toDropdownMenu strokeColor
+                    (List.map (viewDrawingButton keyboardState drawing toDropdownMenu) (drawingOptions shiftPressed)
+                        ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
+                           , viewFillDropdown toDropdownMenu fill
                            , viewLineStrokeDropdown toDropdownMenu
                            ]
                     )
@@ -1144,28 +1134,39 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
-
-viewDrawingButton : Drawing -> (AttributeDropdown -> Html Msg) -> Drawing -> Html Msg
-viewDrawingButton selectedDrawing toDropdownMenu drawing =
-    case drawing of
-        DrawLine lineType lineMode ->
-            button
-                [ Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing ]
-                , onClick <| ChangeDrawing drawing
-                ]
-                [ viewShapeSvg drawing ]
-
-        DrawShape shapeType shapeMode ->
-            case shapeType of
-                TextBorder ->
-                    viewTextSizeDropdown selectedDrawing toDropdownMenu
+        DrawTextBox ->
+            case drawing2 of
+                DrawTextBox ->
+                    True
 
                 _ ->
-                    button
-                        [ Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing ]
-                        , onClick <| ChangeDrawing drawing
-                        ]
-                        [ viewShapeSvg drawing ]
+                    False
+
+
+viewVanillaDrawingButton : Keyboard.State -> Drawing -> Drawing -> Html Msg
+viewVanillaDrawingButton keyboardState selectedDrawing drawing =
+    button
+        [ Html.classList
+            [ "drawing-button" => True
+            , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
+            , "drawing-button--alternate" => drawingsAreEqual selectedDrawing drawing && isPressed Shift keyboardState
+            ]
+        , onClick <| ChangeDrawing drawing
+        ]
+        [ viewShapeSvg drawing ]
+
+
+viewDrawingButton : Keyboard.State -> Drawing -> (AttributeDropdown -> Html Msg) -> Drawing -> Html Msg
+viewDrawingButton keyboardState selectedDrawing toDropdownMenu drawing =
+    case drawing of
+        DrawLine lineType lineMode ->
+            viewVanillaDrawingButton keyboardState selectedDrawing drawing
+
+        DrawShape shapeType shapeMode ->
+            viewVanillaDrawingButton keyboardState selectedDrawing drawing
+
+        DrawTextBox ->
+            viewTextSizeDropdown selectedDrawing toDropdownMenu
 
 
 viewHistoryControls : UndoList (Array Annotation) -> Html Msg
@@ -1181,7 +1182,7 @@ viewTextSizeDropdown drawing toDropdownMenu =
     div [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
-            , Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual drawing (DrawShape TextBorder DrawingShape) ]
+            , Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual drawing DrawTextBox ]
             ]
             [ viewTextIcon ]
         , toDropdownMenu Fonts
@@ -1309,7 +1310,7 @@ viewDropdownOptions curEditMode model selectedOption editOption =
                 viewStrokeColorOptions model.strokeColor
 
             Strokes ->
-                viewLineStrokeOptions model.strokeWidth model.strokeStyle
+                viewLineStrokeOptions model.strokeStyle
 
 
 viewShapeSvg : Drawing -> Html Msg
@@ -1334,19 +1335,17 @@ viewShapeSvg drawing =
                 Ellipse ->
                     viewEllipseIcon
 
-                TextBorder ->
-                    viewTextIcon
-
                 SpotlightRect ->
                     viewSpotlightIcon
 
+        DrawTextBox ->
+            viewTextIcon
 
-viewLineStrokeOptions : StrokeWidth -> StrokeStyle -> Html Msg
-viewLineStrokeOptions strokeWidth strokeStyle =
-    [ List.map (viewLineStrokeOption strokeWidth) lineStrokeOptions
-    , List.map (viewStrokeStyleOption strokeStyle) strokeStyles
-    ]
-        |> List.concat
+
+viewLineStrokeOptions : StrokeStyle -> Html Msg
+viewLineStrokeOptions strokeStyle =
+    strokeStyleOptions
+        |> List.map (viewStrokeStyleOption strokeStyle)
         |> div [ Html.class "dropdown-options" ]
 
 
@@ -1360,27 +1359,37 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         , onClick (SelectStrokeStyle strokeStyle)
         ]
         [ case strokeStyle of
-            Solid ->
-                viewSolidIcon
+            SolidThin ->
+                svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
+                    [ Svg.path [ d "M1 .5h12", stroke "#555", fill "none", fillRule "evenodd", strokeLinecap "square" ] [] ]
 
-            Dotted ->
-                viewDottedIcon
+            SolidMedium ->
+                viewNormalLineIcon
 
-            Dashed ->
-                viewDashedIcon
+            SolidThick ->
+                svg [ Attr.width "14", Attr.height "4", viewBox "0 0 14 4" ]
+                    [ Svg.path [ d "M0 4h16V0H0z", fillRule "nonzero", fill "#555" ] [] ]
+
+            SolidVeryThick ->
+                svg [ Attr.width "14", Attr.height "6", viewBox "0 0 14 6" ]
+                    [ Svg.path [ d "M0 6h16V0H0z", fillRule "nonzero", fill "#555" ] [] ]
+
+            DashedThin ->
+                svg [ Attr.width "14", Attr.height "1", viewBox "0 0 14 1" ]
+                    [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
+
+            DashedMedium ->
+                svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
+                    [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
+
+            DashedThick ->
+                svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
+                    [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
+
+            DashedVeryThick ->
+                svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
+                    [ Svg.path [ d "M0 4h6V0H0v4zm9 0h6V0H9v4z", fillRule "nonzero", fill "#555" ] [] ]
         ]
-
-
-viewLineStrokeOption : StrokeWidth -> StrokeWidth -> Html Msg
-viewLineStrokeOption selectedStroke stroke =
-    button
-        [ Html.classList
-            [ "dropdown-button" => True
-            , "dropdown-button--selected" => selectedStroke == stroke
-            ]
-        , onClick <| SelectLineStroke stroke
-        ]
-        [ viewLineStroke (strokeToWidth stroke) [] ]
 
 
 drawingStateEvents : Drawing -> AnnotationState -> List (Html.Attribute Msg)
@@ -1407,7 +1416,8 @@ drawingStateEvents drawing annotationState =
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position ]
 
         EditingATextBox index ->
-            [ SE.onClick <| FinishEditingText index ]
+            [ SE.onMouseDown <| FinishEditingText index
+            ]
 
 
 viewMask : Float -> Float -> Svg msg
@@ -1561,9 +1571,12 @@ viewCanvas model image =
 
 viewSvgFilters : Svg Msg
 viewSvgFilters =
-    Svg.filter [ Attr.id "dropShadow" ]
-        [ Svg.feGaussianBlur [ Attr.in_ "SourceAlpha", Attr.stdDeviation "3" ] []
-        , Svg.feOffset [ Attr.dx "2", Attr.dy "4" ] []
+    Svg.filter [ Attr.id "dropShadow", Attr.x "-20%", Attr.y "-20%", Attr.width "200%", Attr.height "200%" ]
+        [ Svg.feGaussianBlur [ Attr.in_ "SourceAlpha", Attr.stdDeviation "2.2" ] []
+        , Svg.feOffset [ Attr.dx "2", Attr.dy "2", Attr.result "offsetblur" ] []
+        , Svg.feComponentTransfer []
+            [ Svg.feFuncA [ Attr.type_ "linear", Attr.slope "0.2" ] []
+            ]
         , Svg.feMerge []
             [ Svg.feMergeNode [] []
             , Svg.feMergeNode [ Attr.in_ "SourceGraphic" ] []
@@ -1580,7 +1593,7 @@ viewArrowHeadDefinition color =
         , markerHeight "4"
         , refX "0.1"
         , refY "2"
-        , Attr.style "cursor: pointer;"
+        , Attr.class "pointerCursor"
         ]
         [ Svg.path [ d "M0,0 V4 L2,2 Z", Attr.fill <| Color.Convert.colorToHex color ] []
         ]
@@ -1616,29 +1629,29 @@ annotationStateEvents index annotation annotationState =
     case annotationState of
         ReadyToDraw ->
             [ SE.on "mousedown" <| Json.map (SelectAnnotation index annotation << toDrawingPosition) Mouse.position
-            , Attr.style "cursor: pointer;"
+            , Attr.class "pointerCursor"
             , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
 
         DrawingAnnotation start ->
-            [ Attr.style "cursor: crosshair;" ]
+            [ Attr.class "crosshairCursor" ]
 
         SelectedAnnotation start annotation ->
-            [ Attr.style "cursor: move;"
+            [ Attr.class "moveCursor"
             , SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
             , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
 
         MovingAnnotation index annotation startPos ->
             [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
-            , Attr.style "cursor: move;"
+            , Attr.class "moveCursor"
             ]
 
         ResizingAnnotation _ _ _ _ ->
-            [ Attr.style "cursor: nesw-resize;" ]
+            [ Attr.class "resizeCursor" ]
 
         EditingATextBox index ->
-            [ Attr.style "cursor: crosshair;" ]
+            [ Attr.class "crosshairCursor" ]
 
 
 getSelectState : Int -> AnnotationState -> SelectState
@@ -1684,24 +1697,29 @@ viewAnnotation annotationState index annotation =
         toVertexEvents =
             annotationStateVertexEvents index annotation annotationState
 
-        vertices { start, end } =
-            viewVertices start end toVertexEvents selectState
+        vertices verticesType { start, end } =
+            viewVertices verticesType start end toVertexEvents selectState
     in
         case annotation of
             Lines lineType line ->
-                viewLine movementEvents (vertices line) lineType line
+                viewLine movementEvents (vertices Linear line) lineType line
 
             Shapes shapeType shape ->
-                viewShape movementEvents (vertices shape) shapeType shape
+                case shapeType of
+                    Ellipse ->
+                        viewShape movementEvents (vertices Elliptical shape) shapeType shape
+
+                    _ ->
+                        viewShape movementEvents (vertices Rectangular shape) shapeType shape
 
             TextBox textBox ->
-                viewTextBox movementEvents (vertices textBox) annotationState selectState index textBox
+                viewTextBox movementEvents (vertices Rectangular textBox) annotationState selectState index textBox
 
 
 annotationStateVertexEvents : Int -> Annotation -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
 annotationStateVertexEvents index annotation annotationState vertex =
     [ SE.on "mousedown" <| Json.map (StartResizingAnnotation index annotation vertex << toDrawingPosition) Mouse.position
-    , Attr.style "cursor: nesw-resize;"
+    , Attr.class "resizeCursor"
     , Html.attribute "onmousedown" "event.stopPropagation();"
     ]
         ++ case annotationState of
@@ -1749,16 +1767,16 @@ calcLinePos start end lineMode =
 
 
 viewDrawing : Model -> StartPosition -> Bool -> Svg Msg
-viewDrawing { drawing, fill, strokeColor, strokeWidth, strokeStyle, fontSize, mouse, keyboardState } pos isInMask =
+viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboardState } pos isInMask =
     let
         lineAttrs lineType lineMode =
-            lineAttributes lineType <| Line pos (calcLinePos pos mouse lineMode) strokeColor strokeWidth strokeStyle
+            lineAttributes lineType <| Line pos (calcLinePos pos mouse lineMode) strokeColor strokeStyle
 
         shapeAttrs shapeType shapeMode =
-            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) fill strokeColor strokeWidth strokeStyle
+            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) fill strokeColor strokeStyle
 
         spotlightAttrs shapeType shapeMode spotlightFill spotlightColor =
-            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) spotlightFill spotlightColor strokeWidth strokeStyle
+            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) spotlightFill spotlightColor strokeStyle
     in
         case drawing of
             DrawLine lineType lineMode ->
@@ -1780,15 +1798,14 @@ viewDrawing { drawing, fill, strokeColor, strokeWidth, strokeStyle, fontSize, mo
                     Ellipse ->
                         Svg.ellipse (shapeAttrs shapeType shapeMode) []
 
-                    TextBorder ->
-                        TextArea pos (calcShapePos pos mouse shapeMode) strokeColor fontSize "" 0 (AutoExpand.initState (config 0 fontSize))
-                            |> viewTextBoxWithBorder
-
                     SpotlightRect ->
                         if isInMask then
                             Svg.rect (spotlightAttrs shapeType shapeMode MaskFill Color.white) []
                         else
                             Svg.rect (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
+
+            DrawTextBox ->
+                Svg.rect ((shapeAttributes Rect <| Shape pos mouse EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
 
 
 fillStyle : Fill -> List (Svg.Attribute Msg)
@@ -1843,29 +1860,37 @@ viewShape attrs vertices shapeType shape =
                 SpotlightRect ->
                     [ Svg.rect allAttrs [] ]
 
-                TextBorder ->
-                    [ Svg.rect allAttrs [] ]
 
+viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
+viewVertices vertices start end toVertexEvents selectState =
+    let
+        toVertices =
+            case vertices of
+                Rectangular ->
+                    shapeVertices
 
-viewVertices : StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
-viewVertices start end toVertexEvents selectState =
-    if selectState == SelectedWithVertices then
-        shapeVertices toVertexEvents start end
-    else
-        []
+                Elliptical ->
+                    ellipseVertices
+
+                Linear ->
+                    lineVertices
+    in
+        if selectState == SelectedWithVertices then
+            toVertices toVertexEvents start end
+        else
+            []
 
 
 shapeAttrs : Shape -> List (Svg.Attribute Msg)
-shapeAttrs ({ strokeStyle, strokeColor, strokeWidth, fill } as shape) =
-    (Attr.style <| pointerEvents fill) :: strokeAttrs strokeStyle strokeColor strokeWidth
+shapeAttrs ({ strokeStyle, strokeColor, fill } as shape) =
+    (Attr.style <| pointerEvents fill) :: strokeAttrs strokeStyle strokeColor
 
 
-strokeAttrs : StrokeStyle -> Color -> StrokeWidth -> List (Svg.Attribute Msg)
-strokeAttrs strokeStyle strokeColor strokeWidth =
-    [ Attr.strokeWidth <| toString <| strokeToWidth strokeWidth
-    , Attr.stroke <| Color.Convert.colorToHex strokeColor
-    , toLineStyle strokeStyle
+strokeAttrs : StrokeStyle -> Color -> List (Svg.Attribute Msg)
+strokeAttrs strokeStyle strokeColor =
+    [ Attr.stroke <| Color.Convert.colorToHex strokeColor
     ]
+        ++ toLineStyle strokeStyle
 
 
 rectAttrs : Shape -> List (Svg.Attribute Msg)
@@ -1874,6 +1899,7 @@ rectAttrs { start, end } =
     , Attr.height <| toString <| abs <| end.y - start.y
     , x <| toString <| Basics.min start.x end.x
     , y <| toString <| Basics.min start.y end.y
+    , Attr.filter "url(#dropShadow)"
     ]
 
 
@@ -1883,7 +1909,7 @@ ellipseAttributes { start, end } =
     , ry <| toString <| abs <| end.y - start.y
     , cx <| toString <| start.x
     , cy <| toString <| start.y
-      -- , Attr.filter "url(#dropShadow)"
+    , Attr.filter "url(#dropShadow)"
     ]
 
 
@@ -1900,9 +1926,6 @@ shapeAttributes shapeType shape =
             Ellipse ->
                 shapeAttrs shape ++ ellipseAttributes shape
 
-            TextBorder ->
-                shapeAttrs shape ++ rectAttrs shape
-
             SpotlightRect ->
                 shapeAttrs shape ++ rectAttrs shape
 
@@ -1916,13 +1939,23 @@ shapeVertices toVertexEvents start end =
     ]
 
 
+lineVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
+lineVertices toVertexEvents start end =
+    [ viewVertex (toVertexEvents Start) start.x start.y
+    , viewVertex (toVertexEvents End) end.x end.y
+    ]
+
+
 viewVertex : List (Svg.Attribute Msg) -> Int -> Int -> Svg Msg
 viewVertex vertexEvents x y =
     circle
         ([ cx <| toString x
          , cy <| toString y
-         , r "7"
+         , r "5"
          , fill <| Color.Convert.colorToHex Color.blue
+         , Attr.stroke "white"
+         , Attr.strokeWidth "2"
+         , Attr.filter "url(#dropShadow)"
          ]
             ++ vertexEvents
         )
@@ -1977,33 +2010,26 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
         Selected ->
             (viewTextArea index selectState textBox)
                 |> List.singleton
-                |> flip List.append (viewShape ([ Attr.style "opacity: 0;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black Thin Solid))
+                |> flip List.append (viewShape ([ Attr.style "opacity: 0;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black SolidThin))
 
         NotSelected ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
                 |> List.singleton
-                |> flip List.append (viewShape ([ Attr.style "stroke: transparent; pointer-events: auto; cursor: pointer;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black Thin Solid))
+                |> flip List.append (viewShape ([ Attr.style "stroke: transparent; pointer-events: auto; cursor: pointer;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black SolidThin))
 
         SelectedWithVertices ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
                 |> List.singleton
                 |> flip List.append
-                    (viewShape attrs vertices Rect (Shape start end EmptyFill Color.black Thin Solid)
-                        ++ viewShape (attrs ++ [ SE.onMouseDown <| StartEditingText index textBox, Attr.style "pointer-events: fill; cursor: pointer;" ]) vertices Rect (Shape start end EmptyFill Color.black Thin Solid)
+                    (viewShape (Attr.strokeWidth "0.5" :: attrs) vertices Rect (Shape start end EmptyFill Color.white SolidThin)
+                        ++ viewShape (attrs ++ [ Attr.strokeWidth "0.5", SE.onMouseDown <| StartEditingText index textBox, Attr.style "pointer-events: fill; cursor: pointer;" ]) vertices Rect (Shape start end EmptyFill (Color.rgb 230 230 230) SolidThin)
                     )
-
-
-viewTextBoxWithBorder : TextArea -> Svg Msg
-viewTextBoxWithBorder ({ start, end, text, fill, fontSize, angle } as textBox) =
-    Svg.g []
-        [ Svg.rect (shapeAttributes Rect (Shape start end EmptyFill Color.black Thin Solid)) []
-        ]
 
 
 viewLine : List (Svg.Attribute Msg) -> List (Svg Msg) -> LineType -> Line -> List (Svg Msg)
@@ -2012,7 +2038,7 @@ viewLine attrs vertices lineType line =
         allAttrs =
             lineAttributes lineType line ++ attrs
     in
-        List.append vertices <|
+        flip List.append vertices <|
             case lineType of
                 StraightLine ->
                     [ Svg.path allAttrs [] ]
@@ -2026,7 +2052,7 @@ simpleLineAttrs ({ start, end } as line) =
     []
         ++ [ Attr.fill "none"
            , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
-             -- , Attr.filter "url(#dropShadow)"
+             --  , Attr.filter "url(#dropShadow)"
            ]
 
 
@@ -2039,10 +2065,10 @@ lineAttributes : LineType -> Line -> List (Svg.Attribute Msg)
 lineAttributes lineType line =
     case lineType of
         Arrow ->
-            arrowAttributes line ++ simpleLineAttrs line ++ strokeAttrs line.strokeStyle line.strokeColor line.strokeWidth
+            arrowAttributes line ++ simpleLineAttrs line ++ strokeAttrs line.strokeStyle line.strokeColor
 
         StraightLine ->
-            simpleLineAttrs line ++ strokeAttrs line.strokeStyle line.strokeColor line.strokeWidth
+            simpleLineAttrs line ++ strokeAttrs line.strokeStyle line.strokeColor
 
 
 viewImage : Image -> Html Msg
@@ -2056,21 +2082,6 @@ viewImage { width, height, url } =
         []
 
 
-viewSolidIcon : Html msg
-viewSolidIcon =
-    viewLineStroke 4 []
-
-
-viewDottedIcon : Html msg
-viewDottedIcon =
-    viewLineStroke 4 [ strokeDasharray "5, 5" ]
-
-
-viewDashedIcon : Html msg
-viewDashedIcon =
-    viewLineStroke 4 [ strokeDasharray "10, 5" ]
-
-
 viewResetArrow : Html msg
 viewResetArrow =
     svg [ Attr.width "20", Attr.height "20", viewBox "0 0 14.155 14.155" ]
@@ -2081,8 +2092,8 @@ viewResetArrow =
 
 viewUndoArrow : Html msg
 viewUndoArrow =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 26.676 26.676" ]
-        [ Svg.path [ d "M26.105,21.891c-0.229,0-0.439-0.131-0.529-0.346l0,0c-0.066-0.156-1.716-3.857-7.885-4.59c-1.285-0.156-2.824-0.236-4.693-0.25v4.613c0,0.213-0.115,0.406-0.304,0.508c-0.188,0.098-0.413,0.084-0.588-0.033L0.254,13.815C0.094,13.708,0,13.528,0,13.339c0-0.191,0.094-0.365,0.254-0.477l11.857-7.979c0.175-0.121,0.398-0.129,0.588-0.029c0.19,0.102,0.303,0.295,0.303,0.502v4.293c2.578,0.336,13.674,2.33,13.674,11.674c0,0.271-0.191,0.508-0.459,0.562C26.18,21.891,26.141,21.891,26.105,21.891z", fill "currentColor" ] []
+    svg [ Attr.width "15", Attr.height "8", viewBox "0 0 15 8" ]
+        [ Svg.path [ d "M4.036 2.572c3.44-2.342 6.622-1.915 9.262.275C14.11 3.52 14.682 4.2 15 4.682L13.45 6c-.044-.067-.15-.21-.31-.402-.28-.33-.61-.665-.985-.976-1.978-1.64-4.246-2.003-6.866-.335L8 8l-8-.94L2.158 0l1.878 2.572z", fill "currentColor", fillRule "nonzero" ] []
         ]
 
 
@@ -2119,50 +2130,45 @@ viewEllipseIcon =
 
 viewFillIcon : Fill -> Html msg
 viewFillIcon fill =
-    let
-        ( fillAttr, showLine ) =
-            case fill of
-                SolidFill color ->
-                    if color == Color.white then
-                        [ Attr.fill <| Color.Convert.colorToHex Color.white
-                        , Attr.stroke "#555"
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ case fill of
+            SolidFill color ->
+                if color == Color.white then
+                    circle
+                        [ cx "7"
+                        , cy "7"
                         , r "6"
+                        , Attr.fill "none"
+                        , Attr.stroke "#555"
                         ]
-                            => False
-                    else
-                        [ Attr.fill <| Color.Convert.colorToHex color ]
-                            => False
+                        []
+                else
+                    circle
+                        [ cx "7"
+                        , cy "7"
+                        , r "7"
+                        , Attr.fill <| Color.Convert.colorToHex color
+                        ]
+                        []
 
-                SpotlightFill ->
-                    [ Attr.fill "white" ]
-                        => False
+            SpotlightFill ->
+                Svg.text ""
 
-                MaskFill ->
-                    [ Attr.fill "white" ]
-                        => False
+            MaskFill ->
+                Svg.text ""
 
-                EmptyFill ->
-                    [ Attr.fill "#555", r "6" ]
-                        => True
-    in
-        svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-            ([ circle
-                ([ cx "7", cy "7", r "6" ]
-                    ++ fillAttr
-                )
-                []
-             ]
-                ++ if showLine then
-                    [ Svg.path [ d "M11 0L0 11l1 1L12 1z", fillRule "nonzero", Attr.fill "white" ] [] ]
-                   else
-                    []
-            )
+            EmptyFill ->
+                Svg.path [ d "M0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7zm9.793-4.207l-7.07 7.07 1.413 1.415 7.07-7.07-1.413-1.415z", Attr.fill "#555", fillRule "evenodd" ] []
+        ]
 
 
 viewStrokeColorIcon : Color -> Html msg
 viewStrokeColorIcon strokeColor =
     svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path ([ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill <| Color.Convert.colorToHex strokeColor ]) [] ]
+        [ Svg.path
+            [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill <| Color.Convert.colorToHex strokeColor ]
+            []
+        ]
 
 
 viewLineStrokeDropdownIcon : Color -> Html msg
@@ -2180,22 +2186,10 @@ viewLineIcon =
         [ Svg.path [ d "M11 0L0 11l1 1L12 1z", fillRule "nonzero", fill "#555" ] [] ]
 
 
-viewLineStroke : number -> List (Svg.Attribute msg) -> Html msg
-viewLineStroke strokeWidth attrs =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
-        [ g [ stroke "grey" ]
-            [ line
-                ([ x1 "0"
-                 , x2 "20"
-                 , y1 "10"
-                 , y2 "10"
-                 , Attr.strokeWidth <| toString <| strokeWidth
-                 ]
-                    ++ attrs
-                )
-                []
-            ]
-        ]
+viewNormalLineIcon : Html msg
+viewNormalLineIcon =
+    svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
+        [ Svg.path [ d "M0 2h14V0H0z", fillRule "nonzero", fill "#555" ] [] ]
 
 
 viewDownArrow : Html msg
@@ -2312,35 +2306,37 @@ equalXandY a b =
         Position b.x (a.y + abs b.x - a.x)
 
 
-strokeToWidth : StrokeWidth -> Int
-strokeToWidth stroke =
-    case stroke of
-        Thin ->
-            4
-
-        Medium ->
-            6
-
-        Thick ->
-            8
-
-
-toLineStyle : StrokeStyle -> Svg.Attribute Msg
+toLineStyle : StrokeStyle -> List (Svg.Attribute Msg)
 toLineStyle strokeStyle =
     case strokeStyle of
-        Solid ->
-            strokeDasharray ""
+        SolidThin ->
+            [ strokeWidth "4", strokeDasharray "" ]
 
-        Dotted ->
-            strokeDasharray "1, 5"
+        SolidMedium ->
+            [ strokeWidth "6", strokeDasharray "" ]
 
-        Dashed ->
-            strokeDasharray "10, 5"
+        SolidThick ->
+            [ strokeWidth "8", strokeDasharray "" ]
+
+        SolidVeryThick ->
+            [ strokeWidth "10", strokeDasharray "" ]
+
+        DashedThin ->
+            [ strokeWidth "4", strokeDasharray "10, 5" ]
+
+        DashedMedium ->
+            [ strokeWidth "6", strokeDasharray "10, 5" ]
+
+        DashedThick ->
+            [ strokeWidth "8", strokeDasharray "10, 5" ]
+
+        DashedVeryThick ->
+            [ strokeWidth "10", strokeDasharray "10, 5" ]
 
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
 toDrawingPosition mouse =
-    { mouse | x = mouse.x - 72, y = mouse.y }
+    { mouse | x = mouse.x - controlUIWidth, y = mouse.y }
 
 
 annotationStateToCursor : AnnotationState -> String
