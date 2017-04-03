@@ -49,6 +49,7 @@ type LineMode
 type Drawing
     = DrawLine LineType LineMode
     | DrawShape ShapeType ShapeMode
+    | DrawTextBox
 
 
 type Fill
@@ -123,7 +124,6 @@ type ShapeType
     | RoundedRect
     | Ellipse
     | SpotlightRect
-    | TextBorder
 
 
 type Vertices
@@ -245,7 +245,7 @@ drawingOptions shiftPressed =
         , DrawShape Rect DrawingEqualizedShape
         , DrawShape RoundedRect DrawingEqualizedShape
         , DrawShape Ellipse DrawingEqualizedShape
-        , DrawShape TextBorder DrawingEqualizedShape
+        , DrawTextBox
         , DrawShape SpotlightRect DrawingEqualizedShape
         ]
     else
@@ -254,7 +254,7 @@ drawingOptions shiftPressed =
         , DrawShape Rect DrawingShape
         , DrawShape RoundedRect DrawingShape
         , DrawShape Ellipse DrawingShape
-        , DrawShape TextBorder DrawingShape
+        , DrawTextBox
         , DrawShape SpotlightRect DrawingShape
         ]
 
@@ -366,6 +366,7 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                 annotations
                     |> Array.set index (TextBox textArea)
                     |> logChange model
+                    |> startEditingText index
                     => [ "text-box-edit--"
                             ++ toString index
                             |> Dom.focus
@@ -386,11 +387,7 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
             FinishEditingText index ->
                 model
                     |> finishEditingText index
-                    => [ "text-box-edit--"
-                            ++ toString index
-                            |> Dom.blur
-                            |> Task.attempt tryToBlur
-                       ]
+                    => []
 
             AutoExpandInput index { state, textValue } ->
                 annotations
@@ -643,19 +640,20 @@ finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) 
                             |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill strokeColor strokeStyle))
                             => []
 
-                    TextBorder ->
-                        model
-                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeStyle))
-                            => [ "text-box-edit--"
-                                    ++ toString numAnnotations
-                                    |> Dom.focus
-                                    |> Task.attempt (tryToEdit numAnnotations)
-                               ]
-
                     _ ->
                         model
                             |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeStyle))
                             => []
+
+            DrawTextBox ->
+                model
+                    |> addAnnotation (TextBox <| TextArea start (calcShapePos start end DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize)))
+                    |> startEditingText numAnnotations
+                    => [ "text-box-edit--"
+                            ++ toString numAnnotations
+                            |> Dom.focus
+                            |> Task.attempt (tryToEdit numAnnotations)
+                       ]
 
 
 startEditingText : Int -> Model -> Model
@@ -834,7 +832,7 @@ toggleDropdown editOption model =
         , drawing =
             case editOption of
                 Fonts ->
-                    selectShape TextBorder model.keyboardState
+                    DrawTextBox
 
                 _ ->
                     model.drawing
@@ -887,6 +885,9 @@ transitionOnShift drawing =
 
                 DrawingEqualizedShape ->
                     DrawShape shapeType DrawingShape
+
+        DrawTextBox ->
+            drawing
 
 
 cancelDrawing : Model -> Model
@@ -1133,6 +1134,14 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
+        DrawTextBox ->
+            case drawing2 of
+                DrawTextBox ->
+                    True
+
+                _ ->
+                    False
+
 
 viewVanillaDrawingButton : Keyboard.State -> Drawing -> Drawing -> Html Msg
 viewVanillaDrawingButton keyboardState selectedDrawing drawing =
@@ -1154,12 +1163,10 @@ viewDrawingButton keyboardState selectedDrawing toDropdownMenu drawing =
             viewVanillaDrawingButton keyboardState selectedDrawing drawing
 
         DrawShape shapeType shapeMode ->
-            case shapeType of
-                TextBorder ->
-                    viewTextSizeDropdown selectedDrawing toDropdownMenu
+            viewVanillaDrawingButton keyboardState selectedDrawing drawing
 
-                _ ->
-                    viewVanillaDrawingButton keyboardState selectedDrawing drawing
+        DrawTextBox ->
+            viewTextSizeDropdown selectedDrawing toDropdownMenu
 
 
 viewHistoryControls : UndoList (Array Annotation) -> Html Msg
@@ -1175,7 +1182,7 @@ viewTextSizeDropdown drawing toDropdownMenu =
     div [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
-            , Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual drawing (DrawShape TextBorder DrawingShape) ]
+            , Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual drawing DrawTextBox ]
             ]
             [ viewTextIcon ]
         , toDropdownMenu Fonts
@@ -1328,11 +1335,11 @@ viewShapeSvg drawing =
                 Ellipse ->
                     viewEllipseIcon
 
-                TextBorder ->
-                    viewTextIcon
-
                 SpotlightRect ->
                     viewSpotlightIcon
+
+        DrawTextBox ->
+            viewTextIcon
 
 
 viewLineStrokeOptions : StrokeStyle -> Html Msg
@@ -1409,7 +1416,8 @@ drawingStateEvents drawing annotationState =
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position ]
 
         EditingATextBox index ->
-            [ SE.onClick <| FinishEditingText index ]
+            [ SE.onMouseDown <| FinishEditingText index
+            ]
 
 
 viewMask : Float -> Float -> Svg msg
@@ -1790,15 +1798,15 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboard
                     Ellipse ->
                         Svg.ellipse (shapeAttrs shapeType shapeMode) []
 
-                    TextBorder ->
-                        TextArea pos (calcShapePos pos mouse shapeMode) strokeColor fontSize "" 0 (AutoExpand.initState (config 0 fontSize))
-                            |> viewTextBoxWithBorder
-
                     SpotlightRect ->
                         if isInMask then
                             Svg.rect (spotlightAttrs shapeType shapeMode MaskFill Color.white) []
                         else
                             Svg.rect (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
+
+            DrawTextBox ->
+                TextArea pos (calcShapePos pos mouse DrawingShape) strokeColor fontSize "" 0 (AutoExpand.initState (config 0 fontSize))
+                    |> viewTextBoxWithBorder
 
 
 fillStyle : Fill -> List (Svg.Attribute Msg)
@@ -1851,9 +1859,6 @@ viewShape attrs vertices shapeType shape =
                     [ Svg.ellipse allAttrs [] ]
 
                 SpotlightRect ->
-                    [ Svg.rect allAttrs [] ]
-
-                TextBorder ->
                     [ Svg.rect allAttrs [] ]
 
 
@@ -1921,9 +1926,6 @@ shapeAttributes shapeType shape =
 
             Ellipse ->
                 shapeAttrs shape ++ ellipseAttributes shape
-
-            TextBorder ->
-                shapeAttrs shape ++ rectAttrs shape
 
             SpotlightRect ->
                 shapeAttrs shape ++ rectAttrs shape
