@@ -6,12 +6,12 @@ import Color
 import Expect
 import Fuzz exposing (Fuzzer)
 import Keyboard.Extra as Keyboard
+import List.Zipper
 import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
 import Test exposing (..)
 import UndoList
-import List.Zipper
 
 
 goat : Image
@@ -24,8 +24,8 @@ goat =
     }
 
 
-initialImageEditState : Model
-initialImageEditState =
+model : Model
+model =
     { edits = UndoList.fresh Array.empty
     , fill = EmptyFill
     , strokeColor = Color.red
@@ -50,12 +50,15 @@ end =
     Mouse.Position 76 88
 
 
-line =
-    Line start end Color.red SolidMedium
+line strokeColor strokeStyle =
+    Line start end strokeColor strokeStyle
 
 
-lineDrawing =
-    Lines StraightLine line
+getFirstAnnotation model =
+    model
+        |> .edits
+        |> .present
+        |> Array.get 0
 
 
 position : Fuzzer Position
@@ -71,13 +74,33 @@ all =
         [ describe "Drawing"
             [ test "finishLineDrawing should add a line annotation to the edit history" <|
                 \() ->
-                    initialImageEditState
+                    model
                         |> finishLineDrawing start end StraightLine DrawingLine
-                        |> .edits
-                        |> .present
-                        |> Array.get 0
-                        |> Maybe.map (Expect.equal lineDrawing)
+                        |> getFirstAnnotation
+                        |> Maybe.map (Expect.equal (Lines StraightLine <| Line start end model.strokeColor model.strokeStyle))
                         |> Maybe.withDefault (Expect.fail "Array missing line annotation")
+            , test "finishLineDrawing should add an arrow annotation to the edit history" <|
+                \() ->
+                    model
+                        |> finishLineDrawing start end Arrow DrawingLine
+                        |> getFirstAnnotation
+                        |> Maybe.map (Expect.equal (Lines Arrow <| Line start end model.strokeColor model.strokeStyle))
+                        |> Maybe.withDefault (Expect.fail "Array missing arrow annotation")
+            , test "finishShapeDrawing should add a shape annotation to the edit history" <|
+                \() ->
+                    model
+                        |> finishShapeDrawing start end Rect DrawingShape
+                        |> getFirstAnnotation
+                        |> Maybe.map (Expect.equal (Shapes Rect <| Shape start end model.fill model.strokeColor model.strokeStyle))
+                        |> Maybe.withDefault (Expect.fail "Array missing rect annotation")
+            , test "finishShapeDrawing should add a spotlight annotation with a spotlight fill to the edit history" <|
+                -- should spotlights be refactored, this is some custom logic to get around modeling?
+                \() ->
+                    model
+                        |> finishShapeDrawing start end SpotlightRect DrawingShape
+                        |> getFirstAnnotation
+                        |> Maybe.map (Expect.equal (Shapes SpotlightRect <| Shape start end SpotlightFill model.strokeColor model.strokeStyle))
+                        |> Maybe.withDefault (Expect.fail "Array missing spotlight rect annotation")
             ]
         , describe "Utils"
             [ fuzz2 position position "mouse step function works properly" <|

@@ -626,6 +626,18 @@ finishLineDrawing start end lineType lineMode model =
         |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) model.strokeColor model.strokeStyle))
 
 
+finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> ShapeMode -> Model -> Model
+finishShapeDrawing start end shapeType shapeMode model =
+    case shapeType of
+        SpotlightRect ->
+            model
+                |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill model.strokeColor model.strokeStyle))
+
+        _ ->
+            model
+                |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) model.fill model.strokeColor model.strokeStyle))
+
+
 finishDrawing : StartPosition -> EndPosition -> Model -> ( Model, List (Cmd Msg) )
 finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) =
     let
@@ -641,16 +653,8 @@ finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) 
                     => []
 
             DrawShape shapeType shapeMode ->
-                case shapeType of
-                    SpotlightRect ->
-                        model
-                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill strokeColor strokeStyle))
-                            => []
-
-                    _ ->
-                        model
-                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeStyle))
-                            => []
+                finishShapeDrawing start end shapeType shapeMode model
+                    => []
 
             DrawTextBox ->
                 model
