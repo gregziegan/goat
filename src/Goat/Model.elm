@@ -277,4 +277,4 @@ init flags =
 
 controlUIWidth : number
 controlUIWidth =
-    72
+    73
