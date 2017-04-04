@@ -248,6 +248,7 @@ drawingOptions shiftPressed =
         , DrawShape Ellipse DrawingEqualizedShape
         , DrawTextBox
         , DrawSpotlight Rect DrawingEqualizedShape
+        , DrawSpotlight RoundedRect DrawingEqualizedShape
         , DrawSpotlight Ellipse DrawingEqualizedShape
         ]
     else
@@ -258,6 +259,7 @@ drawingOptions shiftPressed =
         , DrawShape Ellipse DrawingShape
         , DrawTextBox
         , DrawSpotlight Rect DrawingShape
+        , DrawSpotlight RoundedRect DrawingEqualizedShape
         , DrawSpotlight Ellipse DrawingShape
         ]
 
@@ -1390,8 +1392,16 @@ viewShapeSvg drawing =
         DrawTextBox ->
             viewTextIcon
 
-        DrawSpotlight _ _ ->
-            viewSpotlightIcon
+        DrawSpotlight shapeType _ ->
+            case shapeType of
+                Rect ->
+                    viewSpotlightRectIcon
+
+                RoundedRect ->
+                    viewSpotlightRoundedRectIcon
+
+                Ellipse ->
+                    viewSpotlightEllipseIcon
 
 
 viewLineStrokeOptions : StrokeStyle -> Html Msg
@@ -2189,8 +2199,20 @@ viewRectangleIcon =
         [ Svg.path [ d "M2 12h10V2H2v10zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
 
 
-viewSpotlightIcon : Html msg
-viewSpotlightIcon =
+viewSpotlightRectIcon : Html msg
+viewSpotlightRectIcon =
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
+
+
+viewSpotlightRoundedRectIcon : Html msg
+viewSpotlightRoundedRectIcon =
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
+
+
+viewSpotlightEllipseIcon : Html msg
+viewSpotlightEllipseIcon =
     svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
         [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
 
