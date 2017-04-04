@@ -2,6 +2,7 @@ module Tests exposing (..)
 
 import Annotator exposing (..)
 import Array exposing (Array)
+import AutoExpand
 import Color
 import Color.Convert
 import Expect
@@ -14,10 +15,10 @@ import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
 import Svg exposing (svg)
-import Svg.Attributes as Attr
+import Svg.Attributes as Attr exposing (fontSize)
 import Test exposing (..)
 import Test.Html.Query as Query
-import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, tag, text)
+import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, tag, text, class)
 import UndoList
 
 
@@ -116,8 +117,17 @@ ellipseSelector shape =
     , attribute "ry" <| toString <| abs end.y - start.y
     , attribute "cx" <| toString start.x
     , attribute "cy" <| toString start.y
+    , attribute "filter" "url(#dropShadow)"
     ]
         ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
+        |> HtmlSelector.all
+
+
+roundedRectSelector shape =
+    [ attribute "rx" "15"
+    , attribute "rx" "15"
+    , rectSelector shape
+    ]
         |> HtmlSelector.all
 
 
@@ -135,9 +145,31 @@ fillSelectors fill =
 
 rectSelector : Shape -> Selector
 rectSelector shape =
-    fillSelectors shape.fill
+    attribute "filter" "url(#dropShadow)"
+        :: fillSelectors shape.fill
         ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
         |> HtmlSelector.all
+
+
+aTextArea : TextArea
+aTextArea =
+    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (Annotator.config 0 model.fontSize))
+
+
+svgTextSelector : TextArea -> List Selector
+svgTextSelector { start, end } =
+    [ tag "text"
+    , attribute "x" <| toString <| Basics.min start.y end.y
+    ]
+
+
+tspanSelector : TextArea -> List Selector
+tspanSelector { start, end, fontSize, fill } =
+    [ tag "tspan"
+    , attribute "dy" <| toString <| fontSize
+    , attribute "x" <| toString <| Basics.min start.x end.x
+    , attribute "fill" <| Color.Convert.colorToHex fill
+    ]
 
 
 all : Test
@@ -166,7 +198,7 @@ all =
                         |> Maybe.map (Expect.equal (Shapes Rect <| Shape start end model.fill model.strokeColor model.strokeStyle))
                         |> Maybe.withDefault (Expect.fail "Array missing rect annotation")
             , test "finishShapeDrawing should add a spotlight annotation with a spotlight fill to the edit history" <|
-                -- should spotlights be refactored, this is some custom logic to get around modeling?
+                -- should spotlights be refactored? this is some custom logic to get around modeling
                 \() ->
                     model
                         |> finishShapeDrawing start end SpotlightRect DrawingShape
@@ -202,6 +234,15 @@ all =
                         |> Query.fromHtml
                         |> Query.find [ tag "rect" ]
                         |> Query.has [ rectSelector aShape ]
+            , test "A rounded rectangle has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Shapes RoundedRect
+                        |> viewAnnotation ReadyToDraw 0
+                        |> svgDrawspace
+                        |> Query.fromHtml
+                        |> Query.find [ tag "rect" ]
+                        |> Query.has [ roundedRectSelector aShape ]
             , test "An ellipse has the appropriate view attributes" <|
                 \() ->
                     aShape
@@ -211,6 +252,27 @@ all =
                         |> Query.fromHtml
                         |> Query.find [ tag "ellipse" ]
                         |> Query.has [ ellipseSelector aShape ]
+            , test "A textbox's unselected svg text has the appropriate view attributes" <|
+                \() ->
+                    aTextArea
+                        |> TextBox
+                        |> viewAnnotation ReadyToDraw 0
+                        |> svgDrawspace
+                        |> Query.fromHtml
+                        |> Query.find [ tag "text" ]
+                        |> Query.has (svgTextSelector aTextArea)
+            , test "A textbox's unselected svg tspans have the appropriate view attributes" <|
+                \() ->
+                    aTextArea
+                        |> TextBox
+                        |> viewAnnotation ReadyToDraw 0
+                        |> svgDrawspace
+                        |> Query.fromHtml
+                        |> Query.findAll [ tag "tspan" ]
+                        |> Query.each
+                            (Expect.all
+                                [ Query.has (tspanSelector aTextArea) ]
+                            )
             ]
         , describe "Utils"
             [ fuzz2 position position "mouse step function works properly" <|
