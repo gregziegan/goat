@@ -1234,7 +1234,9 @@ viewTextSizeDropdown drawing toDropdownMenu =
             [ onClick <| ToggleDropdown Fonts
             , Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual drawing DrawTextBox ]
             ]
-            [ viewTextIcon ]
+            [ viewTextIcon
+            , viewCornerArrow
+            ]
         , toDropdownMenu Fonts
         ]
 
@@ -1304,7 +1306,8 @@ viewLineStrokeDropdown toDropdownMenu =
             [ onClick <| ToggleDropdown Strokes
             , Html.class "drawing-button"
             ]
-            [ viewLineStrokeDropdownIcon Color.grey
+            [ viewLineStrokeDropdownIcon
+            , viewCornerArrow
             ]
         , toDropdownMenu Strokes
         ]
@@ -1319,6 +1322,7 @@ viewFillDropdown toDropdownMenu fill =
             , Html.class "drawing-button"
             ]
             [ viewFillIcon fill
+            , viewCornerArrow
             ]
         , toDropdownMenu Fills
         ]
@@ -1333,9 +1337,16 @@ viewStrokeColorDropdown toDropdownMenu strokeColor =
             , Html.class "drawing-button"
             ]
             [ viewStrokeColorIcon strokeColor
+            , viewCornerArrow
             ]
         , toDropdownMenu StrokeColors
         ]
+
+
+viewCornerArrow : Html msg
+viewCornerArrow =
+    svg [ Attr.width "5", Attr.height "5", viewBox "0 0 5 5", Attr.class "corner-arrow" ]
+        [ Svg.path [ d "M5 0L0 5h5", fill "#555", fillRule "evenodd" ] [] ]
 
 
 viewDropdownMenu : Maybe AttributeDropdown -> Drawing -> Model -> AttributeDropdown -> Html Msg
@@ -2236,10 +2247,10 @@ viewStrokeColorIcon strokeColor =
         ]
 
 
-viewLineStrokeDropdownIcon : Color -> Html msg
-viewLineStrokeDropdownIcon strokeColor =
+viewLineStrokeDropdownIcon : Html msg
+viewLineStrokeDropdownIcon =
     svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
-        [ g [ stroke <| Color.Convert.colorToHex strokeColor ]
+        [ g [ stroke "#555" ]
             [ line [ x1 "0", x2 "20", y1 "10", y2 "10", strokeWidth "6" ] []
             ]
         ]

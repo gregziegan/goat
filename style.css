@@ -39,6 +39,7 @@ button:active, button:focus, button:hover {
   margin: 3px;
   height: 30px;
   width: 30px;
+  position: relative;
 }
 
 .drawing-button--selected {
@@ -231,4 +232,10 @@ button:active, button:focus, button:hover {
 
 .moveCursor {
   cursor: move;
+}
+
+.corner-arrow {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
 }
