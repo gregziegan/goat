@@ -9,6 +9,7 @@
     "exposed-modules": [],
     "dependencies": {
         "NoRedInk/rocket-update": "1.0.0 <= v < 2.0.0",
+        "Skinney/elm-array-exploration": "2.0.3 <= v < 3.0.0",
         "elm-community/list-extra": "6.0.0 <= v < 7.0.0",
         "elm-community/undo-redo": "2.0.0 <= v < 3.0.0",
         "elm-lang/animation-frame": "1.0.1 <= v < 2.0.0",

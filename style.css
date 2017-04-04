@@ -30,6 +30,7 @@ button:active, button:focus, button:hover {
 }
 
 .drawing-button {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -39,7 +40,6 @@ button:active, button:focus, button:hover {
   margin: 3px;
   height: 30px;
   width: 30px;
-  position: relative;
 }
 
 .drawing-button--selected {

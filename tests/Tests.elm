@@ -1,7 +1,7 @@
 module Tests exposing (..)
 
 import Annotator exposing (..)
-import Array exposing (Array)
+import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color
 import Color.Convert

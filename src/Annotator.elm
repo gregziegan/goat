@@ -1,6 +1,6 @@
 port module Annotator exposing (..)
 
-import Array exposing (Array)
+import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
