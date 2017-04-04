@@ -198,30 +198,26 @@ controlUIWidth =
 
 strokeColorOptions : List Color
 strokeColorOptions =
-    [ Color.red
-    , Color.orange
-    , Color.yellow
-    , Color.green
-    , Color.blue
-    , Color.purple
-    , Color.brown
-    , Color.black
-    , Color.white
+    [ Color.rgb 255 0 0
+    , Color.rgb 255 0 212
+    , Color.rgb 73 0 255
+    , Color.rgb 0 202 255
+    , Color.rgb 16 255 0
+    , Color.rgb 255 226 0
+    , Color.rgb 255 129 0
     ]
 
 
 fillOptions : List Fill
 fillOptions =
     [ EmptyFill
-    , SolidFill Color.red
-    , SolidFill Color.orange
-    , SolidFill Color.yellow
-    , SolidFill Color.green
-    , SolidFill Color.blue
-    , SolidFill Color.purple
-    , SolidFill Color.brown
-    , SolidFill Color.black
-    , SolidFill Color.white
+    , SolidFill (Color.rgb 255 0 0)
+    , SolidFill (Color.rgb 255 0 212)
+    , SolidFill (Color.rgb 73 0 255)
+    , SolidFill (Color.rgb 0 202 255)
+    , SolidFill (Color.rgb 16 255 0)
+    , SolidFill (Color.rgb 255 226 0)
+    , SolidFill (Color.rgb 255 129 0)
     ]
 
 
@@ -279,7 +275,7 @@ init : Flags -> ( Model, List (Cmd Msg) )
 init flags =
     { edits = UndoList.fresh Array.empty
     , fill = EmptyFill
-    , strokeColor = Color.red
+    , strokeColor = Color.rgb 255 0 0
     , strokeStyle = SolidMedium
     , fontSize = 14
     , mouse = Mouse.Position 0 0
@@ -2245,23 +2241,13 @@ viewFillIcon fill =
     svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
         [ case fill of
             SolidFill color ->
-                if color == Color.white then
-                    circle
-                        [ cx "7"
-                        , cy "7"
-                        , r "6"
-                        , Attr.fill "none"
-                        , Attr.stroke "#555"
-                        ]
-                        []
-                else
-                    circle
-                        [ cx "7"
-                        , cy "7"
-                        , r "7"
-                        , Attr.fill <| Color.Convert.colorToHex color
-                        ]
-                        []
+                circle
+                    [ cx "7"
+                    , cy "7"
+                    , r "7"
+                    , Attr.fill <| Color.Convert.colorToHex color
+                    ]
+                    []
 
             SpotlightFill ->
                 Svg.text ""
