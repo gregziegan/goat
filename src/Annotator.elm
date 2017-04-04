@@ -50,6 +50,7 @@ type Drawing
     = DrawLine LineType LineMode
     | DrawShape ShapeType ShapeMode
     | DrawTextBox
+    | DrawSpotlight ShapeType ShapeMode
 
 
 type Fill
@@ -123,8 +124,6 @@ type ShapeType
     = Rect
     | RoundedRect
     | Ellipse
-    | SpotlightRect
-    | SpotlightEllipse
 
 
 type Vertices
@@ -137,6 +136,7 @@ type Annotation
     = Lines LineType Line
     | Shapes ShapeType Shape
     | TextBox TextArea
+    | Spotlight ShapeType Shape
 
 
 type Vertex
@@ -247,8 +247,8 @@ drawingOptions shiftPressed =
         , DrawShape RoundedRect DrawingEqualizedShape
         , DrawShape Ellipse DrawingEqualizedShape
         , DrawTextBox
-        , DrawShape SpotlightRect DrawingEqualizedShape
-        , DrawShape SpotlightEllipse DrawingEqualizedShape
+        , DrawSpotlight Rect DrawingEqualizedShape
+        , DrawSpotlight Ellipse DrawingEqualizedShape
         ]
     else
         [ DrawLine Arrow DrawingLine
@@ -257,8 +257,8 @@ drawingOptions shiftPressed =
         , DrawShape RoundedRect DrawingShape
         , DrawShape Ellipse DrawingShape
         , DrawTextBox
-        , DrawShape SpotlightRect DrawingShape
-        , DrawShape SpotlightEllipse DrawingShape
+        , DrawSpotlight Rect DrawingShape
+        , DrawSpotlight Ellipse DrawingShape
         ]
 
 
@@ -510,8 +510,10 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
 
             StartResizingAnnotation index annotation vertex startPos ->
                 model
+                    |> setMouse startPos
                     |> selectAnnotation index annotation
                     |> startResizingAnnotation index annotation vertex startPos
+                    |> resizeAnnotation index annotation vertex startPos startPos
                     => []
 
             ResizeAnnotation index annotation vertex startPos endPos ->
@@ -621,6 +623,24 @@ addAnnotation annotation model =
     }
 
 
+finishLineDrawing : StartPosition -> EndPosition -> LineType -> LineMode -> Model -> Model
+finishLineDrawing start end lineType lineMode model =
+    model
+        |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) model.strokeColor model.strokeStyle))
+
+
+finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> ShapeMode -> Model -> Model
+finishShapeDrawing start end shapeType shapeMode model =
+    model
+        |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) model.fill model.strokeColor model.strokeStyle))
+
+
+finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> ShapeMode -> Model -> Model
+finishSpotlightDrawing start end shapeType shapeMode model =
+    model
+        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill model.strokeColor model.strokeStyle))
+
+
 finishDrawing : StartPosition -> EndPosition -> Model -> ( Model, List (Cmd Msg) )
 finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) =
     let
@@ -632,26 +652,12 @@ finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) 
     in
         case model.drawing of
             DrawLine lineType lineMode ->
-                model
-                    |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) strokeColor strokeStyle))
+                finishLineDrawing start end lineType lineMode model
                     => []
 
             DrawShape shapeType shapeMode ->
-                case shapeType of
-                    SpotlightRect ->
-                        model
-                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill strokeColor strokeStyle))
-                            => []
-
-                    SpotlightEllipse ->
-                        model
-                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill strokeColor strokeStyle))
-                            => []
-
-                    _ ->
-                        model
-                            |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) fill strokeColor strokeStyle))
-                            => []
+                finishShapeDrawing start end shapeType shapeMode model
+                    => []
 
             DrawTextBox ->
                 model
@@ -662,6 +668,10 @@ finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) 
                             |> Dom.focus
                             |> Task.attempt (tryToEdit numAnnotations)
                        ]
+
+            DrawSpotlight shapeType shapeMode ->
+                finishSpotlightDrawing start end shapeType shapeMode model
+                    => []
 
 
 startEditingText : Int -> Model -> Model
@@ -681,6 +691,9 @@ updateStrokeColor strokeColor annotation =
         TextBox textBox ->
             TextBox { textBox | fill = strokeColor }
 
+        Spotlight shapeType shape ->
+            Spotlight shapeType { shape | strokeColor = strokeColor }
+
 
 updateFill : Fill -> Annotation -> Annotation
 updateFill fill annotation =
@@ -692,6 +705,9 @@ updateFill fill annotation =
             Shapes shapeType { shape | fill = fill }
 
         TextBox textBox ->
+            annotation
+
+        Spotlight shapeType shape ->
             annotation
 
 
@@ -706,6 +722,9 @@ updateStrokeStyle strokeStyle annotation =
 
         TextBox textBox ->
             annotation
+
+        Spotlight shapeType shape ->
+            Spotlight shapeType { shape | strokeStyle = strokeStyle }
 
 
 updateFontSize : Float -> Annotation -> Annotation
@@ -790,6 +809,9 @@ resize start end vertex annotation =
         TextBox textArea ->
             TextBox (resizeVertices end vertex textArea)
 
+        Spotlight shapeType shape ->
+            Spotlight shapeType (resizeVertices end vertex shape)
+
 
 move : StartPosition -> EndPosition -> Annotation -> Annotation
 move oldPos newPos annotation =
@@ -812,6 +834,9 @@ move oldPos newPos annotation =
 
             TextBox textArea ->
                 TextBox (shift textArea)
+
+            Spotlight shapeType shape ->
+                Spotlight shapeType (shift shape)
 
 
 shiftPosition : Int -> Int -> Mouse.Position -> Mouse.Position
@@ -896,6 +921,14 @@ transitionOnShift drawing =
 
         DrawTextBox ->
             drawing
+
+        DrawSpotlight shapeType shapeMode ->
+            case shapeMode of
+                DrawingShape ->
+                    DrawSpotlight shapeType DrawingEqualizedShape
+
+                DrawingEqualizedShape ->
+                    DrawSpotlight shapeType DrawingShape
 
 
 cancelDrawing : Model -> Model
@@ -1150,6 +1183,14 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
+        DrawSpotlight shapeType shapeMode ->
+            case drawing2 of
+                DrawSpotlight shapeType2 _ ->
+                    shapeType == shapeType2
+
+                _ ->
+                    False
+
 
 viewVanillaDrawingButton : Keyboard.State -> Drawing -> Drawing -> Html Msg
 viewVanillaDrawingButton keyboardState selectedDrawing drawing =
@@ -1167,14 +1208,17 @@ viewVanillaDrawingButton keyboardState selectedDrawing drawing =
 viewDrawingButton : Keyboard.State -> Drawing -> (AttributeDropdown -> Html Msg) -> Drawing -> Html Msg
 viewDrawingButton keyboardState selectedDrawing toDropdownMenu drawing =
     case drawing of
-        DrawLine lineType lineMode ->
+        DrawLine _ _ ->
             viewVanillaDrawingButton keyboardState selectedDrawing drawing
 
-        DrawShape shapeType shapeMode ->
+        DrawShape _ _ ->
             viewVanillaDrawingButton keyboardState selectedDrawing drawing
 
         DrawTextBox ->
             viewTextSizeDropdown selectedDrawing toDropdownMenu
+
+        DrawSpotlight _ _ ->
+            viewVanillaDrawingButton keyboardState selectedDrawing drawing
 
 
 viewHistoryControls : UndoList (Array Annotation) -> Html Msg
@@ -1343,14 +1387,11 @@ viewShapeSvg drawing =
                 Ellipse ->
                     viewEllipseIcon
 
-                SpotlightRect ->
-                    viewSpotlightIcon
-
-                SpotlightEllipse ->
-                    viewSpotlightIcon
-
         DrawTextBox ->
             viewTextIcon
+
+        DrawSpotlight _ _ ->
+            viewSpotlightIcon
 
 
 viewLineStrokeOptions : StrokeStyle -> Html Msg
@@ -1531,15 +1572,10 @@ viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing
             DrawingAnnotation start ->
                 case drawing of
                     DrawShape shapeType _ ->
-                        case shapeType of
-                            SpotlightRect ->
-                                spotlightDrawingAndAnnotations start
+                        nonSpotlightDrawingAndAnnotations start
 
-                            SpotlightEllipse ->
-                                spotlightDrawingAndAnnotations start
-
-                            _ ->
-                                nonSpotlightDrawingAndAnnotations start
+                    DrawSpotlight _ _ ->
+                        spotlightDrawingAndAnnotations start
 
                     _ ->
                         nonSpotlightDrawingAndAnnotations start
@@ -1616,8 +1652,8 @@ viewArrowHeadDefinition color =
 isSpotlightShape : Annotation -> Bool
 isSpotlightShape annotation =
     case annotation of
-        Shapes shapeType _ ->
-            shapeType == SpotlightRect || shapeType == SpotlightEllipse
+        Spotlight _ _ ->
+            True
 
         _ ->
             False
@@ -1626,16 +1662,8 @@ isSpotlightShape annotation =
 spotlightFillToMaskFill : Annotation -> Annotation
 spotlightFillToMaskFill annotation =
     case annotation of
-        Shapes shapeType shape ->
-            case shapeType of
-                SpotlightRect ->
-                    Shapes Rect { shape | fill = MaskFill }
-
-                SpotlightEllipse ->
-                    Shapes Ellipse { shape | fill = MaskFill }
-
-                _ ->
-                    annotation
+        Spotlight shapeType shape ->
+            Spotlight shapeType { shape | fill = MaskFill }
 
         _ ->
             annotation
@@ -1726,14 +1754,19 @@ viewAnnotation annotationState index annotation =
                     Ellipse ->
                         viewShape movementEvents (vertices Elliptical shape) shapeType shape
 
-                    SpotlightEllipse ->
-                        viewShape movementEvents (vertices Elliptical shape) shapeType shape
-
                     _ ->
                         viewShape movementEvents (vertices Rectangular shape) shapeType shape
 
             TextBox textBox ->
                 viewTextBox movementEvents (vertices Rectangular textBox) annotationState selectState index textBox
+
+            Spotlight shapeType shape ->
+                case shapeType of
+                    Ellipse ->
+                        viewShape movementEvents (vertices Elliptical shape) shapeType shape
+
+                    _ ->
+                        viewShape movementEvents (vertices Rectangular shape) shapeType shape
 
 
 annotationStateVertexEvents : Int -> Annotation -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
@@ -1818,36 +1851,42 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboard
                     Ellipse ->
                         Svg.ellipse (shapeAttrs shapeType shapeMode) []
 
-                    SpotlightRect ->
-                        if isInMask then
-                            Svg.rect (spotlightAttrs shapeType shapeMode MaskFill Color.white) []
-                        else
-                            Svg.rect (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
-
-                    SpotlightEllipse ->
-                        if isInMask then
-                            Svg.ellipse (spotlightAttrs shapeType shapeMode MaskFill Color.white) []
-                        else
-                            Svg.ellipse (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
-
             DrawTextBox ->
                 Svg.rect ((shapeAttributes Rect <| Shape pos mouse EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
 
+            DrawSpotlight shapeType shapeMode ->
+                let
+                    ( fillDependentOnMask, strokeDependentOnMask ) =
+                        if isInMask then
+                            MaskFill => Color.white
+                        else
+                            EmptyFill => strokeColor
+                in
+                    case shapeType of
+                        Rect ->
+                            Svg.rect (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
 
-fillStyle : Fill -> List (Svg.Attribute Msg)
+                        RoundedRect ->
+                            Svg.rect (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
+
+                        Ellipse ->
+                            Svg.ellipse (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
+
+
+fillStyle : Fill -> ( String, Bool )
 fillStyle fill =
     case fill of
         SolidFill color ->
-            [ Attr.fill <| Color.Convert.colorToHex color ]
+            Color.Convert.colorToHex color => True
 
         SpotlightFill ->
-            [ Attr.fill "white", fillOpacity "0" ]
+            "white" => False
 
         MaskFill ->
-            [ Attr.fill "black" ]
+            "black" => True
 
         EmptyFill ->
-            [ Attr.fill "white", fillOpacity "0" ]
+            "white" => False
 
 
 pointerEvents : Fill -> String
@@ -1883,12 +1922,6 @@ viewShape attrs vertices shapeType shape =
                 Ellipse ->
                     [ Svg.ellipse allAttrs [] ]
 
-                SpotlightRect ->
-                    [ Svg.rect allAttrs [] ]
-
-                SpotlightEllipse ->
-                    [ Svg.ellipse allAttrs [] ]
-
 
 viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
 viewVertices vertices start end toVertexEvents selectState =
@@ -1917,9 +1950,14 @@ shapeAttrs ({ strokeStyle, strokeColor, fill } as shape) =
 
 strokeAttrs : StrokeStyle -> Color -> List (Svg.Attribute Msg)
 strokeAttrs strokeStyle strokeColor =
-    [ Attr.stroke <| Color.Convert.colorToHex strokeColor
-    ]
-        ++ toLineStyle strokeStyle
+    let
+        ( strokeWidth, dashArray ) =
+            toLineStyle strokeStyle
+    in
+        [ Attr.stroke <| Color.Convert.colorToHex strokeColor
+        , Attr.strokeWidth strokeWidth
+        , Attr.strokeDasharray dashArray
+        ]
 
 
 rectAttrs : Shape -> List (Svg.Attribute Msg)
@@ -1934,32 +1972,36 @@ rectAttrs { start, end } =
 
 ellipseAttributes : Shape -> List (Svg.Attribute Msg)
 ellipseAttributes { start, end } =
-    [ rx <| toString <| abs <| end.x - start.x
-    , ry <| toString <| abs <| end.y - start.y
-    , cx <| toString <| start.x
-    , cy <| toString <| start.y
+    [ rx <| toString <| abs end.x - start.x
+    , ry <| toString <| abs end.y - start.y
+    , cx <| toString start.x
+    , cy <| toString start.y
     , Attr.filter "url(#dropShadow)"
     ]
 
 
 shapeAttributes : ShapeType -> Shape -> List (Svg.Attribute Msg)
 shapeAttributes shapeType shape =
-    List.append (fillStyle shape.fill) <|
-        case shapeType of
-            Rect ->
-                shapeAttrs shape ++ rectAttrs shape
+    let
+        ( fillColor, isVisible ) =
+            fillStyle shape.fill
 
-            RoundedRect ->
-                shapeAttrs shape ++ rectAttrs shape ++ [ rx "15", ry "15" ]
+        fillStyles =
+            if isVisible then
+                [ Attr.fill fillColor ]
+            else
+                [ Attr.fill fillColor, fillOpacity "0" ]
+    in
+        List.append fillStyles <|
+            case shapeType of
+                Rect ->
+                    shapeAttrs shape ++ rectAttrs shape
 
-            Ellipse ->
-                shapeAttrs shape ++ ellipseAttributes shape
+                RoundedRect ->
+                    shapeAttrs shape ++ rectAttrs shape ++ [ rx "15", ry "15" ]
 
-            SpotlightRect ->
-                shapeAttrs shape ++ rectAttrs shape
-
-            SpotlightEllipse ->
-                shapeAttrs shape ++ ellipseAttributes shape
+                Ellipse ->
+                    shapeAttrs shape ++ ellipseAttributes shape
 
 
 shapeVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
@@ -2047,7 +2089,7 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
         NotSelected ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ dy <| toString fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
                 |> List.singleton
                 |> flip List.append (viewShape ([ Attr.style "stroke: transparent; pointer-events: auto; cursor: pointer;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black SolidThin))
@@ -2055,7 +2097,7 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
         SelectedWithVertices ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString <| fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ dy <| toString fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
                 |> List.singleton
                 |> flip List.append
@@ -2083,9 +2125,14 @@ simpleLineAttrs : Line -> List (Svg.Attribute Msg)
 simpleLineAttrs ({ start, end } as line) =
     []
         ++ [ Attr.fill "none"
-           , d <| "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+           , d <| linePath start end
              --  , Attr.filter "url(#dropShadow)"
            ]
+
+
+linePath : StartPosition -> EndPosition -> String
+linePath start end =
+    "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
 
 
 arrowAttributes : Line -> List (Svg.Attribute Msg)
@@ -2338,32 +2385,32 @@ equalXandY a b =
         Position b.x (a.y + (Basics.max (b.x - a.x) (a.x - b.x)))
 
 
-toLineStyle : StrokeStyle -> List (Svg.Attribute Msg)
+toLineStyle : StrokeStyle -> ( String, String )
 toLineStyle strokeStyle =
     case strokeStyle of
         SolidThin ->
-            [ strokeWidth "4", strokeDasharray "" ]
+            "4" => ""
 
         SolidMedium ->
-            [ strokeWidth "6", strokeDasharray "" ]
+            "6" => ""
 
         SolidThick ->
-            [ strokeWidth "8", strokeDasharray "" ]
+            "8" => ""
 
         SolidVeryThick ->
-            [ strokeWidth "10", strokeDasharray "" ]
+            "10" => ""
 
         DashedThin ->
-            [ strokeWidth "4", strokeDasharray "10, 5" ]
+            "4" => "10, 5"
 
         DashedMedium ->
-            [ strokeWidth "6", strokeDasharray "10, 5" ]
+            "6" => "10, 5"
 
         DashedThick ->
-            [ strokeWidth "8", strokeDasharray "10, 5" ]
+            "8" => "10, 5"
 
         DashedVeryThick ->
-            [ strokeWidth "10", strokeDasharray "10, 5" ]
+            "10" => "10, 5"
 
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
