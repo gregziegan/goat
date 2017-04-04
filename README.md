@@ -37,7 +37,7 @@ Then you can just do `elm-make src/Annotator.elm --output=elm.js --debug` and op
 Use `elm-live` (`npm i -g elm-live`)
 
 ```
-elm-live src/Annotator.elm --output=elm.js --open --debug
+elm-live src/Main.elm --output=elm.js --open --debug
 ```
 
 This will open a browser tab with CSS hot reloading and page refreshing on Elm code changes.

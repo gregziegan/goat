@@ -1,12 +1,15 @@
 module Tests exposing (..)
 
-import Annotator exposing (..)
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color
 import Color.Convert
 import Expect
 import Fuzz exposing (Fuzzer)
+import Goat.Helpers exposing (..)
+import Goat.Model exposing (..)
+import Goat.Update exposing (..)
+import Goat.View exposing (..)
 import Html
 import Html.Attributes as Html
 import Keyboard.Extra as Keyboard
@@ -18,7 +21,7 @@ import Svg exposing (svg)
 import Svg.Attributes as Attr exposing (fontSize)
 import Test exposing (..)
 import Test.Html.Query as Query
-import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, tag, text, class)
+import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
 import UndoList
 
 
@@ -32,6 +35,7 @@ goat =
     }
 
 
+svgDrawspace : List (Svg.Svg msg) -> Html.Html msg
 svgDrawspace =
     svg
         [ Attr.id "drawing"
@@ -60,18 +64,22 @@ model =
     }
 
 
+start : StartPosition
 start =
     Mouse.Position 50 50
 
 
+end : EndPosition
 end =
     Mouse.Position 76 88
 
 
+line : Color.Color -> StrokeStyle -> Line
 line strokeColor strokeStyle =
     Line start end strokeColor strokeStyle
 
 
+getFirstAnnotation : Model -> Maybe Annotation
 getFirstAnnotation model =
     model
         |> .edits
@@ -86,10 +94,12 @@ position =
         (\{ x, y } -> Shrink.map Position (Shrink.int x) |> Shrink.andMap (Shrink.int y))
 
 
+aLine : Line
 aLine =
     Line start end model.strokeColor model.strokeStyle
 
 
+aShape : Shape
 aShape =
     Shape start end model.fill model.strokeColor model.strokeStyle
 
@@ -121,6 +131,7 @@ ellipseSelector shape =
         ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
 
 
+roundedRectSelector : Shape -> List Selector
 roundedRectSelector shape =
     [ attribute "rx" "15"
     , attribute "rx" "15"
@@ -149,7 +160,7 @@ rectSelector shape =
 
 aTextArea : TextArea
 aTextArea =
-    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (Annotator.config 0 model.fontSize))
+    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (config 0 model.fontSize))
 
 
 svgTextSelector : TextArea -> List Selector
