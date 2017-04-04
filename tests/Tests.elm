@@ -205,7 +205,6 @@ all =
                         |> Maybe.map (Expect.equal (Shapes Rect <| Shape start end model.fill model.strokeColor model.strokeStyle))
                         |> Maybe.withDefault (Expect.fail "Array missing rect annotation")
             , test "finishShapeDrawing should add a spotlight annotation with a spotlight fill to the edit history" <|
-                -- should spotlights be refactored? this is some custom logic to get around modeling
                 \() ->
                     model
                         |> finishSpotlightDrawing start end Rect DrawingShape
