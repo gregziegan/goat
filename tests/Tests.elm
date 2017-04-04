@@ -94,13 +94,12 @@ aShape =
     Shape start end model.fill model.strokeColor model.strokeStyle
 
 
-lineSelector : Line -> Selector
+lineSelector : Line -> List Selector
 lineSelector line =
     [ attribute "fill" "none"
     , attribute "d" (linePath line.start line.end)
     ]
         ++ (uncurry strokeSelectors (toLineStyle line.strokeStyle)) line.strokeColor
-        |> HtmlSelector.all
 
 
 strokeSelectors : String -> String -> Color.Color -> List Selector
@@ -111,7 +110,7 @@ strokeSelectors strokeWidth dashArray strokeColor =
     ]
 
 
-ellipseSelector : Shape -> Selector
+ellipseSelector : Shape -> List Selector
 ellipseSelector shape =
     [ attribute "rx" <| toString <| abs end.x - start.x
     , attribute "ry" <| toString <| abs end.y - start.y
@@ -120,15 +119,13 @@ ellipseSelector shape =
     , attribute "filter" "url(#dropShadow)"
     ]
         ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
-        |> HtmlSelector.all
 
 
 roundedRectSelector shape =
     [ attribute "rx" "15"
     , attribute "rx" "15"
-    , rectSelector shape
     ]
-        |> HtmlSelector.all
+        ++ rectSelector shape
 
 
 fillSelectors : Fill -> List Selector
@@ -143,12 +140,11 @@ fillSelectors fill =
             [ attribute "fill" fillColor, attribute "fill-opacity" "0" ]
 
 
-rectSelector : Shape -> Selector
+rectSelector : Shape -> List Selector
 rectSelector shape =
     attribute "filter" "url(#dropShadow)"
         :: fillSelectors shape.fill
         ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
-        |> HtmlSelector.all
 
 
 aTextArea : TextArea
@@ -201,9 +197,9 @@ all =
                 -- should spotlights be refactored? this is some custom logic to get around modeling
                 \() ->
                     model
-                        |> finishShapeDrawing start end SpotlightRect DrawingShape
+                        |> finishSpotlightDrawing start end Rect DrawingShape
                         |> getFirstAnnotation
-                        |> Maybe.map (Expect.equal (Shapes SpotlightRect <| Shape start end SpotlightFill model.strokeColor model.strokeStyle))
+                        |> Maybe.map (Expect.equal (Spotlight Rect <| Shape start end SpotlightFill model.strokeColor model.strokeStyle))
                         |> Maybe.withDefault (Expect.fail "Array missing spotlight rect annotation")
             ]
         , describe "annotations"
@@ -215,7 +211,7 @@ all =
                         |> svgDrawspace
                         |> Query.fromHtml
                         |> Query.find [ tag "path" ]
-                        |> Query.has [ lineSelector aLine ]
+                        |> Query.has (lineSelector aLine)
             , test "An arrow has the appropriate view attributes" <|
                 \() ->
                     aLine
@@ -224,7 +220,7 @@ all =
                         |> svgDrawspace
                         |> Query.fromHtml
                         |> Query.find [ tag "path" ]
-                        |> Query.has [ lineSelector aLine ]
+                        |> Query.has (lineSelector aLine)
             , test "A rectangle has the appropriate view attributes" <|
                 \() ->
                     aShape
@@ -233,7 +229,7 @@ all =
                         |> svgDrawspace
                         |> Query.fromHtml
                         |> Query.find [ tag "rect" ]
-                        |> Query.has [ rectSelector aShape ]
+                        |> Query.has (rectSelector aShape)
             , test "A rounded rectangle has the appropriate view attributes" <|
                 \() ->
                     aShape
@@ -242,7 +238,7 @@ all =
                         |> svgDrawspace
                         |> Query.fromHtml
                         |> Query.find [ tag "rect" ]
-                        |> Query.has [ roundedRectSelector aShape ]
+                        |> Query.has (roundedRectSelector aShape)
             , test "An ellipse has the appropriate view attributes" <|
                 \() ->
                     aShape
@@ -251,7 +247,7 @@ all =
                         |> svgDrawspace
                         |> Query.fromHtml
                         |> Query.find [ tag "ellipse" ]
-                        |> Query.has [ ellipseSelector aShape ]
+                        |> Query.has (ellipseSelector aShape)
             , test "A textbox's unselected svg text has the appropriate view attributes" <|
                 \() ->
                     aTextArea
@@ -273,6 +269,15 @@ all =
                             (Expect.all
                                 [ Query.has (tspanSelector aTextArea) ]
                             )
+            , test "A spotlight has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Spotlight Rect
+                        |> viewAnnotation ReadyToDraw 0
+                        |> svgDrawspace
+                        |> Query.fromHtml
+                        |> Query.find [ tag "rect" ]
+                        |> Query.has (rectSelector aShape)
             ]
         , describe "Utils"
             [ fuzz2 position position "mouse step function works properly" <|
