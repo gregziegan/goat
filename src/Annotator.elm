@@ -248,6 +248,8 @@ drawingOptions shiftPressed =
         , DrawShape Ellipse DrawingEqualizedShape
         , DrawTextBox
         , DrawSpotlight Rect DrawingEqualizedShape
+        , DrawSpotlight RoundedRect DrawingEqualizedShape
+        , DrawSpotlight Ellipse DrawingEqualizedShape
         ]
     else
         [ DrawLine Arrow DrawingLine
@@ -257,6 +259,8 @@ drawingOptions shiftPressed =
         , DrawShape Ellipse DrawingShape
         , DrawTextBox
         , DrawSpotlight Rect DrawingShape
+        , DrawSpotlight RoundedRect DrawingEqualizedShape
+        , DrawSpotlight Ellipse DrawingShape
         ]
 
 
@@ -1388,8 +1392,16 @@ viewShapeSvg drawing =
         DrawTextBox ->
             viewTextIcon
 
-        DrawSpotlight _ _ ->
-            viewSpotlightIcon
+        DrawSpotlight shapeType _ ->
+            case shapeType of
+                Rect ->
+                    viewSpotlightRectIcon
+
+                RoundedRect ->
+                    viewSpotlightRoundedRectIcon
+
+                Ellipse ->
+                    viewSpotlightEllipseIcon
 
 
 viewLineStrokeOptions : StrokeStyle -> Html Msg
@@ -1853,10 +1865,22 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboard
                 Svg.rect ((shapeAttributes Rect <| Shape pos mouse EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
 
             DrawSpotlight shapeType shapeMode ->
-                if isInMask then
-                    Svg.rect (spotlightAttrs shapeType shapeMode MaskFill Color.white) []
-                else
-                    Svg.rect (spotlightAttrs shapeType shapeMode EmptyFill strokeColor) []
+                let
+                    ( fillDependentOnMask, strokeDependentOnMask ) =
+                        if isInMask then
+                            MaskFill => Color.white
+                        else
+                            EmptyFill => strokeColor
+                in
+                    case shapeType of
+                        Rect ->
+                            Svg.rect (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
+
+                        RoundedRect ->
+                            Svg.rect (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
+
+                        Ellipse ->
+                            Svg.ellipse (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
 
 
 fillStyle : Fill -> ( String, Bool )
@@ -2175,8 +2199,20 @@ viewRectangleIcon =
         [ Svg.path [ d "M2 12h10V2H2v10zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
 
 
-viewSpotlightIcon : Html msg
-viewSpotlightIcon =
+viewSpotlightRectIcon : Html msg
+viewSpotlightRectIcon =
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
+
+
+viewSpotlightRoundedRectIcon : Html msg
+viewSpotlightRoundedRectIcon =
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
+
+
+viewSpotlightEllipseIcon : Html msg
+viewSpotlightEllipseIcon =
     svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
         [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
 
