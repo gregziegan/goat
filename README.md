@@ -17,6 +17,10 @@ Minimally annotate images with common features like:
 
 This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/#Compose_&_Edit)
 
+## Credits
+
+👏 Huge thanks to [Jian Wei Liau](https://twitter.com/madebyjw) for the beautiful icons! 👏
+
 ## Development
 
 
