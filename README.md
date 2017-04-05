@@ -21,6 +21,8 @@ This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/
 
 👏 Huge thanks to [Jian Wei Liau](https://twitter.com/madebyjw) for the beautiful icons! 👏
 
+🐐 Thanks to [Alan Hogan](https://github.com/alanhogan) for the acronym behind the 🐐
+
 ## Development
 
 
