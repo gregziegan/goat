@@ -1,5 +1,5 @@
 # G.O.A.T. ![Travis](https://travis-ci.org/thebritican/annotation-editor.svg?branch=master)
-### Graphics Oriented Annotation Tool
+### Graphics Ornamentation and Annotation Tool
 ### a.k.a. Greatest Of All Time
 
 ![demo](https://cloud.githubusercontent.com/assets/3099999/24594663/4055c25e-17e4-11e7-8844-a63a395db5f1.gif)
