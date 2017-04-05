@@ -30,7 +30,7 @@ Get yourself the [Elm programming language](http://elm-lang.org/):
 
 On node 6+: `npm i -g elm`
 
-Then you can just do `elm-make src/Annotator.elm --output=elm.js --debug` and open `index.html`.
+Then you can just do `elm-make src/Main.elm --output=elm.js --debug` and open `index.html`.
 
 #### Nicer workflow
 
