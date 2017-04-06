@@ -647,13 +647,13 @@ annotationStateEvents index annotation annotationState =
         DrawingAnnotation start ->
             [ Attr.class "crosshairCursor" ]
 
-        SelectedAnnotation start annotation ->
+        SelectedAnnotation start _ ->
             [ Attr.class "moveCursor"
             , SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
             , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
 
-        MovingAnnotation index annotation startPos ->
+        MovingAnnotation index _ startPos ->
             [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
             , Attr.class "moveCursor"
             ]
