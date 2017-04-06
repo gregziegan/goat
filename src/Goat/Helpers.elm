@@ -100,7 +100,7 @@ toLineStyle strokeStyle =
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
 toDrawingPosition mouse =
-    { mouse | x = mouse.x - controlUIWidth, y = mouse.y }
+    { mouse | x = mouse.x - controlUIWidth, y = mouse.y - 10 }
 
 
 annotationStateToCursor : AnnotationState -> String

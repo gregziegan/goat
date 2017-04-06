@@ -23,10 +23,9 @@
         var drawingImg = new Image()
         var svg = new Blob([data], {type: 'image/svg+xml'});
         var url = DOMURL.createObjectURL(svg);
-        var canvasPadding = 10;
         drawingImg.onload = function() {
           ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.originalWidth, image.originalHeight, 0, 0, image.width, Math.round(image.height))
-          ctx.drawImage(drawingImg, -canvasPadding, -canvasPadding, image.width, Math.round(image.height));
+          ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height));
           DOMURL.revokeObjectURL(url);
           canvas.toBlob(blob => {
             var exportImage = new Image()
