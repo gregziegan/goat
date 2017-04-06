@@ -1,5 +1,5 @@
 # G.O.A.T. ![Travis](https://travis-ci.org/thebritican/annotation-editor.svg?branch=master)
-### Graphics Oriented Annotation Tool
+### Graphics Ornamentation and Annotation Tool
 ### a.k.a. Greatest Of All Time
 
 ![demo](https://cloud.githubusercontent.com/assets/3099999/24594663/4055c25e-17e4-11e7-8844-a63a395db5f1.gif)
@@ -21,6 +21,8 @@ This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/
 
 👏 Huge thanks to [Jian Wei Liau](https://twitter.com/madebyjw) for the beautiful icons! 👏
 
+🐐 Thanks to [Alan Hogan](https://github.com/alanhogan) for the acronym behind the 🐐
+
 ## Development
 
 
@@ -30,7 +32,7 @@ Get yourself the [Elm programming language](http://elm-lang.org/):
 
 On node 6+: `npm i -g elm`
 
-Then you can just do `elm-make src/Annotator.elm --output=elm.js --debug` and open `index.html`.
+Then you can just do `elm-make src/Main.elm --output=elm.js --debug` and open `index.html`.
 
 #### Nicer workflow
 

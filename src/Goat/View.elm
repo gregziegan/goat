@@ -661,14 +661,14 @@ annotationStateEvents index annotation annotationState =
         DrawingAnnotation start ->
             [ Attr.class "crosshairCursor" ]
 
-        SelectedAnnotation start annotation ->
+        SelectedAnnotation start _ ->
             [ Attr.class "moveCursor"
             , onMouseDown <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation index annotation << toDrawingPosition << toPosition)
             , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
 
-        MovingAnnotation index annotation start ->
+        MovingAnnotation index _ start ->
             [ onMouseUp <| Json.map (FinishMovingAnnotation index annotation start << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index annotation start << toDrawingPosition << toPosition)
             , Attr.class "moveCursor"
@@ -937,8 +937,8 @@ rectAttrs { start, end } =
 
 ellipseAttributes : Shape -> List (Svg.Attribute Msg)
 ellipseAttributes { start, end } =
-    [ rx <| toString <| abs end.x - start.x
-    , ry <| toString <| abs end.y - start.y
+    [ rx <| toString <| abs <| end.x - start.x
+    , ry <| toString <| abs <| end.y - start.y
     , cx <| toString start.x
     , cy <| toString start.y
     , Attr.filter "url(#dropShadow)"

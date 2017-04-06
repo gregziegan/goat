@@ -236,7 +236,7 @@ drawingOptions shiftPressed =
         , DrawShape Ellipse DrawingShape
         , DrawTextBox
         , DrawSpotlight Rect DrawingShape
-        , DrawSpotlight RoundedRect DrawingEqualizedShape
+        , DrawSpotlight RoundedRect DrawingShape
         , DrawSpotlight Ellipse DrawingShape
         ]
 
@@ -277,4 +277,4 @@ init flags =
 
 controlUIWidth : number
 controlUIWidth =
-    73
+    83

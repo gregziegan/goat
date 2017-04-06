@@ -188,8 +188,8 @@ button:active, button:focus, button:hover {
 
 .drawing {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 10px;
+  left: 10px;
 }
 
 .text-box {
