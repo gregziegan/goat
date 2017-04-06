@@ -56,6 +56,8 @@ type Msg
     | Cancel
       -- Keyboard updates
     | KeyboardMsg Keyboard.Msg
+      -- Fun
+    | ShowMeTheGoats
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
@@ -265,6 +267,12 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                             Nothing ->
                                 Cmd.none
                        ]
+
+            ShowMeTheGoats ->
+                { model
+                    | images = List.Zipper.fromList theGoats
+                }
+                    => []
 
 
 {-| Add this editState change to app history

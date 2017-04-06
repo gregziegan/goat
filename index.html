@@ -8,7 +8,7 @@
     <div id="export-image"></div>
     <script src="elm.js"></script>
     <script src="dist/goat-app_v1-0-0-alpha.min.js"></script>
-    <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
+    <!-- <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script> -->
     <script>
       var isMac = navigator.userAgent.indexOf('Mac OS X') != -1
       var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac });
@@ -40,6 +40,39 @@
         drawingImg.src = url
       });
 
+      app.ports.listenForUpload.subscribe(function(className) {
+        var target = document.querySelector('.' + className);
+        target.addEventListener("dragover", function(e) { e.preventDefault(); });
+        target.addEventListener("drop", function(e) {
+        	  e.preventDefault()
+        	  loadImage(e.dataTransfer.files[0])
+        }, true);
+      })
+
+      function loadImage(src) {
+        if (!src.type.match(/image.*/)) {
+          return
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          const contentType = 'image/png';
+          const blob = b64toBlob(e.target.result.replace('data:image/png;base64,', ''), contentType);
+          var editImageBlobUrl = URL.createObjectURL(blob);
+          var newImg = new Image()
+          newImg.onload = function() {
+            app.ports.newImage.send({
+              url: editImageBlobUrl,
+              width: this.naturalWidth,
+              height: this.naturalHeight,
+              originalWidth: this.naturalWidth,
+              originalHeight: this.naturalHeight
+            })
+          }
+          newImg.src = editImageBlobUrl
+        }
+        reader.readAsDataURL(src)
+      }
+
       function getImages(html) {
         const div = document.createElement('div')
         div.innerHTML = html
@@ -59,6 +92,22 @@
           width: width,
           height: height
         }
+      }
+
+      function b64toBlob(b64Data, contentType='', sliceSize=512) {
+        const byteCharacters = atob(b64Data);
+        const byteArrays = [];
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+          const slice = byteCharacters.slice(offset, offset + sliceSize);
+          const byteNumbers = new Array(slice.length);
+          for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          byteArrays.push(byteArray);
+        }
+        const blob = new Blob(byteArrays, {type: contentType});
+        return blob;
       }
 
       function autoScale(canvas) {
@@ -87,7 +136,6 @@
         }
       }
 
-      let imageObjects;
       const client = window.ZAFClient ? ZAFClient.init() : null;
       if (client) {
         client.invoke('resize', { height: 320, width: 1000})
@@ -103,10 +151,6 @@
             app.ports.setImages.send(imageObjects)
           })
         }
-      } else {
-        const testEditorHtml = '<div><p>​<img data-imageuploadid="0.601161934050189" src="goat.jpg" data-upload-token="fETc6elwJa6YPIJqhj8lTS4Ir" data-inline-attachment="true" data-upload-id="7000414807" data-original-height="751" data-original-width="639" style="width: 235px; height: auto;">​<br></p><p>goat pics</p><p><img data-imageuploadid="0.641161934050189" src="goat2.jpg" data-upload-token="fETc6elwJaasPIJqhj8lTS4Ir" data-inline-attachment="true" data-upload-id="7020414807" data-original-height="751" data-original-width="639" style="width: 235px; height: auto;">​<br></p></div>';
-        const imageObjects = getImages(testEditorHtml)
-        app.ports.setImages.send(imageObjects)
       }
     </script>
   </body>

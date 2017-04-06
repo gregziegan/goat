@@ -72,8 +72,15 @@ viewPencilIcon =
 
 viewInfoScreen : Html Msg
 viewInfoScreen =
-    div []
-        [ Html.text "please upload an image!" ]
+    div [ Html.class "droparea" ]
+        [ div [ Html.class "info-text" ]
+            [ Html.h2 [] [ Html.text "Please drag and drop an image onto the page" ]
+            , div [ Html.class "goat-time" ]
+                [ p [] [ Html.text "Or, show me the goats!" ]
+                , button [ Html.class "goat-button", onClick ShowMeTheGoats ] [ Html.text "🐐" ]
+                ]
+            ]
+        ]
 
 
 viewImageAnnotator : Model -> Image -> Html Msg

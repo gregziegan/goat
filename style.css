@@ -240,3 +240,32 @@ button:active, button:focus, button:hover {
   bottom: 2px;
   right: 2px;
 }
+
+.droparea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+}
+
+.info-text {
+  position: absolute;
+  z-index: 2;
+}
+
+.goat-time {
+  display: flex;
+}
+
+.goat-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 5px;
+  border: 1px solid rgb(230, 230, 230);
+  background-color: white;
+  font-size: 18px;
+  margin-left: 3px;
+  height: 40px;
+}

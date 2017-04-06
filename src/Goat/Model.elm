@@ -6,7 +6,6 @@ import Color exposing (Color)
 import Keyboard.Extra as Keyboard
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
-import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
 
 
@@ -252,7 +251,7 @@ fontSizes =
     ]
 
 
-init : Flags -> ( Model, List (Cmd msg) )
+init : Flags -> Model
 init flags =
     { edits = UndoList.fresh Array.empty
     , fill = EmptyFill
@@ -272,7 +271,6 @@ init flags =
         else
             Windows
     }
-        => []
 
 
 controlUIWidth : number

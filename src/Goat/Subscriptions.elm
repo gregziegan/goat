@@ -13,7 +13,9 @@ subscriptions model =
     Sub.batch <|
         case model.images of
             Nothing ->
-                [ Ports.setImages SetImages ]
+                [ Ports.setImages SetImages
+                , Ports.newImage (SetImages << List.singleton)
+                ]
 
             Just images ->
                 if not model.imageSelected then

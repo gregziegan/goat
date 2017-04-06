@@ -148,3 +148,10 @@ toDeltas h theta =
 calcDistance : Position -> Position -> Float
 calcDistance a b =
     sqrt <| toFloat <| (b.x - a.x) ^ 2 + (b.y - a.y) ^ 2
+
+
+theGoats : List Image
+theGoats =
+    [ Image "goat.jpg" 235 276 639 751
+    , Image "goat2.jpg" 235 276 639 751
+    ]
