@@ -260,6 +260,7 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
 
             Save ->
                 model
+                    |> resetToReadyToDraw
                     => [ case model.images of
                             Just images ->
                                 Ports.exportToImage <| List.Zipper.current images

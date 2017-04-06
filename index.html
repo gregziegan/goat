@@ -12,33 +12,11 @@
     <script>
       var isMac = navigator.userAgent.indexOf('Mac OS X') != -1
       var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac });
+      var savedImage
       app.ports.exportToImage.subscribe(function(image) {
-        var canvas = document.createElement('canvas')
-        canvas.crossOrigin='anonymous'
-        canvas.width = image.width
-        canvas.height = image.height
-        autoScale(canvas)
-        var ctx = canvas.getContext('2d')
-        var data = document.getElementById('drawing').outerHTML
-        var DOMURL = window.URL || window.webkitURL || window;
-        var drawingImg = new Image()
-        var svg = new Blob([data], {type: 'image/svg+xml'});
-        var url = DOMURL.createObjectURL(svg);
-        drawingImg.onload = function() {
-          ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.originalWidth, image.originalHeight, 0, 0, image.width, Math.round(image.height))
-          ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height));
-          DOMURL.revokeObjectURL(url);
-          canvas.toBlob(blob => {
-            var exportImage = new Image()
-            exportImage.id = 'export-image'
-            exportImage.src = DOMURL.createObjectURL(blob)
-            exportImage.width = image.width
-            exportImage.height = image.height
-            document.body.replaceChild(exportImage, document.getElementById('export-image'))
-          })
-        }
-        drawingImg.src = url
-      });
+        savedImage = image;
+        window.requestAnimationFrame(exportImage)
+      })
 
       app.ports.listenForUpload.subscribe(function(className) {
         var target = document.querySelector('.' + className);
@@ -135,6 +113,35 @@
             context.scale(ratio, ratio);
         }
       }
+
+      function exportImage() {
+        var image = savedImage
+        var canvas = document.createElement('canvas')
+        canvas.crossOrigin='anonymous'
+        canvas.width = image.width
+        canvas.height = image.height
+        autoScale(canvas)
+        var ctx = canvas.getContext('2d')
+        var data = document.getElementById('drawing').outerHTML
+        var DOMURL = window.URL || window.webkitURL || window;
+        var drawingImg = new Image()
+        var svg = new Blob([data], {type: 'image/svg+xml'});
+        var url = DOMURL.createObjectURL(svg);
+        drawingImg.onload = function() {
+          ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.originalWidth, image.originalHeight, 0, 0, image.width, Math.round(image.height))
+          ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height));
+          DOMURL.revokeObjectURL(url);
+          canvas.toBlob(blob => {
+            var exportImage = new Image()
+            exportImage.id = 'export-image'
+            exportImage.src = DOMURL.createObjectURL(blob)
+            exportImage.width = image.width
+            exportImage.height = image.height
+            document.body.replaceChild(exportImage, document.getElementById('export-image'))
+          })
+        }
+        drawingImg.src = url
+      };
 
       const client = window.ZAFClient ? ZAFClient.init() : null;
       if (client) {
