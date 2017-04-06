@@ -420,24 +420,24 @@ drawingStateEvents drawing annotationState =
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
             ]
 
-        DrawingAnnotation startPos ->
-            onMouseUpOrLeave (Json.map (FinishDrawing startPos << toDrawingPosition) Mouse.position)
-                ++ [ ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing startPos << toDrawingPosition << toPosition)
+        DrawingAnnotation start ->
+            onMouseUpOrLeave (Json.map (FinishDrawing start << toDrawingPosition) Mouse.position)
+                ++ [ ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing start << toDrawingPosition << toPosition)
                    , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
                    ]
 
-        MovingAnnotation index annotation startPos ->
+        MovingAnnotation index annotation start ->
             [ Html.Events.onMouseLeave ResetToReadyToDraw
-            , onMouseUp <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation index annotation startPos << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index annotation startPos << toDrawingPosition << toPosition)
+            , onMouseUp <| Json.map (FinishMovingAnnotation index annotation start << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation index annotation start << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index annotation start << toDrawingPosition << toPosition)
             ]
 
-        ResizingAnnotation index annotation startPos vertex ->
+        ResizingAnnotation index annotation start vertex ->
             [ Html.Events.onMouseLeave ResetToReadyToDraw
-            , onMouseUp <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation index annotation vertex startPos << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition << toPosition)
+            , onMouseUp <| Json.map (FinishResizingAnnotation index annotation vertex start << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation index annotation vertex start << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation index annotation vertex start << toDrawingPosition << toPosition)
             ]
 
         SelectedAnnotation index annotation ->
@@ -690,13 +690,13 @@ getSelectState index annotationState =
             else
                 NotSelected
 
-        MovingAnnotation int annotation startPosition ->
+        MovingAnnotation int annotation startition ->
             if index == int then
                 SelectedWithVertices
             else
                 NotSelected
 
-        ResizingAnnotation int annotation startPosition vertex ->
+        ResizingAnnotation int annotation startition vertex ->
             if index == int then
                 SelectedWithVertices
             else

@@ -200,10 +200,10 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                     |> closeDropdown
                     => []
 
-            SelectAnnotation index annotation startPos ->
+            SelectAnnotation index annotation start ->
                 model
                     |> selectAnnotation index annotation
-                    |> startMovingAnnotation index annotation startPos
+                    |> startMovingAnnotation index annotation start
                     => []
 
             ResetToReadyToDraw ->
@@ -211,11 +211,11 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                     |> resetToReadyToDraw
                     => []
 
-            StartMovingAnnotation index annotation startPos ->
+            StartMovingAnnotation index annotation start ->
                 model
-                    |> setMouse startPos
+                    |> setMouse start
                     |> selectAnnotation index annotation
-                    |> startMovingAnnotation index annotation startPos
+                    |> startMovingAnnotation index annotation start
                     => []
 
             MoveAnnotation index annotation oldPos newPos ->
@@ -223,29 +223,29 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                     |> moveAnnotation index annotation oldPos newPos
                     => []
 
-            FinishMovingAnnotation index annotation startPos endPos ->
+            FinishMovingAnnotation index annotation start end ->
                 model
-                    |> moveAnnotation index annotation startPos endPos
-                    |> finishMovingAnnotation index (move startPos endPos annotation)
+                    |> moveAnnotation index annotation start end
+                    |> finishMovingAnnotation index (move start end annotation)
                     => []
 
-            StartResizingAnnotation index annotation vertex startPos ->
+            StartResizingAnnotation index annotation vertex start ->
                 model
-                    |> setMouse startPos
+                    |> setMouse start
                     |> selectAnnotation index annotation
-                    |> startResizingAnnotation index annotation vertex startPos
-                    |> resizeAnnotation index annotation vertex startPos startPos
+                    |> startResizingAnnotation index annotation vertex start
+                    |> resizeAnnotation index annotation vertex start start
                     => []
 
-            ResizeAnnotation index annotation vertex startPos endPos ->
+            ResizeAnnotation index annotation vertex start end ->
                 model
-                    |> resizeAnnotation index annotation vertex startPos endPos
+                    |> resizeAnnotation index annotation vertex start end
                     => []
 
-            FinishResizingAnnotation index annotation vertex startPos endPos ->
+            FinishResizingAnnotation index annotation vertex start end ->
                 model
-                    |> resizeAnnotation index annotation vertex startPos endPos
-                    |> selectAnnotation index (resize startPos endPos vertex annotation)
+                    |> resizeAnnotation index annotation vertex start end
+                    |> selectAnnotation index (resize start end vertex annotation)
                     => []
 
             Undo ->
@@ -282,10 +282,10 @@ skipChange model editState =
 
 
 startAnnotation : Position -> Maybe (Zipper Image) -> Model -> Model
-startAnnotation startPos images model =
+startAnnotation start images model =
     model
-        |> startDrawing startPos
-        |> updateMouse images startPos
+        |> startDrawing start
+        |> updateMouse images start
 
 
 resetSelection : Model -> Model
@@ -294,8 +294,8 @@ resetSelection model =
 
 
 startDrawing : StartPosition -> Model -> Model
-startDrawing startPos model =
-    { model | annotationState = DrawingAnnotation startPos }
+startDrawing start model =
+    { model | annotationState = DrawingAnnotation start }
 
 
 resetToReadyToDraw : Model -> Model
@@ -479,8 +479,8 @@ setStrokeColor strokeColor model =
 
 
 startMovingAnnotation : Int -> Annotation -> StartPosition -> Model -> Model
-startMovingAnnotation index annotation startPos model =
-    { model | annotationState = MovingAnnotation index annotation startPos }
+startMovingAnnotation index annotation start model =
+    { model | annotationState = MovingAnnotation index annotation start }
 
 
 moveAnnotation : Int -> Annotation -> StartPosition -> EndPosition -> Model -> Model
@@ -491,8 +491,8 @@ moveAnnotation index annotation oldPos newPos model =
 
 
 startResizingAnnotation : Int -> Annotation -> Vertex -> StartPosition -> Model -> Model
-startResizingAnnotation index annotation vertex startPos model =
-    { model | annotationState = ResizingAnnotation index annotation startPos vertex }
+startResizingAnnotation index annotation vertex start model =
+    { model | annotationState = ResizingAnnotation index annotation start vertex }
 
 
 resizeAnnotation : Int -> Annotation -> Vertex -> StartPosition -> EndPosition -> Model -> Model

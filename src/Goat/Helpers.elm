@@ -59,15 +59,15 @@ positionMapY fn pos =
 
 
 stepMouse : StartPosition -> EndPosition -> EndPosition
-stepMouse startPos curPos =
-    arrowAngle startPos curPos
+stepMouse start curPos =
+    arrowAngle start curPos
         / (pi / 4)
         |> round
         |> toFloat
         |> (*) (pi / 4)
-        |> toDeltas (calcDistance startPos curPos)
-        |> positionMapX ((+) startPos.x)
-        |> positionMapY ((+) startPos.y)
+        |> toDeltas (calcDistance start curPos)
+        |> positionMapX ((+) start.x)
+        |> positionMapY ((+) start.y)
 
 
 toLineStyle : StrokeStyle -> ( String, String )
