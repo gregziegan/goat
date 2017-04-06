@@ -79,7 +79,12 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                     => []
 
             FinishDrawing start end ->
-                finishDrawing start end model
+                if isDrawingLargeEnough start end then
+                    model
+                        |> cancelDrawing
+                        => []
+                else
+                    finishDrawing start end model
 
             StartEditingText index textArea ->
                 annotations

@@ -5,6 +5,16 @@ import Mouse exposing (Position)
 import Rocket exposing ((=>))
 
 
+minDrawingDistance : number
+minDrawingDistance =
+    4
+
+
+isDrawingLargeEnough : StartPosition -> EndPosition -> Bool
+isDrawingLargeEnough start end =
+    abs (start.x - end.x) < minDrawingDistance || abs (start.y - end.y) < minDrawingDistance
+
+
 toPx : number -> String
 toPx number =
     toString number ++ "px"
