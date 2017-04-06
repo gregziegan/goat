@@ -2,10 +2,10 @@ module Goat.View exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
-import Color.Convert
 import Color exposing (Color)
-import Goat.Model exposing (..)
+import Color.Convert
 import Goat.Helpers exposing (..)
+import Goat.Model exposing (..)
 import Goat.Update exposing (..)
 import Html exposing (Attribute, Html, button, div, p, text)
 import Html.Attributes as Html exposing (class, classList, disabled, height, id, readonly, src, start, style, type_, width)
@@ -16,9 +16,11 @@ import List.Extra
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
+import SingleTouch as ST
 import Svg exposing (..)
 import Svg.Attributes as Attr exposing (..)
 import Svg.Events as SE
+import Touch as T
 import UndoList exposing (UndoList)
 
 
@@ -415,26 +417,37 @@ drawingStateEvents drawing annotationState =
     case annotationState of
         ReadyToDraw ->
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
             ]
 
         DrawingAnnotation startPos ->
-            onMouseUpOrLeave <| Json.map (FinishDrawing startPos << toDrawingPosition) Mouse.position
+            onMouseUpOrLeave (Json.map (FinishDrawing startPos << toDrawingPosition) Mouse.position)
+                ++ [ ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing startPos << toDrawingPosition << toPosition)
+                   , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
+                   ]
 
         MovingAnnotation index annotation startPos ->
             [ Html.Events.onMouseLeave ResetToReadyToDraw
-            , SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
+            , onMouseUp <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation index annotation startPos << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index annotation startPos << toDrawingPosition << toPosition)
             ]
 
         ResizingAnnotation index annotation startPos vertex ->
             [ Html.Events.onMouseLeave ResetToReadyToDraw
-            , SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
+            , onMouseUp <| Json.map (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation index annotation vertex startPos << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation index annotation vertex startPos << toDrawingPosition << toPosition)
             ]
 
         SelectedAnnotation index annotation ->
-            [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position ]
+            [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
+            ]
 
         EditingATextBox index ->
             [ SE.onMouseDown <| FinishEditingText index
+            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (\_ -> FinishEditingText index)
             ]
 
 
@@ -639,7 +652,8 @@ annotationStateEvents : Int -> Annotation -> AnnotationState -> List (Svg.Attrib
 annotationStateEvents index annotation annotationState =
     case annotationState of
         ReadyToDraw ->
-            [ SE.on "mousedown" <| Json.map (SelectAnnotation index annotation << toDrawingPosition) Mouse.position
+            [ onMouseDown <| Json.map (SelectAnnotation index annotation << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchStart T.preventAndStop (SelectAnnotation index annotation << toDrawingPosition << toPosition)
             , Attr.class "pointerCursor"
             , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
@@ -649,12 +663,14 @@ annotationStateEvents index annotation annotationState =
 
         SelectedAnnotation start _ ->
             [ Attr.class "moveCursor"
-            , SE.on "mousedown" <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
+            , onMouseDown <| Json.map (StartMovingAnnotation index annotation << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation index annotation << toDrawingPosition << toPosition)
             , Html.attribute "onmousedown" "event.stopPropagation();"
             ]
 
-        MovingAnnotation index _ startPos ->
-            [ SE.on "mouseup" <| Json.map (FinishMovingAnnotation index annotation startPos << toDrawingPosition) Mouse.position
+        MovingAnnotation index _ start ->
+            [ onMouseUp <| Json.map (FinishMovingAnnotation index annotation start << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index annotation start << toDrawingPosition << toPosition)
             , Attr.class "moveCursor"
             ]
 
@@ -737,13 +753,16 @@ viewAnnotation annotationState index annotation =
 
 annotationStateVertexEvents : Int -> Annotation -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
 annotationStateVertexEvents index annotation annotationState vertex =
-    [ SE.on "mousedown" <| Json.map (StartResizingAnnotation index annotation vertex << toDrawingPosition) Mouse.position
+    [ onMouseDown <| Json.map (StartResizingAnnotation index annotation vertex << toDrawingPosition) Mouse.position
+    , ST.onSingleTouch T.TouchStart T.preventAndStop (StartResizingAnnotation index annotation vertex << toDrawingPosition << toPosition)
     , Attr.class "resizeCursor"
     , Html.attribute "onmousedown" "event.stopPropagation();"
     ]
         ++ case annotationState of
             ResizingAnnotation int annotation start vertex ->
-                [ SE.on "mouseup" <| Json.map (FinishResizingAnnotation index annotation vertex start << toDrawingPosition) Mouse.position ]
+                [ onMouseUp <| Json.map (FinishResizingAnnotation index annotation vertex start << toDrawingPosition) Mouse.position
+                , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation index annotation vertex start << toDrawingPosition << toPosition)
+                ]
 
             _ ->
                 []
@@ -1048,7 +1067,17 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
                 |> List.singleton
                 |> flip List.append
                     (viewShape (Attr.strokeWidth "0.5" :: attrs) vertices Rect (Shape start end EmptyFill Color.white SolidThin)
-                        ++ viewShape (attrs ++ [ Attr.strokeWidth "0.5", SE.onMouseDown <| StartEditingText index textBox, Attr.style "pointer-events: fill; cursor: pointer;" ]) vertices Rect (Shape start end EmptyFill (Color.rgb 230 230 230) SolidThin)
+                        ++ viewShape
+                            (attrs
+                                ++ [ Attr.strokeWidth "0.5"
+                                   , SE.onMouseDown <| StartEditingText index textBox
+                                   , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> StartEditingText index textBox)
+                                   , Attr.style "pointer-events: fill; cursor: pointer;"
+                                   ]
+                            )
+                            vertices
+                            Rect
+                            (Shape start end EmptyFill (Color.rgb 230 230 230) SolidThin)
                     )
 
 
@@ -1232,6 +1261,11 @@ viewTextIcon =
     svg [ viewBox "0 0 12 15", Attr.height "12", Attr.width "15" ]
         [ Svg.path [ d "M0 0v4l2-2h3v10.03H3l-1 2h8l-1-2H7V2h3l2 2V0z", fillRule "evenodd" ] []
         ]
+
+
+toPosition : ST.SingleTouch -> Position
+toPosition st =
+    Position (round st.touch.clientX) (round st.touch.clientY)
 
 
 
