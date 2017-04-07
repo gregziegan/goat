@@ -5,6 +5,7 @@ import AutoExpand
 import Color exposing (Color)
 import Color.Convert
 import Goat.Helpers exposing (..)
+import Goat.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (..)
 import Html exposing (Attribute, Html, button, div, p, text)
@@ -55,18 +56,8 @@ viewImageOption zipper image =
         ]
         [ Html.img [ src image.url, Html.height <| round image.height, Html.width <| round image.width ] []
         , Html.div [ onClick <| SelectImage image, Html.class "image-edit-pencil" ]
-            [ viewPencilIcon
+            [ Icons.viewPencil
             ]
-        ]
-
-
-viewPencilIcon : Html msg
-viewPencilIcon =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 500 500" ]
-        [ Svg.path [ fill "#555", d "M492.8,58L442,7.2c-9.6-9.6-25.3-9.6-34.8,0l-17.6,17.6l-1.5,1.5L377.4,37l85.5,85.5l10.8-10.8l1.5-1.5l17.6-17.6C502.4,83.2,502.4,67.6,492.8,58z" ] []
-        , Svg.path [ fill "#555", d "M51.7,362.4l85.5,85.5l308.5-308.5l-85.5-85.5L51.7,362.4z M395.2,148.7L146.4,397.3l-9.3-9.3l248.8-248.8L395.2,148.7z M111.7,362.6l-9.3-9.3l248.7-248.8l9.3,9.3L111.7,362.6z" ] []
-        , Svg.polygon [ fill "#555", points "36.4,377.9 14.1,452.9 47.1,485.9 122.1,463.6 79.3,420.7" ] []
-        , Svg.polygon [ fill "#555", points "0,500 36,489.2 10.8,464" ] []
         ]
 
 
@@ -180,8 +171,8 @@ viewDrawingButton keyboardState selectedDrawing toDropdownMenu drawing =
 viewHistoryControls : UndoList (Array Annotation) -> Html Msg
 viewHistoryControls edits =
     div [ Html.class "history-controls" ]
-        [ button [ onClick Undo, Html.class "history-button", disabled <| not <| UndoList.hasPast edits ] [ viewUndoArrow ]
-        , button [ onClick Redo, Html.class "history-button flip", disabled <| not <| UndoList.hasFuture edits ] [ viewUndoArrow ]
+        [ button [ onClick Undo, Html.class "history-button", disabled <| not <| UndoList.hasPast edits ] [ Icons.viewUndoArrow ]
+        , button [ onClick Redo, Html.class "history-button flip", disabled <| not <| UndoList.hasFuture edits ] [ Icons.viewUndoArrow ]
         ]
 
 
@@ -192,8 +183,8 @@ viewTextSizeDropdown drawing toDropdownMenu =
             [ onClick <| ToggleDropdown Fonts
             , Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual drawing DrawTextBox ]
             ]
-            [ viewTextIcon
-            , viewCornerArrow
+            [ Icons.viewText
+            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Fonts
         ]
@@ -229,7 +220,7 @@ viewFillOption selectedFill fill =
             ]
         , onClick (SelectFill fill)
         ]
-        [ viewFillIcon fill ]
+        [ Icons.viewFill fill ]
 
 
 viewStrokeColorOption : Color -> Color -> Html Msg
@@ -241,7 +232,7 @@ viewStrokeColorOption selectedColor color =
             ]
         , onClick (SelectStrokeColor color)
         ]
-        [ viewStrokeColorIcon color ]
+        [ Icons.viewStrokeColor color ]
 
 
 viewFontSizeOption : Float -> Float -> Html Msg
@@ -264,8 +255,8 @@ viewLineStrokeDropdown toDropdownMenu =
             [ onClick <| ToggleDropdown Strokes
             , Html.class "drawing-button"
             ]
-            [ viewLineStrokeDropdownIcon
-            , viewCornerArrow
+            [ Icons.viewLineStrokeDropdown
+            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Strokes
         ]
@@ -279,8 +270,8 @@ viewFillDropdown toDropdownMenu fill =
             [ onClick <| ToggleDropdown Fills
             , Html.class "drawing-button"
             ]
-            [ viewFillIcon fill
-            , viewCornerArrow
+            [ Icons.viewFill fill
+            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Fills
         ]
@@ -294,17 +285,11 @@ viewStrokeColorDropdown toDropdownMenu strokeColor =
             [ onClick <| ToggleDropdown StrokeColors
             , Html.class "drawing-button"
             ]
-            [ viewStrokeColorIcon strokeColor
-            , viewCornerArrow
+            [ Icons.viewStrokeColor strokeColor
+            , Icons.viewCornerArrow
             ]
         , toDropdownMenu StrokeColors
         ]
-
-
-viewCornerArrow : Html msg
-viewCornerArrow =
-    svg [ Attr.width "5", Attr.height "5", viewBox "0 0 5 5", Attr.class "corner-arrow" ]
-        [ Svg.path [ d "M5 0L0 5h5", fill "#555", fillRule "evenodd" ] [] ]
 
 
 viewDropdownMenu : Maybe AttributeDropdown -> Drawing -> Model -> AttributeDropdown -> Html Msg
@@ -338,35 +323,35 @@ viewShapeSvg drawing =
         DrawLine lineType _ ->
             case lineType of
                 StraightLine ->
-                    viewLineIcon
+                    Icons.viewLine
 
                 Arrow ->
-                    viewArrowIcon
+                    Icons.viewArrow
 
         DrawShape shapeType _ ->
             case shapeType of
                 Rect ->
-                    viewRectangleIcon
+                    Icons.viewRectangle
 
                 RoundedRect ->
-                    viewRoundedRectangleIcon
+                    Icons.viewRoundedRectangle
 
                 Ellipse ->
-                    viewEllipseIcon
+                    Icons.viewEllipse
 
         DrawTextBox ->
-            viewTextIcon
+            Icons.viewText
 
         DrawSpotlight shapeType _ ->
             case shapeType of
                 Rect ->
-                    viewSpotlightRectIcon
+                    Icons.viewSpotlightRect
 
                 RoundedRect ->
-                    viewSpotlightRoundedRectIcon
+                    Icons.viewSpotlightRoundedRect
 
                 Ellipse ->
-                    viewSpotlightEllipseIcon
+                    Icons.viewSpotlightEllipse
 
 
 viewLineStrokeOptions : StrokeStyle -> Html Msg
@@ -391,7 +376,7 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
                     [ Svg.path [ d "M1 .5h12", stroke "#555", fill "none", fillRule "evenodd", strokeLinecap "square" ] [] ]
 
             SolidMedium ->
-                viewNormalLineIcon
+                Icons.viewNormalLine
 
             SolidThick ->
                 svg [ Attr.width "14", Attr.height "4", viewBox "0 0 14 4" ]
@@ -1141,142 +1126,6 @@ viewImage { width, height, url } =
         , src url
         ]
         []
-
-
-viewResetArrow : Html msg
-viewResetArrow =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 14.155 14.155" ]
-        [ g [ fill "grey" ]
-            [ Svg.path [ d "M12.083,1.887c-0.795-0.794-1.73-1.359-2.727-1.697v2.135c0.48,0.239,0.935,0.55,1.334,0.95c1.993,1.994,1.993,5.236,0,7.229c-1.993,1.99-5.233,1.99-7.229,0c-1.991-1.995-1.991-5.235,0-7.229C3.466,3.269,3.482,3.259,3.489,3.25h0.002l1.181,1.179L4.665,0.685L0.923,0.68l1.176,1.176C2.092,1.868,2.081,1.88,2.072,1.887c-2.763,2.762-2.763,7.243,0,10.005c2.767,2.765,7.245,2.765,10.011,0C14.844,9.13,14.847,4.649,12.083,1.887z" ] [] ]
-        ]
-
-
-viewUndoArrow : Html msg
-viewUndoArrow =
-    svg [ Attr.width "15", Attr.height "8", viewBox "0 0 15 8" ]
-        [ Svg.path [ d "M4.036 2.572c3.44-2.342 6.622-1.915 9.262.275C14.11 3.52 14.682 4.2 15 4.682L13.45 6c-.044-.067-.15-.21-.31-.402-.28-.33-.61-.665-.985-.976-1.978-1.64-4.246-2.003-6.866-.335L8 8l-8-.94L2.158 0l1.878 2.572z", fill "currentColor", fillRule "nonzero" ] []
-        ]
-
-
-viewArrowIcon : Html msg
-viewArrowIcon =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 347.341 347.341" ]
-        [ polygon [ points "347.341,107.783 347.339,0 239.559,0.002 282.843,43.285 0,326.128 21.213,347.341 304.056,64.498", fill "#555" ] []
-        ]
-
-
-viewRectangleIcon : Html msg
-viewRectangleIcon =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M2 12h10V2H2v10zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
-
-
-viewSpotlightRectIcon : Html msg
-viewSpotlightRectIcon =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
-
-
-viewSpotlightEllipseIcon : Html msg
-viewSpotlightEllipseIcon =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M4 7c0 1.652 1.347 3 3 3 1.652 0 3-1.347 3-3 0-1.652-1.347-3-3-3-1.652 0-3 1.347-3 3zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill "#555" ] [] ]
-
-
-viewSpotlightRoundedRectIcon : Html msg
-viewSpotlightRoundedRectIcon =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M4 10h6V4H4v6zM0 3.003C0 1.345 1.342 0 3.003 0h7.994C12.655 0 14 1.342 14 3.003v7.994C14 12.655 12.658 14 10.997 14H3.003C1.345 14 0 12.658 0 10.997V3.003z", fillRule "nonzero", fill "#555" ] [] ]
-
-
-viewRoundedRectangleIcon : Html msg
-viewRoundedRectangleIcon =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M2 3v8c0 .552.448 1 1 1h8c.552 0 1-.448 1-1V3c0-.552-.448-1-1-1H3c-.552 0-1 .448-1 1zM0 3c0-1.655 1.342-3 3-3h8c1.655 0 3 1.342 3 3v8c0 1.655-1.342 3-3 3H3c-1.655 0-3-1.342-3-3V3z", fillRule "nonzero", fill "#555" ] [] ]
-
-
-viewEllipseIcon : Html msg
-viewEllipseIcon =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill "#555" ] [] ]
-
-
-viewFillIcon : Fill -> Html msg
-viewFillIcon fill =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ case fill of
-            SolidFill color ->
-                if color == Color.white then
-                    circle [ cx "7", cy "7", r "6", stroke "#555", Attr.fill "white" ] []
-                else
-                    circle
-                        [ cx "7"
-                        , cy "7"
-                        , r "7"
-                        , Attr.fill <| Color.Convert.colorToHex color
-                        ]
-                        []
-
-            SpotlightFill ->
-                Svg.text ""
-
-            MaskFill ->
-                Svg.text ""
-
-            EmptyFill ->
-                Svg.path [ d "M0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7zm9.793-4.207l-7.07 7.07 1.413 1.415 7.07-7.07-1.413-1.415z", Attr.fill "#555", fillRule "evenodd" ] []
-        ]
-
-
-viewStrokeColorIcon : Color -> Html msg
-viewStrokeColorIcon strokeColor =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        (if strokeColor == Color.white then
-            [ circle [ cx "7", cy "7", r "7", Attr.fill "#555" ] []
-            , circle [ cx "7", cy "7", r "5", stroke "white", Attr.fill "#555" ] []
-            ]
-         else
-            [ Svg.path
-                [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill <| Color.Convert.colorToHex strokeColor ]
-                []
-            ]
-        )
-
-
-viewLineStrokeDropdownIcon : Html msg
-viewLineStrokeDropdownIcon =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 20 20" ]
-        [ g [ stroke "#555" ]
-            [ line [ x1 "0", x2 "20", y1 "10", y2 "10", strokeWidth "6" ] []
-            ]
-        ]
-
-
-viewLineIcon : Html msg
-viewLineIcon =
-    svg [ Attr.width "20", Attr.height "20", viewBox "0 0 12 12" ]
-        [ Svg.path [ d "M11 0L0 11l1 1L12 1z", fillRule "nonzero", fill "#555" ] [] ]
-
-
-viewNormalLineIcon : Html msg
-viewNormalLineIcon =
-    svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
-        [ Svg.path [ d "M0 2h14V0H0z", fillRule "nonzero", fill "#555" ] [] ]
-
-
-viewDownArrow : Html msg
-viewDownArrow =
-    svg [ Attr.height "20", Attr.width "20", viewBox "0 0 48 48" ]
-        [ Svg.path [ d "M14 20l10 10 10-10z", fill "grey" ] []
-        , Svg.path [ d "M0 0h48v48h-48z", fill "none" ] []
-        ]
-
-
-viewTextIcon : Html msg
-viewTextIcon =
-    svg [ viewBox "0 0 12 15", Attr.height "12", Attr.width "15" ]
-        [ Svg.path [ d "M0 0v4l2-2h3v10.03H3l-1 2h8l-1-2H7V2h3l2 2V0z", fillRule "evenodd" ] []
-        ]
 
 
 toPosition : ST.SingleTouch -> Position
