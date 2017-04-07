@@ -1177,16 +1177,16 @@ viewSpotlightRectIcon =
         [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
 
 
-viewSpotlightRoundedRectIcon : Html msg
-viewSpotlightRoundedRectIcon =
-    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
-
-
 viewSpotlightEllipseIcon : Html msg
 viewSpotlightEllipseIcon =
     svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
+        [ Svg.path [ d "M4 7c0 1.652 1.347 3 3 3 1.652 0 3-1.347 3-3 0-1.652-1.347-3-3-3-1.652 0-3 1.347-3 3zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill "#555" ] [] ]
+
+
+viewSpotlightRoundedRectIcon : Html msg
+viewSpotlightRoundedRectIcon =
+    svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
+        [ Svg.path [ d "M4 10h6V4H4v6zM0 3.003C0 1.345 1.342 0 3.003 0h7.994C12.655 0 14 1.342 14 3.003v7.994C14 12.655 12.658 14 10.997 14H3.003C1.345 14 0 12.658 0 10.997V3.003z", fillRule "nonzero", fill "#555" ] [] ]
 
 
 viewRoundedRectangleIcon : Html msg
@@ -1206,13 +1206,16 @@ viewFillIcon fill =
     svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
         [ case fill of
             SolidFill color ->
-                circle
-                    [ cx "7"
-                    , cy "7"
-                    , r "7"
-                    , Attr.fill <| Color.Convert.colorToHex color
-                    ]
-                    []
+                if color == Color.white then
+                    circle [ cx "7", cy "7", r "6", stroke "#555", Attr.fill "white" ] []
+                else
+                    circle
+                        [ cx "7"
+                        , cy "7"
+                        , r "7"
+                        , Attr.fill <| Color.Convert.colorToHex color
+                        ]
+                        []
 
             SpotlightFill ->
                 Svg.text ""
@@ -1228,10 +1231,16 @@ viewFillIcon fill =
 viewStrokeColorIcon : Color -> Html msg
 viewStrokeColorIcon strokeColor =
     svg [ Attr.width "14", Attr.height "14", viewBox "0 0 14 14" ]
-        [ Svg.path
-            [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill <| Color.Convert.colorToHex strokeColor ]
-            []
-        ]
+        (if strokeColor == Color.white then
+            [ circle [ cx "7", cy "7", r "7", Attr.fill "#555" ] []
+            , circle [ cx "7", cy "7", r "5", stroke "white", Attr.fill "#555" ] []
+            ]
+         else
+            [ Svg.path
+                [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill <| Color.Convert.colorToHex strokeColor ]
+                []
+            ]
+        )
 
 
 viewLineStrokeDropdownIcon : Html msg

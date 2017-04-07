@@ -185,6 +185,8 @@ strokeColorOptions =
     , Color.rgb 16 255 0
     , Color.rgb 255 226 0
     , Color.rgb 255 129 0
+    , Color.black
+    , Color.white
     ]
 
 
@@ -198,6 +200,8 @@ fillOptions =
     , SolidFill (Color.rgb 16 255 0)
     , SolidFill (Color.rgb 255 226 0)
     , SolidFill (Color.rgb 255 129 0)
+    , SolidFill Color.black
+    , SolidFill Color.white
     ]
 
 
