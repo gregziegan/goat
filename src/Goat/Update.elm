@@ -81,7 +81,7 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                     => []
 
             FinishDrawing start end ->
-                if isDrawingLargeEnough start end then
+                if isDrawingLargeEnough (isSpotlightDrawing model.drawing) start end then
                     model
                         |> cancelDrawing
                         => []

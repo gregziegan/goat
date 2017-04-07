@@ -10,9 +10,27 @@ minDrawingDistance =
     4
 
 
-isDrawingLargeEnough : StartPosition -> EndPosition -> Bool
-isDrawingLargeEnough start end =
-    abs (start.x - end.x) < minDrawingDistance || abs (start.y - end.y) < minDrawingDistance
+minSpotlightDrawingDistance : number
+minSpotlightDrawingDistance =
+    8
+
+
+isDrawingLargeEnough : Bool -> StartPosition -> EndPosition -> Bool
+isDrawingLargeEnough isSpotlight start end =
+    if isSpotlight then
+        abs (start.x - end.x) < minSpotlightDrawingDistance && abs (start.y - end.y) < minSpotlightDrawingDistance
+    else
+        abs (start.x - end.x) < minDrawingDistance && abs (start.y - end.y) < minDrawingDistance
+
+
+isSpotlightDrawing : Drawing -> Bool
+isSpotlightDrawing drawing =
+    case drawing of
+        DrawSpotlight _ _ ->
+            True
+
+        _ ->
+            False
 
 
 toPx : number -> String
