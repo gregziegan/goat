@@ -246,12 +246,12 @@ drawingOptions shiftPressed =
 
 fontSizes : List Float
 fontSizes =
-    [ 10
-    , 12
-    , 14
+    [ 14
     , 16
-    , 18
     , 20
+    , 26
+    , 32
+    , 40
     ]
 
 
