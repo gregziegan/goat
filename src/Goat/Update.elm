@@ -760,9 +760,9 @@ alterDrawing maybeKeyChange ({ keyboardState } as model) =
 
                             CharZ ->
                                 if isPressed Shift keyboardState && isPressed controlKey keyboardState then
-                                    { model | edits = UndoList.redo model.edits }
+                                    { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
                                 else if isPressed controlKey keyboardState then
-                                    { model | edits = UndoList.undo model.edits }
+                                    { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
                                 else
                                     model
 
@@ -770,9 +770,9 @@ alterDrawing maybeKeyChange ({ keyboardState } as model) =
                                 if model.operatingSystem == MacOS then
                                     model
                                 else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
-                                    { model | edits = UndoList.redo model.edits }
+                                    { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
                                 else if isPressed CharZ keyboardState then
-                                    { model | edits = UndoList.undo model.edits }
+                                    { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
                                 else
                                     model
 
@@ -780,9 +780,9 @@ alterDrawing maybeKeyChange ({ keyboardState } as model) =
                                 if model.operatingSystem == Windows then
                                     model
                                 else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
-                                    { model | edits = UndoList.redo model.edits }
+                                    { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
                                 else if isPressed CharZ keyboardState then
-                                    { model | edits = UndoList.undo model.edits }
+                                    { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
                                 else
                                     model
 
