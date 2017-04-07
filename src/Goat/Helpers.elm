@@ -15,8 +15,8 @@ minSpotlightDrawingDistance =
     8
 
 
-isDrawingLargeEnough : Bool -> StartPosition -> EndPosition -> Bool
-isDrawingLargeEnough isSpotlight start end =
+isDrawingTooSmall : Bool -> StartPosition -> EndPosition -> Bool
+isDrawingTooSmall isSpotlight start end =
     if isSpotlight then
         abs (start.x - end.x) < minSpotlightDrawingDistance && abs (start.y - end.y) < minSpotlightDrawingDistance
     else
