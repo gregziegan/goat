@@ -1126,27 +1126,3 @@ viewImage { width, height, url } =
         , src url
         ]
         []
-
-
-toPosition : ST.SingleTouch -> Position
-toPosition st =
-    Position (round st.touch.clientX) (round st.touch.clientY)
-
-
-
--- HELPERS
-
-
-onMouseDown : Json.Decoder msg -> Html.Attribute msg
-onMouseDown decodeToMsg =
-    on "mousedown" decodeToMsg
-
-
-onMouseUp : Json.Decoder msg -> Html.Attribute msg
-onMouseUp decodeToMsg =
-    on "mouseup" decodeToMsg
-
-
-onMouseUpOrLeave : Json.Decoder msg -> List (Html.Attribute msg)
-onMouseUpOrLeave decodeToMsg =
-    [ on "mouseleave" decodeToMsg, onMouseUp decodeToMsg ]

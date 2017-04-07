@@ -1,8 +1,12 @@
 module Goat.Helpers exposing (..)
 
+import Html exposing (Attribute)
+import Html.Events exposing (on)
 import Goat.Model exposing (..)
+import Json.Decode as Json
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
+import SingleTouch as ST
 
 
 minDrawingDistance : number
@@ -173,3 +177,23 @@ theGoats =
     [ Image "goat.jpg" 235 276 639 751
     , Image "goat2.jpg" 235 276 639 751
     ]
+
+
+toPosition : ST.SingleTouch -> Position
+toPosition st =
+    Position (round st.touch.clientX) (round st.touch.clientY)
+
+
+onMouseDown : Json.Decoder msg -> Attribute msg
+onMouseDown decodeToMsg =
+    on "mousedown" decodeToMsg
+
+
+onMouseUp : Json.Decoder msg -> Attribute msg
+onMouseUp decodeToMsg =
+    on "mouseup" decodeToMsg
+
+
+onMouseUpOrLeave : Json.Decoder msg -> List (Attribute msg)
+onMouseUpOrLeave decodeToMsg =
+    [ on "mouseleave" decodeToMsg, onMouseUp decodeToMsg ]
