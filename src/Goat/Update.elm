@@ -826,12 +826,13 @@ config index fontSize =
     AutoExpand.config
         { onInput = AutoExpandInput index
         , padding = 2
-        , lineHeight = fontSize
+        , lineHeight = fontSize * 1.2
         , minRows = 1
         , maxRows = 4
         , attributes =
             [ Attr.id <| "text-box-edit--" ++ toString index
             , Attr.class "text-box-textarea"
             , Attr.style [ "font-size" => toPx fontSize ]
+            , Attr.attribute "onfocus" "this.select();"
             ]
         }
