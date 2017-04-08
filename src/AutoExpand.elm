@@ -30,7 +30,6 @@ type State
 type alias ConfigInternal msg =
     { onInput : { textValue : String, state : State } -> msg
     , padding : Float
-    , lineHeight : Float
     , minRows : Int
     , maxRows : Int
     , attributes : List (Html.Attribute msg)
@@ -54,7 +53,6 @@ A typical configuration might look like this:
         AutoExpand.config
             { onInput = AutoExpandInput
             , padding = 10
-            , lineHeight = 20
             , minRows = 1
             , maxRows = 4
             , attributes = []
@@ -63,7 +61,6 @@ A typical configuration might look like this:
 config :
     { onInput : { textValue : String, state : State } -> msg
     , padding : Float
-    , lineHeight : Float
     , minRows : Int
     , maxRows : Int
     , attributes : List (Html.Attribute msg)
@@ -85,40 +82,40 @@ initState (Config config) =
     view model =
         AutoExpand.view config model.autoExpandState model.textValue
 -}
-view : Config msg -> State -> String -> Html msg
-view (Config config) (State rowCount) textValue =
+view : Config msg -> Float -> State -> String -> Html msg
+view (Config config) lineHeight (State rowCount) textValue =
     textarea
         (config.attributes
-            ++ [ on "input" (inputDecoder config)
+            ++ [ on "input" (inputDecoder config lineHeight)
                , rows rowCount
                , Html.Attributes.value textValue
-               , textareaStyles config rowCount
+               , textareaStyles config lineHeight rowCount
                ]
         )
         []
 
 
-getRows : ConfigInternal msg -> Int -> Int
-getRows config scrollHeight =
-    ((toFloat scrollHeight - 2 * config.padding) / config.lineHeight)
+getRows : ConfigInternal msg -> Float -> Int -> Int
+getRows config lineHeight scrollHeight =
+    ((toFloat scrollHeight - 2 * config.padding) / lineHeight)
         |> ceiling
         |> clamp config.minRows config.maxRows
 
 
-inputDecoder : ConfigInternal msg -> Decoder msg
-inputDecoder config =
+inputDecoder : ConfigInternal msg -> Float -> Decoder msg
+inputDecoder config lineHeight =
     map2 (\t s -> config.onInput { textValue = t, state = s })
         (at [ "target", "value" ] string)
         (at [ "target", "scrollHeight" ] int
-            |> map (State << getRows config)
+            |> map (State << getRows config lineHeight)
         )
 
 
-textareaStyles : ConfigInternal msg -> Int -> Html.Attribute msg
-textareaStyles config rowCount =
+textareaStyles : ConfigInternal msg -> Float -> Int -> Html.Attribute msg
+textareaStyles config lineHeight rowCount =
     [ ( "padding", toString config.padding ++ "px" )
     , ( "box-sizing", "border-box" )
-    , ( "line-height", toString config.lineHeight ++ "px" )
+    , ( "line-height", toString lineHeight ++ "px" )
     , ( "overflow"
       , if rowCount <= config.maxRows then
             "visible"

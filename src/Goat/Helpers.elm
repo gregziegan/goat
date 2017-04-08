@@ -1,5 +1,6 @@
 module Goat.Helpers exposing (..)
 
+import Array.Hamt as Array exposing (Array)
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import Goat.Model exposing (..)
@@ -197,3 +198,13 @@ onMouseUp decodeToMsg =
 onMouseUpOrLeave : Json.Decoder msg -> List (Attribute msg)
 onMouseUpOrLeave decodeToMsg =
     [ on "mouseleave" decodeToMsg, onMouseUp decodeToMsg ]
+
+
+mapAtIndex : (a -> a) -> Int -> Array a -> Array a
+mapAtIndex fn index xs =
+    case Array.get index xs of
+        Just x ->
+            Array.set index (fn x) xs
+
+        Nothing ->
+            xs

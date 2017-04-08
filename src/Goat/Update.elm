@@ -30,7 +30,7 @@ type Msg
     | SelectFill Fill
     | SelectStrokeColor Color
     | SelectStrokeStyle StrokeStyle
-    | SelectFontSize Float
+    | SelectFontSize Int
       -- Control UI updates
     | ToggleDropdown AttributeDropdown
     | ChangeDrawing Drawing
@@ -326,6 +326,11 @@ updateAnySelectedAnnotations fn model =
                 , annotationState = SelectedAnnotation index (fn annotation)
             }
 
+        EditingATextBox index ->
+            { model
+                | edits = UndoList.mapPresent (mapAtIndex fn index) model.edits
+            }
+
         _ ->
             model
 
@@ -378,7 +383,7 @@ finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) 
             Array.length model.edits.present
 
         initialTextBox =
-            TextBox <| TextArea start end strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize))
+            TextBox <| TextArea start end strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations))
     in
         case model.drawing of
             DrawLine lineType lineMode ->
@@ -391,7 +396,7 @@ finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) 
 
             DrawTextBox ->
                 model
-                    |> addAnnotation (TextBox <| TextArea start (calcShapePos start end DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations fontSize)))
+                    |> addAnnotation (TextBox <| TextArea start (calcShapePos start end DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations)))
                     |> startEditingText numAnnotations
                     => [ "text-box-edit--"
                             ++ toString numAnnotations
@@ -457,7 +462,7 @@ updateStrokeStyle strokeStyle annotation =
             Spotlight shapeType { shape | strokeStyle = strokeStyle }
 
 
-updateFontSize : Float -> Annotation -> Annotation
+updateFontSize : Int -> Annotation -> Annotation
 updateFontSize fontSize annotation =
     case annotation of
         TextBox textBox ->
@@ -472,7 +477,7 @@ setFill fill model =
     { model | fill = fill }
 
 
-setFontSize : Float -> Model -> Model
+setFontSize : Int -> Model -> Model
 setFontSize fontSize model =
     { model | fontSize = fontSize }
 
@@ -852,18 +857,16 @@ tryToBlur result =
             Undo
 
 
-config : Int -> Float -> AutoExpand.Config Msg
-config index fontSize =
+config : Int -> AutoExpand.Config Msg
+config index =
     AutoExpand.config
         { onInput = AutoExpandInput index
         , padding = 2
-        , lineHeight = fontSize * 1.2
         , minRows = 1
         , maxRows = 4
         , attributes =
             [ Attr.id <| "text-box-edit--" ++ toString index
             , Attr.class "text-box-textarea"
-            , Attr.style [ "font-size" => toPx fontSize ]
             , Attr.attribute "onfocus" "this.select();"
             ]
         }

@@ -77,7 +77,7 @@ type alias TextArea =
     { start : Position
     , end : Position
     , fill : Color
-    , fontSize : Float
+    , fontSize : Int
     , text : String
     , angle : Float
     , autoexpand : AutoExpand.State
@@ -160,7 +160,7 @@ type alias Model =
     , strokeColor : Color
     , strokeStyle : StrokeStyle
     , fontSize :
-        Float
+        Int
         -- Important I/O device info
     , mouse : Mouse.Position
     , keyboardState :
@@ -244,7 +244,7 @@ drawingOptions shiftPressed =
         ]
 
 
-fontSizes : List Float
+fontSizes : List Int
 fontSizes =
     [ 14
     , 16
@@ -261,7 +261,7 @@ init flags =
     , fill = EmptyFill
     , strokeColor = Color.rgb 255 0 0
     , strokeStyle = SolidMedium
-    , fontSize = 14
+    , fontSize = 20
     , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.initialState
     , images = List.Zipper.fromList []

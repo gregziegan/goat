@@ -208,9 +208,6 @@ button:active, button:focus, button:hover {
   position: absolute;
 }
 
-.text-box-textarea--unselected {
-}
-
 .text-box-textarea {
   border: 1px solid #dedede;
   background-color: transparent;
@@ -218,6 +215,7 @@ button:active, button:focus, button:hover {
   outline: none;
   overflow: hidden;
   color: currentColor;
+  font-size: inherit;
 }
 
 .pointerCursor {
