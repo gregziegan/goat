@@ -19,7 +19,7 @@ This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/
 
 ## Credits
 
-👏 Huge thanks to [Jian Wei Liau](https://twitter.com/madebyjw) for the beautiful icons! 👏
+👏 Huge thanks to [Jian Wei Liau](https://twitter.com/madebyjw) for the beautiful icons and logo! 👏
 
 🐐 Thanks to [Alan Hogan](https://github.com/alanhogan) for the acronym behind the 🐐
 

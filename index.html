@@ -7,7 +7,7 @@
     <div id="root"></div>
     <div id="export-image"></div>
     <script src="elm.js"></script>
-    <script src="dist/goat-app_v1-0-0-rc.min.js"></script>
+    <!-- <script src="dist/goat-app_v1-0-0-rc.min.js"></script> -->
     <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
     <script>
       var isMac = navigator.userAgent.indexOf('Mac OS X') != -1
@@ -37,6 +37,7 @@
           const blob = b64toBlob(e.target.result.replace('data:image/png;base64,', ''), contentType);
           var editImageBlobUrl = URL.createObjectURL(blob);
           var newImg = new Image()
+          newImg.crossOrigin = 'anonymous'
           newImg.onload = function() {
             app.ports.newImage.send({
               url: editImageBlobUrl,
@@ -125,6 +126,7 @@
         var data = document.getElementById('drawing').outerHTML
         var DOMURL = window.URL || window.webkitURL || window;
         var drawingImg = new Image()
+        drawingImg.crossOrigin = 'anonymous'
         var svg = new Blob([data], {type: 'image/svg+xml'});
         var url = DOMURL.createObjectURL(svg);
         drawingImg.onload = function() {
@@ -133,6 +135,7 @@
           DOMURL.revokeObjectURL(url);
           canvas.toBlob(blob => {
             var exportImage = new Image()
+            exportImage.crossOrigin = 'anonymous'
             exportImage.id = 'export-image'
             exportImage.src = DOMURL.createObjectURL(blob)
             exportImage.width = image.width
