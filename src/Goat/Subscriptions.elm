@@ -1,9 +1,8 @@
 module Goat.Subscriptions exposing (subscriptions)
 
 import Goat.Helpers exposing (toDrawingPosition)
-import Goat.Model exposing (AnnotationState(..), Flags, Model, init)
+import Goat.Model exposing (AnnotationState(..), Flags, Model, Msg(..), init)
 import Goat.Ports as Ports
-import Goat.Update exposing (Msg(..))
 import Keyboard.Extra as Keyboard
 import Mouse
 

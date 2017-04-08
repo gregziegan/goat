@@ -98,8 +98,19 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
                            , viewLineStrokeDropdown toDropdownMenu
                            ]
                     )
+                , button [ Html.class "cancel-button", onClick (BugReports <| ShowBugReportInput) ] [ Html.text "Report Bug" ]
                 ]
             , viewCanvas model selectedImage
+            , div [ onClick (BugReports <| CancelBugReport), Html.classList [ "dialog-mask" => True, "dialog-mask--show" => model.bugReportText /= Nothing ] ] []
+            , div [ Html.classList [ "dialog" => True, "dialog--show" => model.bugReportText /= Nothing ] ]
+                [ Html.input
+                    [ Html.id "bug-report-text"
+                    , onInput (BugReports << BugReportInput)
+                    , Html.value <| Maybe.withDefault "" model.bugReportText
+                    ]
+                    []
+                , Html.button [ onClick (BugReports <| SubmitBugReport), Html.class "save-button" ] [ Html.text "Submit Bug" ]
+                ]
             ]
 
 

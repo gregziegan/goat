@@ -6,12 +6,146 @@
   <body>
     <div id="root"></div>
     <div id="export-image"></div>
-    <script src="elm.js"></script>
-    <script src="dist/goat-app_v1-0-0-rc.min.js"></script>
+    <script id="debug-build" src="elm.js" type="text/javascript"></script>
+    <!-- <script src="dist/goat-app_v1-0-0-rc.min.js"></script> -->
     <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
     <script>
       var isMac = navigator.userAgent.indexOf('Mac OS X') != -1
-      var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac });
+      var testModel = {
+        "annotationState" : {
+          "_0" : {
+            "x" : 73,
+            "y" : 29
+          },
+          "ctor" : "DrawingAnnotation"
+        },
+        "bugReportText" : {
+          "ctor" : "Nothing"
+        },
+        "currentDropdown" : {
+          "ctor" : "Nothing"
+        },
+        "drawing" : {
+          "_0" : {
+            "ctor" : "Arrow"
+          },
+          "_1" : {
+            "ctor" : "DrawingLine"
+          },
+          "ctor" : "DrawLine"
+        },
+        "edits" : {
+          "future" : {
+            "ctor" : "[]"
+          },
+          "past" : {
+            "_0" : {
+              "_0" : 0,
+              "_1" : 5,
+              "ctor" : "Array"
+            },
+            "_1" : {
+              "ctor" : "[]"
+            },
+            "ctor" : "::"
+          },
+          "present" : {
+            "_0" : 1,
+            "_1" : 5,
+            "_3" : [ {
+              "_0" : {
+                "ctor" : "Rect"
+              },
+              "_1" : {
+                "end" : {
+                  "x" : 152,
+                  "y" : 101
+                },
+                "fill" : {
+                  "ctor" : "EmptyFill"
+                },
+                "start" : {
+                  "x" : 113,
+                  "y" : 62
+                },
+                "strokeColor" : {
+                  "_0" : 255,
+                  "_1" : 0,
+                  "_2" : 0,
+                  "_3" : 1,
+                  "ctor" : "RGBA"
+                },
+                "strokeStyle" : {
+                  "ctor" : "SolidMedium"
+                }
+              },
+              "ctor" : "Shapes"
+            } ],
+            "ctor" : "Array"
+          }
+        },
+        "fill" : {
+          "ctor" : "EmptyFill"
+        },
+        "fontSize" : 14,
+        "imageSelected" : true,
+        "images" : {
+          "_0" : {
+            "_0" : {
+              "ctor" : "[]"
+            },
+            "_1" : {
+              "height" : 276,
+              "originalHeight" : 751,
+              "originalWidth" : 639,
+              "url" : "goat.jpg",
+              "width" : 235
+            },
+            "_2" : {
+              "_0" : {
+                "height" : 276,
+                "originalHeight" : 751,
+                "originalWidth" : 639,
+                "url" : "goat2.jpg",
+                "width" : 235
+              },
+              "_1" : {
+                "ctor" : "[]"
+              },
+              "ctor" : "::"
+            },
+            "ctor" : "Zipper"
+          },
+          "ctor" : "Just"
+        },
+        "keyboardState" : {
+          "_0" : {
+            "ctor" : "[]"
+          },
+          "ctor" : "State"
+        },
+        "mouse" : {
+          "x" : 73,
+          "y" : 80
+        },
+        "operatingSystem" : {
+          "ctor" : "MacOS"
+        },
+        "strokeColor" : {
+          "_0" : 255,
+          "_1" : 0,
+          "_2" : 0,
+          "_3" : 1,
+          "ctor" : "RGBA"
+        },
+        "strokeStyle" : {
+          "ctor" : "SolidMedium"
+        }
+      }
+
+
+      var debugModel = document.getElementById('debug-build') ? null : null
+      var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac, debugModel: debugModel });
       var savedImage
       app.ports.exportToImage.subscribe(function(image) {
         savedImage = image;

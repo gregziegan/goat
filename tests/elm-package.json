@@ -9,6 +9,7 @@
     ],
     "exposed-modules": [],
     "dependencies": {
+        "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
         "NoRedInk/rocket-update": "1.0.0 <= v < 2.0.0",
         "Skinney/elm-array-exploration": "2.0.3 <= v < 3.0.0",
         "eeue56/elm-html-test": "1.0.1 <= v < 2.0.0",

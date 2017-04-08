@@ -1,13 +1,15 @@
 {
     "version": "1.0.0",
     "summary": "helpful summary of your project, less than 80 characters",
-    "repository": "https://github.com/user/project.git",
+    "repository": "https://github.com/thebritican/goat.git",
     "license": "BSD3",
     "source-directories": [
         "./src"
     ],
     "exposed-modules": [],
+    "native-modules": true,
     "dependencies": {
+        "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
         "NoRedInk/rocket-update": "1.0.0 <= v < 2.0.0",
         "Skinney/elm-array-exploration": "2.0.3 <= v < 3.0.0",
         "elm-community/list-extra": "6.0.0 <= v < 7.0.0",
@@ -16,6 +18,7 @@
         "elm-lang/core": "5.1.1 <= v < 6.0.0",
         "elm-lang/dom": "1.1.1 <= v < 2.0.0",
         "elm-lang/html": "2.0.0 <= v < 3.0.0",
+        "elm-lang/http": "1.0.0 <= v < 2.0.0",
         "elm-lang/keyboard": "1.0.1 <= v < 2.0.0",
         "elm-lang/mouse": "1.0.1 <= v < 2.0.0",
         "elm-lang/svg": "2.0.0 <= v < 3.0.0",

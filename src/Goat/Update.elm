@@ -8,6 +8,9 @@ import Goat.Helpers exposing (..)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
 import Html.Attributes as Attr
+import Http exposing (jsonBody)
+import Json.Decode exposing (decodeString, field)
+import Json.Encode exposing (object, string, list)
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(..), isPressed)
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
@@ -16,52 +19,14 @@ import Task exposing (succeed)
 import UndoList exposing (UndoList)
 
 
-type Msg
-    = StartDrawing StartPosition
-    | ContinueDrawing StartPosition
-    | FinishDrawing StartPosition EndPosition
-      -- TextArea Updates
-    | StartEditingText Int TextArea
-    | SwitchToEditingText Int
-    | FinishEditingText Int
-    | SetText Int TextArea String
-    | AutoExpandInput Int { textValue : String, state : AutoExpand.State }
-      -- Annotation Attribute updates
-    | SelectFill Fill
-    | SelectStrokeColor Color
-    | SelectStrokeStyle StrokeStyle
-    | SelectFontSize Float
-      -- Control UI updates
-    | ToggleDropdown AttributeDropdown
-    | ChangeDrawing Drawing
-    | CloseDropdown
-      -- Selection Updates
-    | ResetToReadyToDraw
-    | SelectAnnotation Int Annotation StartPosition
-      -- Move updates
-    | StartMovingAnnotation Int Annotation StartPosition
-    | MoveAnnotation Int Annotation StartPosition EndPosition
-    | FinishMovingAnnotation Int Annotation StartPosition EndPosition
-      -- Resize updates
-    | StartResizingAnnotation Int Annotation Vertex StartPosition
-    | ResizeAnnotation Int Annotation Vertex StartPosition EndPosition
-    | FinishResizingAnnotation Int Annotation Vertex StartPosition EndPosition
-      -- History updates
-    | Undo
-    | Redo
-    | Save
-      -- Image Selection updates
-    | SelectImage Image
-    | SetImages (List Image)
-    | Cancel
-      -- Keyboard updates
-    | KeyboardMsg Keyboard.Msg
-      -- Fun
-    | ShowMeTheGoats
+update : Msg -> BugReportModel -> ( BugReportModel, List (Cmd Msg) )
+update msg bugReportModel =
+    updateApp bugReportModel.messages bugReportModel.bugReportState msg bugReportModel.app
+        |> Tuple.mapFirst (addMessage msg bugReportModel)
 
 
-update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, keyboardState, drawing } as model) =
+updateApp : List Msg -> Model -> Msg -> Model -> ( Model, List (Cmd Msg) )
+updateApp messages bugState msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, keyboardState, drawing } as model) =
     let
         annotations =
             edits.present
@@ -132,7 +97,7 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                 { model | images = List.Zipper.fromList images }
                     => []
 
-            Cancel ->
+            Goat.Model.Cancel ->
                 { model | imageSelected = False, edits = UndoList.reset model.edits }
                     => []
 
@@ -268,6 +233,34 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                             Nothing ->
                                 Cmd.none
                        ]
+
+            BugReports bugReportMsg ->
+                case bugReportMsg of
+                    ShowBugReportInput ->
+                        model
+                            |> showBugReportInput
+                            => [ Dom.focus "bug-report-text"
+                                    |> Task.attempt tryToFocusBugReport
+                               ]
+
+                    BugReportInput text ->
+                        model
+                            |> setBugReportInput text
+                            => []
+
+                    SubmitBugReport ->
+                        model
+                            |> dismissBugReportDialog
+                            => [ logBugReport (Maybe.withDefault "" model.bugReportText) messages bugState ]
+
+                    CancelBugReport ->
+                        model
+                            |> dismissBugReportDialog
+                            => []
+
+                    SubmittedBugReport _ ->
+                        model
+                            => []
 
             ShowMeTheGoats ->
                 { model
@@ -801,6 +794,11 @@ alterDrawing maybeKeyChange ({ keyboardState } as model) =
                 model
 
 
+tryToFocusBugReport : Result Dom.Error () -> Msg
+tryToFocusBugReport result =
+    BugReports <| BugReportInput ""
+
+
 tryToEdit : Int -> Result Dom.Error () -> Msg
 tryToEdit index result =
     case result of
@@ -819,6 +817,44 @@ tryToBlur result =
 
         Err _ ->
             Undo
+
+
+showBugReportInput : Model -> Model
+showBugReportInput model =
+    { model | bugReportText = Just "" }
+
+
+setBugReportInput : String -> Model -> Model
+setBugReportInput text model =
+    { model | bugReportText = Just text }
+
+
+dismissBugReportDialog : Model -> Model
+dismissBugReportDialog model =
+    { model | bugReportText = Nothing }
+
+
+logBugReport : String -> List Msg -> Model -> Cmd Msg
+logBugReport reason messages state =
+    Http.post "https://goat-b4988.firebaseio.com/.json" (jsonBody (object [ "reason" => string reason, "history" => list (List.map (string << toString) messages), "state" => elmToJs state ])) (field "name" Json.Decode.string)
+        |> Http.send (BugReports << SubmittedBugReport)
+
+
+addMessage : Msg -> BugReportModel -> Model -> BugReportModel
+addMessage msg bugReportModel model =
+    case msg of
+        BugReports _ ->
+            { bugReportModel | app = model }
+
+        _ ->
+            if List.length bugReportModel.messages < 50 then
+                { bugReportModel | messages = msg :: bugReportModel.messages, app = model }
+            else
+                { bugReportModel
+                    | messages = [ msg ]
+                    , bugReportState = model
+                    , app = model
+                }
 
 
 config : Int -> Float -> AutoExpand.Config Msg

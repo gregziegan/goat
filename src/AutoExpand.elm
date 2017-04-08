@@ -1,4 +1,4 @@
-module AutoExpand exposing (Config, State, initState, config, view)
+module AutoExpand exposing (Config, State, initState, config, view, encode, decode)
 
 {-|
 Taken from https://github.com/ohanhi/autoexpand/blob/master/src/AutoExpand.elm
@@ -19,6 +19,7 @@ import Html exposing (Html, div, p, br, textarea, text)
 import Html.Attributes exposing (rows, style)
 import Html.Events exposing (onInput, on)
 import Json.Decode exposing (Decoder, field, at, map, map2, int, string)
+import Json.Encode
 
 
 {-| Keeps track of how many rows we need.
@@ -35,6 +36,16 @@ type alias ConfigInternal msg =
     , maxRows : Int
     , attributes : List (Html.Attribute msg)
     }
+
+
+encode : State -> Json.Encode.Value
+encode (State numRows) =
+    Json.Encode.int numRows
+
+
+decode : Int -> Decoder State
+decode numRows =
+    Json.Decode.succeed (State numRows)
 
 
 {-| Configuration for your textarea, describing the look and feel.
