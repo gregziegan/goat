@@ -190,7 +190,7 @@ viewTextSizeDropdown drawing toDropdownMenu =
         ]
 
 
-viewFontSizeOptions : Float -> Html Msg
+viewFontSizeOptions : Int -> Html Msg
 viewFontSizeOptions fontSize =
     fontSizes
         |> List.map (viewFontSizeOption fontSize)
@@ -235,7 +235,7 @@ viewStrokeColorOption selectedColor color =
         [ Icons.viewStrokeColor color ]
 
 
-viewFontSizeOption : Float -> Float -> Html Msg
+viewFontSizeOption : Int -> Int -> Html Msg
 viewFontSizeOption selectedFontSize fontSize =
     button
         [ Html.classList
@@ -1015,8 +1015,8 @@ ellipseVertices toVertexEvents start end =
         shapeVertices toVertexEvents rectStart end
 
 
-viewTextArea : Int -> SelectState -> TextArea -> Svg Msg
-viewTextArea index selectState { start, end, text, fill, fontSize, angle, autoexpand } =
+viewTextArea : Int -> TextArea -> Svg Msg
+viewTextArea index { start, end, text, fill, fontSize, angle, autoexpand } =
     foreignObject
         []
         [ div
@@ -1030,7 +1030,7 @@ viewTextArea index selectState { start, end, text, fill, fontSize, angle, autoex
                 ]
             , Html.attribute "onclick" "event.stopPropagation();"
             ]
-            [ AutoExpand.view (Goat.Update.config index fontSize) autoexpand text
+            [ AutoExpand.view (Goat.Update.config index) (toFloat fontSize * 1.2) autoexpand text
             ]
         ]
 
@@ -1039,38 +1039,43 @@ viewTextBox : List (Svg.Attribute Msg) -> List (Svg Msg) -> AnnotationState -> S
 viewTextBox attrs vertices annotationState selectState index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) =
     case selectState of
         Selected ->
-            (viewTextArea index selectState textBox)
+            (viewTextArea index textBox)
                 |> List.singleton
-                |> flip List.append (viewShape ([ Attr.style "opacity: 0;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black SolidThin))
 
         NotSelected ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
-                |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
+                |> List.map (Svg.tspan [ dy <| toString fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
+                |> Svg.text_ ([ y <| toString <| Basics.min start.y end.y ] ++ attrs)
                 |> List.singleton
-                |> flip List.append (viewShape ([ Attr.style "stroke: transparent; pointer-events: auto; cursor: pointer;" ] ++ attrs) vertices Rect (Shape start end EmptyFill Color.black SolidThin))
 
         SelectedWithVertices ->
             textBox.text
                 |> String.split "\n"
                 |> List.map (Svg.tspan [ dy <| toString fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
-                |> Svg.text_ [ y <| toString <| Basics.min start.y end.y, Attr.style "pointer-events: none; user-select: none;" ]
-                |> List.singleton
-                |> flip List.append
-                    (viewShape (Attr.strokeWidth "0.5" :: attrs) vertices Rect (Shape start end EmptyFill Color.white SolidThin)
-                        ++ viewShape
-                            (attrs
-                                ++ [ Attr.strokeWidth "0.5"
-                                   , SE.onMouseDown <| StartEditingText index textBox
-                                   , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> StartEditingText index textBox)
-                                   , Attr.style "pointer-events: fill; cursor: pointer;"
-                                   ]
-                            )
-                            vertices
-                            Rect
-                            (Shape start end EmptyFill (Color.rgb 230 230 230) SolidThin)
+                |> Svg.text_
+                    ([ y <| toString <| Basics.min start.y end.y
+                     , Html.Events.onDoubleClick <| StartEditingText index textBox
+                     , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> StartEditingText index textBox)
+                     , Attr.stroke <|
+                        if fill == Color.black then
+                            "white"
+                        else
+                            "black"
+                     , Attr.strokeWidth "0.5px"
+                     , Attr.fontSize <| toString fontSize
+                     ]
+                        ++ attrs
                     )
+                |> List.singleton
+
+
+svgTextHeight : Int -> String -> Int
+svgTextHeight fontSize text =
+    text
+        |> String.split "\n"
+        |> List.length
+        |> (*) fontSize
 
 
 viewLine : List (Svg.Attribute Msg) -> List (Svg Msg) -> LineType -> Line -> List (Svg Msg)
