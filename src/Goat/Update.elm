@@ -527,6 +527,32 @@ resizeVertices pos vertex annotation =
             { annotation | start = pos, end = Position annotation.end.x annotation.start.y }
 
 
+resizeEllipseVertices : Position -> Vertex -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
+resizeEllipseVertices pos vertex annotation =
+    let
+        { start, end } =
+            annotation
+
+        dX =
+            start.x - pos.x
+
+        dY =
+            end.y - pos.y
+    in
+        case vertex of
+            Start ->
+                { annotation | start = Position (pos.x + ((end.x - pos.x) // 2)) (end.y - (dY // 2)) }
+
+            Goat.Model.End ->
+                { annotation | end = pos }
+
+            StartPlusX ->
+                { annotation | start = Position (pos.x + ((end.x - pos.x) // 2) - ((end.x - start.x) // 2)) (end.y - (dY // 2)), end = Position start.x end.y }
+
+            StartPlusY ->
+                { annotation | start = Position (pos.x + ((end.x - pos.x) // 2)) (start.y - ((start.y - pos.y) // 2)), end = Position end.x start.y }
+
+
 resize : StartPosition -> EndPosition -> Vertex -> Annotation -> Annotation
 resize start end vertex annotation =
     case annotation of
@@ -534,7 +560,12 @@ resize start end vertex annotation =
             Lines lineType (resizeVertices end vertex line)
 
         Shapes shapeType shape ->
-            Shapes shapeType (resizeVertices end vertex shape)
+            case shapeType of
+                Ellipse ->
+                    Shapes shapeType (resizeEllipseVertices end vertex shape)
+
+                _ ->
+                    Shapes shapeType (resizeVertices end vertex shape)
 
         TextBox textArea ->
             TextBox (resizeVertices end vertex textArea)
