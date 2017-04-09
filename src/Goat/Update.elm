@@ -62,217 +62,203 @@ type Msg
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
 update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, keyboardState, drawing } as model) =
-    let
-        annotations =
-            edits.present
+    case msg of
+        StartDrawing pos ->
+            model
+                |> startAnnotation pos images
+                => []
 
-        ( width, height ) =
-            case images of
-                Just imageZipper ->
-                    (List.Zipper.current imageZipper).width => (List.Zipper.current imageZipper).height
+        FinishDrawing start end ->
+            if isDrawingTooSmall (isSpotlightDrawing model.drawing) start end then
+                model
+                    |> cancelDrawing
+                    => []
+            else
+                finishDrawing start end model
+
+        StartEditingText index textArea ->
+            model.edits.present
+                |> Array.set index (TextBox textArea)
+                |> logChange model
+                |> startEditingText index
+                => [ "text-box-edit--"
+                        ++ toString index
+                        |> Dom.focus
+                        |> Task.attempt (tryToEdit index)
+                   ]
+
+        SwitchToEditingText index ->
+            model
+                |> startEditingText index
+                => []
+
+        SetText index textBox newText ->
+            model.edits.present
+                |> Array.set index (TextBox { textBox | text = newText })
+                |> skipChange model
+                => []
+
+        FinishEditingText index ->
+            model
+                |> finishEditingText index
+                => []
+
+        AutoExpandInput index { state, textValue } ->
+            model.edits.present
+                |> mapAtIndex index (autoExpandAnnotation state textValue)
+                |> skipChange model
+                => []
+
+        ContinueDrawing pos ->
+            model
+                |> setMouse pos
+                => []
+
+        SetImages images ->
+            { model | images = List.Zipper.fromList images }
+                => []
+
+        Cancel ->
+            { model | imageSelected = False, edits = UndoList.reset model.edits }
+                => []
+
+        KeyboardMsg keyMsg ->
+            let
+                ( keyboardState, maybeKeyChange ) =
+                    Keyboard.updateWithKeyChange keyMsg model.keyboardState
+            in
+                { model | keyboardState = keyboardState }
+                    |> alterDrawingsWithKeyboard maybeKeyChange
+
+        SelectImage image ->
+            case model.images of
+                Just images ->
+                    { model
+                        | images =
+                            images
+                                |> List.Zipper.first
+                                |> List.Zipper.find ((==) image.url << .url)
+                        , imageSelected = True
+                    }
+                        => []
 
                 Nothing ->
-                    ( 0, 0 )
-    in
-        case msg of
-            StartDrawing pos ->
-                model
-                    |> startAnnotation pos images
-                    => []
+                    model => []
 
-            FinishDrawing start end ->
-                if isDrawingTooSmall (isSpotlightDrawing model.drawing) start end then
-                    model
-                        |> cancelDrawing
-                        => []
-                else
-                    finishDrawing start end model
+        ChangeDrawing drawing ->
+            { model | drawing = drawing }
+                |> closeDropdown
+                => []
 
-            StartEditingText index textArea ->
-                annotations
-                    |> Array.set index (TextBox textArea)
-                    |> logChange model
-                    |> startEditingText index
-                    => [ "text-box-edit--"
-                            ++ toString index
-                            |> Dom.focus
-                            |> Task.attempt (tryToEdit index)
-                       ]
+        SelectFill fill ->
+            model
+                |> updateAnySelectedAnnotations (updateFill fill)
+                |> setFill fill
+                |> closeDropdown
+                => []
 
-            SwitchToEditingText index ->
-                model
-                    |> startEditingText index
-                    => []
+        SelectStrokeColor strokeColor ->
+            model
+                |> updateAnySelectedAnnotations (updateStrokeColor strokeColor)
+                |> setStrokeColor strokeColor
+                |> closeDropdown
+                => []
 
-            SetText index textBox newText ->
-                annotations
-                    |> Array.set index (TextBox { textBox | text = newText })
-                    |> skipChange model
-                    => []
+        SelectStrokeStyle strokeStyle ->
+            model
+                |> updateAnySelectedAnnotations (updateStrokeStyle strokeStyle)
+                |> setStrokeStyle strokeStyle
+                |> closeDropdown
+                => []
 
-            FinishEditingText index ->
-                model
-                    |> finishEditingText index
-                    => []
+        SelectFontSize fontSize ->
+            model
+                |> updateAnySelectedAnnotations (updateFontSize fontSize)
+                |> setFontSize fontSize
+                |> closeDropdown
+                => []
 
-            AutoExpandInput index { state, textValue } ->
-                annotations
-                    |> Array.get index
-                    |> Maybe.map (\ann -> Array.set index (autoExpandAnnotation state textValue ann) annotations)
-                    |> Maybe.withDefault annotations
-                    |> skipChange model
-                    => []
+        ToggleDropdown editOption ->
+            model
+                |> toggleDropdown editOption
+                => []
 
-            ContinueDrawing pos ->
-                model
-                    |> setMouse pos
-                    => []
+        CloseDropdown ->
+            model
+                |> closeDropdown
+                => []
 
-            SetImages images ->
-                { model | images = List.Zipper.fromList images }
-                    => []
+        SelectAnnotation index start ->
+            model
+                |> selectAnnotation index
+                |> startMovingAnnotation index start
+                => []
 
-            Cancel ->
-                { model | imageSelected = False, edits = UndoList.reset model.edits }
-                    => []
+        ResetToReadyToDraw ->
+            model
+                |> resetToReadyToDraw
+                => []
 
-            KeyboardMsg keyMsg ->
-                let
-                    ( keyboardState, maybeKeyChange ) =
-                        Keyboard.updateWithKeyChange keyMsg model.keyboardState
-                in
-                    { model | keyboardState = keyboardState }
-                        |> alterDrawingsWithKeyboard maybeKeyChange
+        StartMovingAnnotation index start ->
+            model
+                |> selectAnnotation index
+                |> startMovingAnnotation index start
+                => []
 
-            SelectImage image ->
-                case model.images of
-                    Just images ->
-                        { model
-                            | images =
-                                images
-                                    |> List.Zipper.first
-                                    |> List.Zipper.find ((==) image.url << .url)
-                            , imageSelected = True
-                        }
-                            => []
+        MoveAnnotation index start newPos ->
+            model
+                |> moveAnnotation index start newPos
+                => []
 
-                    Nothing ->
-                        model => []
+        FinishMovingAnnotation index start newPos ->
+            model
+                |> moveAnnotation index start newPos
+                |> finishMovingAnnotation index
+                => []
 
-            ChangeDrawing drawing ->
-                { model | drawing = drawing }
-                    |> closeDropdown
-                    => []
+        StartResizingAnnotation index vertex start ->
+            model
+                |> setMouse start
+                |> selectAnnotation index
+                |> startResizingAnnotation index vertex start
+                |> resizeAnnotation start
+                => []
 
-            SelectFill fill ->
-                model
-                    |> updateAnySelectedAnnotations (updateFill fill)
-                    |> setFill fill
-                    |> closeDropdown
-                    => []
+        ResizeAnnotation pos ->
+            model
+                |> resizeAnnotation pos
+                => []
 
-            SelectStrokeColor strokeColor ->
-                model
-                    |> updateAnySelectedAnnotations (updateStrokeColor strokeColor)
-                    |> setStrokeColor strokeColor
-                    |> closeDropdown
-                    => []
+        FinishResizingAnnotation pos ->
+            model
+                |> resizeAnnotation pos
+                |> finishResizingAnnotation
+                => []
 
-            SelectStrokeStyle strokeStyle ->
-                model
-                    |> updateAnySelectedAnnotations (updateStrokeStyle strokeStyle)
-                    |> setStrokeStyle strokeStyle
-                    |> closeDropdown
-                    => []
+        Undo ->
+            { model | edits = UndoList.undo model.edits }
+                => []
 
-            SelectFontSize fontSize ->
-                model
-                    |> updateAnySelectedAnnotations (updateFontSize fontSize)
-                    |> setFontSize fontSize
-                    |> closeDropdown
-                    => []
+        Redo ->
+            { model | edits = UndoList.redo model.edits }
+                => []
 
-            ToggleDropdown editOption ->
-                model
-                    |> toggleDropdown editOption
-                    => []
+        Save ->
+            model
+                |> resetToReadyToDraw
+                => [ case model.images of
+                        Just images ->
+                            Ports.exportToImage <| List.Zipper.current images
 
-            CloseDropdown ->
-                model
-                    |> closeDropdown
-                    => []
+                        Nothing ->
+                            Cmd.none
+                   ]
 
-            SelectAnnotation index start ->
-                model
-                    |> selectAnnotation index
-                    |> startMovingAnnotation index start
-                    => []
-
-            ResetToReadyToDraw ->
-                model
-                    |> resetToReadyToDraw
-                    => []
-
-            StartMovingAnnotation index start ->
-                model
-                    |> selectAnnotation index
-                    |> startMovingAnnotation index start
-                    => []
-
-            MoveAnnotation index start newPos ->
-                model
-                    |> moveAnnotation index start newPos
-                    => []
-
-            FinishMovingAnnotation index start newPos ->
-                model
-                    |> moveAnnotation index start newPos
-                    |> finishMovingAnnotation index
-                    => []
-
-            StartResizingAnnotation index vertex start ->
-                model
-                    |> setMouse start
-                    |> selectAnnotation index
-                    |> startResizingAnnotation index vertex start
-                    |> resizeAnnotation start
-                    => []
-
-            ResizeAnnotation pos ->
-                model
-                    |> resizeAnnotation pos
-                    => []
-
-            FinishResizingAnnotation pos ->
-                model
-                    |> resizeAnnotation pos
-                    |> finishResizingAnnotation
-                    => []
-
-            Undo ->
-                { model | edits = UndoList.undo model.edits }
-                    => []
-
-            Redo ->
-                { model | edits = UndoList.redo model.edits }
-                    => []
-
-            Save ->
-                model
-                    |> resetToReadyToDraw
-                    => [ case model.images of
-                            Just images ->
-                                Ports.exportToImage <| List.Zipper.current images
-
-                            Nothing ->
-                                Cmd.none
-                       ]
-
-            ShowMeTheGoats ->
-                { model
-                    | images = List.Zipper.fromList theGoats
-                }
-                    => []
+        ShowMeTheGoats ->
+            { model
+                | images = List.Zipper.fromList theGoats
+            }
+                => []
 
 
 {-| Add this editState change to app history
