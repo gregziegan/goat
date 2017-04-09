@@ -124,6 +124,22 @@ type Annotation
     | Spotlight ShapeType Shape
 
 
+{-|
+  Vertices are classified by their relationship to the `start` and `end`
+  mouse positions that created the annotation.
+
+  e.g: (assume a top-left to bottom-right draw)
+
+  Start            StartPlusX
+        +----------+
+        |          |
+        |          |
+        |          |
+        |          |
+        +----------+
+  StartPlusY       End
+
+-}
 type Vertex
     = Start
     | End
@@ -136,6 +152,42 @@ type OperatingSystem
     | Windows
 
 
+{-|
+
+The finite state machine for annotating.
+
+                   +-------------------------------------------------------+
+                 |                                                       |
+                 +                                                       v
+
+       +------------------+         +------------------+         +------------------+
+       |                  |         |                  |         |                  |
+       |                  |         |                  |         |                  |
++--->  |    ReadyToDraw   +-------> |    Drawing       |         |     Selected     |
+|      |                  |         |    Annotation    |         |     Annotation   |
+|      |                  | <-------+                  +----+    |                  |
+|      |                  |         |                  |    |  +-+                  |
+|      +------------------+         +------------------+    |  | +------------+-----+
+|                                                           |  |              |
+|                                                           |  |              |
+|              +-----------------------------+-----------------+              |
+|              |                             |              |                 |
+|              v                             v              |                 v
+|                                                           |
+|      +------------------+         +------------------+    |    +------------------+
+|      |                  |         |                  |    |    |                  |
+|      |                  |         |                  |    |    |                  |
+|      |   Moving         |         |    Resizing      |    +--> |    Editing       |
+|      |   Annotation     |         |    Annotation    |         |    A Textbox     |
+|      |                  |         |                  |         |                  |
+|      |                  |         |                  |         |                  |
+|      +------------------+         +------------------+         +-----------+------+
+|                                                                            |
+|                                                                            |
+|                                                                            |
++----------------------------------------------------------------------------+
+
+-}
 type AnnotationState
     = ReadyToDraw
     | DrawingAnnotation StartPosition
@@ -145,6 +197,13 @@ type AnnotationState
     | EditingATextBox Int
 
 
+{-|
+   Annotations are viewed differently based on the kind of selection.
+   1. Selected corresponds to annotations that are not in a state for resizing/moving.
+     This is currently only relevant to Textboxes when they are being edited.
+   2. SelectedWithVertices shows vertices on any annotation that allows for resizing/moving
+   3. NotSelected shows the unadorned annotation
+-}
 type SelectState
     = Selected
     | SelectedWithVertices
@@ -153,23 +212,15 @@ type SelectState
 
 type alias Model =
     { edits : UndoList (Array Annotation)
-    , annotationState :
-        AnnotationState
-        -- annotation attributes
+    , annotationState : AnnotationState
     , fill : Fill
     , strokeColor : Color
     , strokeStyle : StrokeStyle
-    , fontSize :
-        Int
-        -- Important I/O device info
+    , fontSize : Int
     , mouse : Mouse.Position
-    , keyboardState :
-        Keyboard.State
-        -- Image selection fields
+    , keyboardState : Keyboard.State
     , images : Maybe (Zipper Image)
-    , imageSelected :
-        Bool
-        -- Control Interface
+    , imageSelected : Bool
     , currentDropdown : Maybe AttributeDropdown
     , drawing : Drawing
     , operatingSystem : OperatingSystem
@@ -277,6 +328,11 @@ init flags =
     }
 
 
+{-|
+  The sidebar is a hard-coded width. This offset is used to shift the incoming mouse position.
+  TODO: investigate whether this can be skipped by using position: relative, or some
+  other CSS rule.
+-}
 controlUIWidth : number
 controlUIWidth =
     83
