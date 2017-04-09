@@ -160,7 +160,7 @@ rectSelector shape =
 
 aTextArea : TextArea
 aTextArea =
-    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (config 0 model.fontSize))
+    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (config 0))
 
 
 svgTextSelector : TextArea -> List Selector
@@ -212,6 +212,14 @@ all =
                         |> Maybe.map (Expect.equal (Spotlight Rect <| Shape start end SpotlightFill model.strokeColor model.strokeStyle))
                         |> Maybe.withDefault (Expect.fail "Array missing spotlight rect annotation")
             ]
+          -- , describe "updating annotation attributes"
+          --     [ test "annotation update function is called on selected annotation" <|
+          --        \() ->
+          --
+          --           -- { model | annotationState = SelectedAnnotation 0 }
+          --           --   |> updateAnySelectedAnnotations updateAnnotationFn
+          --           --   |> Array.get
+          --     ]
         , describe "annotations"
             [ test "A straight line has the appropriate view attributes" <|
                 \() ->
