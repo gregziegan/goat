@@ -547,15 +547,6 @@ startResizingAnnotation index vertex start model =
             model
 
 
-originalDimensions : Annotation -> ( Float, Float )
-originalDimensions annotation =
-    let
-        ( start, end ) =
-            getPositions annotation
-    in
-        ( toFloat <| end.x - start.x, toFloat <| end.y - start.y )
-
-
 resizeAnnotation : Position -> Model -> Model
 resizeAnnotation newPos model =
     case model.annotationState of
