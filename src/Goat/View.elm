@@ -580,9 +580,8 @@ annotationStateEvents : Int -> Annotation -> AnnotationState -> List (Svg.Attrib
 annotationStateEvents annIndex annotation annotationState =
     case annotationState of
         ReadyToDraw ->
-            [ onMouseDown <| Json.map (SelectAndMoveAnnotation annIndex << toDrawingPosition) Mouse.position
+            [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (SelectAndMoveAnnotation annIndex << toDrawingPosition) Mouse.position
             , Attr.class "pointerCursor"
-            , Html.attribute "onmousedown" "event.stopPropagation();"
             , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu annIndex) Mouse.position)
             ]
 
@@ -591,9 +590,8 @@ annotationStateEvents annIndex annotation annotationState =
 
         SelectedAnnotation _ ->
             [ Attr.class "moveCursor"
-            , onMouseDown <| Json.map (StartMovingAnnotation annIndex << toDrawingPosition) Mouse.position
+            , Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartMovingAnnotation annIndex << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation annIndex << toDrawingPosition << toPosition)
-            , Html.attribute "onmousedown" "event.stopPropagation();"
             , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu annIndex) Mouse.position)
             ]
 
@@ -697,10 +695,9 @@ viewAnnotation annotationState index annotation =
 
 annotationStateVertexEvents : Int -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
 annotationStateVertexEvents index annotationState vertex =
-    [ onMouseDown <| Json.map (StartResizingAnnotation index vertex << toDrawingPosition) Mouse.position
+    [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartResizingAnnotation index vertex << toDrawingPosition) Mouse.position
     , ST.onSingleTouch T.TouchStart T.preventAndStop (StartResizingAnnotation index vertex << toDrawingPosition << toPosition)
     , Attr.class "resizeCursor"
-    , Html.attribute "onmousedown" "event.stopPropagation();"
     ]
         ++ case annotationState of
             MovingAnnotation int start ( dx, dy ) ->
@@ -951,7 +948,7 @@ viewTextArea index { start, end, text, fill, fontSize, angle, autoexpand } =
                 , "font-size" => toPx fontSize
                 , "color" => Color.Convert.colorToHex fill
                 ]
-            , Html.attribute "onclick" "event.stopPropagation();"
+            , Html.attribute "onmousedown" "evt ? evt.stopPropagation() : event.stopPropagation();"
             ]
             [ AutoExpand.view (Goat.Update.config index) (fontSizeToLineHeight fontSize) autoexpand text
             ]

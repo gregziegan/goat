@@ -348,3 +348,8 @@ selectSpotlight shapeType keyboardState =
 defaultPrevented : Html.Events.Options
 defaultPrevented =
     Html.Events.Options False True
+
+
+stopPropagation : Html.Events.Options
+stopPropagation =
+    Html.Events.Options True False
