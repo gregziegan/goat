@@ -1,9 +1,22 @@
 module Goat.Helpers exposing (..)
 
 import Array.Hamt as Array exposing (Array)
+import Goat.Model
+    exposing
+        ( Annotation(..)
+        , AnnotationState(..)
+        , Drawing(..)
+        , EndPosition
+        , Fill(..)
+        , Image
+        , LineMode(..)
+        , ShapeMode(..)
+        , StartPosition
+        , StrokeStyle(..)
+        , controlUIWidth
+        )
 import Html exposing (Attribute)
 import Html.Events exposing (on)
-import Goat.Model exposing (..)
 import Json.Decode as Json
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
