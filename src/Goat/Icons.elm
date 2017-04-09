@@ -1,11 +1,11 @@
 module Goat.Icons exposing (..)
 
-import Color.Convert exposing (colorToHex)
 import Color exposing (Color)
-import Goat.Model exposing (Fill(..))
+import Color.Convert exposing (colorToHex)
+import Goat.Model exposing (Fill(..), StrokeStyle(..))
 import Html exposing (Html)
-import Svg exposing (..)
-import Svg.Attributes exposing (..)
+import Svg exposing (circle, g, line, polygon, svg)
+import Svg.Attributes exposing (class, cx, cy, d, fill, fillRule, height, path, points, r, stroke, viewBox, width, strokeLinecap)
 
 
 viewUndoArrow : Html msg
@@ -100,15 +100,6 @@ viewStrokeColor strokeColor =
         )
 
 
-viewLineStrokeDropdown : Html msg
-viewLineStrokeDropdown =
-    svg [ width "20", height "20", viewBox "0 0 20 20" ]
-        [ g [ stroke "#555" ]
-            [ line [ x1 "0", x2 "20", y1 "10", y2 "10", strokeWidth "6" ] []
-            ]
-        ]
-
-
 viewLine : Html msg
 viewLine =
     svg [ width "20", height "20", viewBox "0 0 12 12" ]
@@ -150,3 +141,38 @@ viewCornerArrow : Html msg
 viewCornerArrow =
     svg [ width "5", height "5", viewBox "0 0 5 5", class "corner-arrow" ]
         [ Svg.path [ d "M5 0L0 5h5", fill "#555", fillRule "evenodd" ] [] ]
+
+
+viewStrokeStyle : StrokeStyle -> Html msg
+viewStrokeStyle strokeStyle =
+    case strokeStyle of
+        SolidThin ->
+            svg [ width "14", height "2", viewBox "0 0 14 2" ]
+                [ Svg.path [ d "M1 .5h12", stroke "#555", fill "none", fillRule "evenodd", strokeLinecap "square" ] [] ]
+
+        SolidMedium ->
+            viewNormalLine
+
+        SolidThick ->
+            svg [ width "14", height "4", viewBox "0 0 14 4" ]
+                [ Svg.path [ d "M0 4h16V0H0z", fillRule "nonzero", fill "#555" ] [] ]
+
+        SolidVeryThick ->
+            svg [ width "14", height "6", viewBox "0 0 14 6" ]
+                [ Svg.path [ d "M0 6h16V0H0z", fillRule "nonzero", fill "#555" ] [] ]
+
+        DashedThin ->
+            svg [ width "14", height "1", viewBox "0 0 14 1" ]
+                [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
+
+        DashedMedium ->
+            svg [ width "14", height "2", viewBox "0 0 14 2" ]
+                [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
+
+        DashedThick ->
+            svg [ width "14", height "2", viewBox "0 0 14 2" ]
+                [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
+
+        DashedVeryThick ->
+            svg [ width "14", height "2", viewBox "0 0 14 2" ]
+                [ Svg.path [ d "M0 4h6V0H0v4zm9 0h6V0H9v4z", fillRule "nonzero", fill "#555" ] [] ]

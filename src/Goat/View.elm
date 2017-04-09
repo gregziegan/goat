@@ -75,7 +75,7 @@ viewInfoScreen =
 
 
 viewImageAnnotator : Model -> Image -> Html Msg
-viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDropdown, drawing } as model) selectedImage =
+viewImageAnnotator ({ edits, fill, strokeColor, strokeStyle, mouse, keyboardState, currentDropdown, drawing } as model) selectedImage =
     let
         toDropdownMenu =
             viewDropdownMenu currentDropdown drawing model
@@ -95,7 +95,7 @@ viewImageAnnotator ({ edits, fill, strokeColor, mouse, keyboardState, currentDro
                     (List.map (viewDrawingButton keyboardState drawing toDropdownMenu) (drawingOptions shiftPressed)
                         ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
                            , viewFillDropdown toDropdownMenu fill
-                           , viewLineStrokeDropdown toDropdownMenu
+                           , viewLineStrokeDropdown toDropdownMenu strokeStyle
                            ]
                     )
                 ]
@@ -247,15 +247,15 @@ viewFontSizeOption selectedFontSize fontSize =
         [ Html.text <| toString <| fontSize ]
 
 
-viewLineStrokeDropdown : (AttributeDropdown -> Html Msg) -> Html Msg
-viewLineStrokeDropdown toDropdownMenu =
+viewLineStrokeDropdown : (AttributeDropdown -> Html Msg) -> StrokeStyle -> Html Msg
+viewLineStrokeDropdown toDropdownMenu strokeStyle =
     div
         [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Strokes
             , Html.class "drawing-button"
             ]
-            [ Icons.viewLineStrokeDropdown
+            [ Icons.viewStrokeStyle strokeStyle
             , Icons.viewCornerArrow
             ]
         , toDropdownMenu Strokes
@@ -370,38 +370,7 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
             ]
         , onClick (SelectStrokeStyle strokeStyle)
         ]
-        [ case strokeStyle of
-            SolidThin ->
-                svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
-                    [ Svg.path [ d "M1 .5h12", stroke "#555", fill "none", fillRule "evenodd", strokeLinecap "square" ] [] ]
-
-            SolidMedium ->
-                Icons.viewNormalLine
-
-            SolidThick ->
-                svg [ Attr.width "14", Attr.height "4", viewBox "0 0 14 4" ]
-                    [ Svg.path [ d "M0 4h16V0H0z", fillRule "nonzero", fill "#555" ] [] ]
-
-            SolidVeryThick ->
-                svg [ Attr.width "14", Attr.height "6", viewBox "0 0 14 6" ]
-                    [ Svg.path [ d "M0 6h16V0H0z", fillRule "nonzero", fill "#555" ] [] ]
-
-            DashedThin ->
-                svg [ Attr.width "14", Attr.height "1", viewBox "0 0 14 1" ]
-                    [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
-
-            DashedMedium ->
-                svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
-                    [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
-
-            DashedThick ->
-                svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
-                    [ Svg.path [ d "M0 2h4V0H0v2zm5 0h4V0H5v2zm5 0h4V0h-4v2z", fillRule "nonzero", fill "#555" ] [] ]
-
-            DashedVeryThick ->
-                svg [ Attr.width "14", Attr.height "2", viewBox "0 0 14 2" ]
-                    [ Svg.path [ d "M0 4h6V0H0v4zm9 0h6V0H9v4z", fillRule "nonzero", fill "#555" ] [] ]
-        ]
+        [ Icons.viewStrokeStyle strokeStyle ]
 
 
 drawingStateEvents : Drawing -> AnnotationState -> List (Html.Attribute Msg)
