@@ -46,6 +46,8 @@ type Msg
     | StartResizingAnnotation Int Vertex StartPosition
     | ResizeAnnotation Position
     | FinishResizingAnnotation Position
+      -- Annotation menu updates
+    | BringAnnotationToFront Int
       -- History updates
     | Undo
     | Redo
@@ -56,7 +58,7 @@ type Msg
     | Cancel
       -- Keyboard updates
     | KeyboardMsg Keyboard.Msg
-      -- Fun
+      -- !!! GOATS !!!
     | ShowMeTheGoats
 
 
@@ -233,6 +235,10 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
             model
                 |> resizeAnnotation pos
                 |> finishResizingAnnotation
+                => []
+
+        BringAnnotationToFront index ->
+            model
                 => []
 
         Undo ->

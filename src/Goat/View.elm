@@ -367,6 +367,7 @@ drawingStateEvents drawing annotationState =
         SelectedAnnotation index ->
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
+            , Html.contextmenu "annotation-menu"
             ]
 
         EditingATextBox index ->
@@ -1009,3 +1010,31 @@ viewImage { width, height, url } =
         , src url
         ]
         []
+
+
+viewAnnotationMenu : Position -> Int -> Html Msg
+viewAnnotationMenu pos index =
+    div
+        [ id "annotation-menu"
+          -- , onWithOptions "contextmenu" defaultPrevented
+        , class "annotation-menu"
+        , Html.style
+            [ ( "top", toPx pos.y )
+            , ( "left", toPx pos.x )
+            ]
+        ]
+        [ Html.ul [ class "annotation-menu__list" ]
+            [ viewAnnotationMenuItem (BringAnnotationToFront index) "Bring to Front"
+            ]
+        ]
+
+
+viewAnnotationMenuItem : Msg -> String -> Html Msg
+viewAnnotationMenuItem msg buttonText =
+    Html.li [ class "annotation-menu__item" ]
+        [ button
+            [ Html.class "annotation-menu__button"
+            , onClick msg
+            ]
+            [ Html.text buttonText ]
+        ]
