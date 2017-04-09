@@ -74,7 +74,7 @@ viewInfoScreen =
 
 
 viewImageAnnotator : Model -> Image -> Html Msg
-viewImageAnnotator ({ edits, fill, strokeColor, strokeStyle, mouse, keyboardState, currentDropdown, drawing } as model) selectedImage =
+viewImageAnnotator ({ edits, fill, strokeColor, strokeStyle, keyboardState, currentDropdown, drawing } as model) selectedImage =
     let
         toDropdownMenu =
             viewDropdownMenu currentDropdown drawing model
@@ -366,9 +366,9 @@ drawingStateEvents drawing annotationState =
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
             ]
 
-        DrawingAnnotation start ->
-            onMouseUpOrLeave (Json.map (FinishDrawing start << toDrawingPosition) Mouse.position)
-                ++ [ ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing start << toDrawingPosition << toPosition)
+        DrawingAnnotation _ _ ->
+            onMouseUpOrLeave (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
+                ++ [ ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
                    , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
                    ]
 
@@ -378,7 +378,7 @@ drawingStateEvents drawing annotationState =
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index start << toDrawingPosition << toPosition)
             ]
 
-        ResizingAnnotation _ _ _ _ ->
+        ResizingAnnotation _ ->
             [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
@@ -477,23 +477,20 @@ viewDrawingAndAnnotations :
     (List (Svg Msg) -> List (Svg Msg))
     -> List (Svg Msg)
     -> (Bool -> List (Svg Msg))
-    -> (StartPosition -> Bool -> Svg Msg)
+    -> (StartPosition -> Position -> Bool -> Svg Msg)
     -> Drawing
     -> AnnotationState
     -> List (Svg Msg)
 viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing annotationState =
-    let
-        justAnnotations =
-            definitions spotlights ++ toAnnotations False
+    case annotationState of
+        DrawingAnnotation start curPos ->
+            let
+                nonSpotlightDrawingAndAnnotations start =
+                    definitions spotlights ++ toAnnotations False ++ [ toDrawing start curPos False ]
 
-        nonSpotlightDrawingAndAnnotations start =
-            definitions spotlights ++ toAnnotations False ++ [ toDrawing start False ]
-
-        spotlightDrawingAndAnnotations start =
-            definitions (spotlights ++ [ toDrawing start True ]) ++ toAnnotations True ++ [ toDrawing start False ]
-    in
-        case annotationState of
-            DrawingAnnotation start ->
+                spotlightDrawingAndAnnotations start =
+                    definitions (spotlights ++ [ toDrawing start curPos True ]) ++ toAnnotations True ++ [ toDrawing start curPos False ]
+            in
                 case drawing of
                     DrawShape shapeType _ ->
                         nonSpotlightDrawingAndAnnotations start
@@ -504,8 +501,8 @@ viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing
                     _ ->
                         nonSpotlightDrawingAndAnnotations start
 
-            _ ->
-                justAnnotations
+        _ ->
+            definitions spotlights ++ toAnnotations False
 
 
 viewDrawingArea : Model -> Image -> Html Msg
@@ -514,8 +511,8 @@ viewDrawingArea model image =
         annotations =
             model.edits.present
 
-        toDrawing start isInMask =
-            viewDrawing model start isInMask
+        toDrawing =
+            viewDrawing model
 
         spotlights =
             viewSpotlights model.annotationState annotations
@@ -585,7 +582,7 @@ annotationStateEvents annIndex annotation annotationState =
             , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu annIndex) Mouse.position)
             ]
 
-        DrawingAnnotation start ->
+        DrawingAnnotation _ _ ->
             [ Attr.class "crosshairCursor" ]
 
         SelectedAnnotation _ ->
@@ -605,7 +602,7 @@ annotationStateEvents annIndex annotation annotationState =
                    else
                     []
 
-        ResizingAnnotation _ _ _ _ ->
+        ResizingAnnotation _ ->
             [ Attr.class "resizeCursor"
             ]
 
@@ -614,28 +611,28 @@ annotationStateEvents annIndex annotation annotationState =
 
 
 getSelectState : Int -> AnnotationState -> SelectState
-getSelectState index annotationState =
+getSelectState annIndex annotationState =
     case annotationState of
-        SelectedAnnotation int ->
-            if index == int then
+        SelectedAnnotation index ->
+            if index == annIndex then
                 SelectedWithVertices
             else
                 NotSelected
 
-        MovingAnnotation int _ _ ->
-            if index == int then
+        MovingAnnotation index _ _ ->
+            if index == annIndex then
                 SelectedWithVertices
             else
                 NotSelected
 
-        ResizingAnnotation int _ _ _ ->
-            if index == int then
+        ResizingAnnotation { index } ->
+            if index == annIndex then
                 SelectedWithVertices
             else
                 NotSelected
 
-        EditingATextBox int ->
-            if index == int then
+        EditingATextBox index ->
+            if index == annIndex then
                 Selected
             else
                 NotSelected
@@ -703,7 +700,7 @@ annotationStateVertexEvents index annotationState vertex =
             MovingAnnotation int start ( dx, dy ) ->
                 [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
 
-            ResizingAnnotation _ _ _ _ ->
+            ResizingAnnotation _ ->
                 [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
                 , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
                 ]
@@ -728,17 +725,17 @@ maskDefinition annotationState width height shapes =
         |> Svg.mask [ Attr.id "Mask" ]
 
 
-viewDrawing : Model -> StartPosition -> Bool -> Svg Msg
-viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboardState } pos isInMask =
+viewDrawing : Model -> StartPosition -> Position -> Bool -> Svg Msg
+viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, keyboardState } start curPos isInMask =
     let
         lineAttrs lineType lineMode =
-            lineAttributes lineType <| Line pos (calcLinePos pos mouse lineMode) strokeColor strokeStyle
+            lineAttributes lineType <| Line start (calcLinePos start curPos lineMode) strokeColor strokeStyle
 
         shapeAttrs shapeType shapeMode =
-            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) fill strokeColor strokeStyle
+            shapeAttributes shapeType <| Shape start (calcShapePos start curPos shapeMode) fill strokeColor strokeStyle
 
         spotlightAttrs shapeType shapeMode spotlightFill spotlightColor =
-            shapeAttributes shapeType <| Shape pos (calcShapePos pos mouse shapeMode) spotlightFill spotlightColor strokeStyle
+            shapeAttributes shapeType <| Shape start (calcShapePos start curPos shapeMode) spotlightFill spotlightColor strokeStyle
     in
         case drawing of
             DrawLine lineType lineMode ->
@@ -761,7 +758,7 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboard
                         Svg.ellipse (shapeAttrs shapeType shapeMode) []
 
             DrawTextBox ->
-                Svg.rect ((shapeAttributes Rect <| Shape pos mouse EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
+                Svg.rect ((shapeAttributes Rect <| Shape start curPos EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
 
             DrawSpotlight shapeType shapeMode ->
                 let

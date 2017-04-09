@@ -152,6 +152,15 @@ type OperatingSystem
     | Windows
 
 
+type alias ResizingData =
+    { index : Int
+    , start : Position
+    , curPos : Position
+    , vertex : Vertex
+    , originalCoords : ( StartPosition, EndPosition )
+    }
+
+
 {-|
 
 The finite state machine for annotating.
@@ -194,10 +203,10 @@ The finite state machine for annotating.
 -}
 type AnnotationState
     = ReadyToDraw
-    | DrawingAnnotation StartPosition
+    | DrawingAnnotation StartPosition Position
     | SelectedAnnotation Int
     | MovingAnnotation Int StartPosition ( Int, Int )
-    | ResizingAnnotation Int StartPosition Vertex ( StartPosition, EndPosition )
+    | ResizingAnnotation ResizingData
     | EditingATextBox Int
 
 
@@ -221,7 +230,6 @@ type alias Model =
     , strokeColor : Color
     , strokeStyle : StrokeStyle
     , fontSize : Int
-    , mouse : Mouse.Position
     , keyboardState : Keyboard.State
     , images : Maybe (Zipper Image)
     , imageSelected : Bool
@@ -320,7 +328,6 @@ init flags =
     , strokeColor = Color.rgb 255 0 0
     , strokeStyle = SolidMedium
     , fontSize = 20
-    , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.initialState
     , images = List.Zipper.fromList []
     , imageSelected = False

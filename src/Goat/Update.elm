@@ -17,9 +17,9 @@ import UndoList exposing (UndoList)
 
 
 type Msg
-    = StartDrawing StartPosition
-    | ContinueDrawing StartPosition
-    | FinishDrawing StartPosition EndPosition
+    = StartDrawing Position
+    | ContinueDrawing Position
+    | FinishDrawing Position
       -- TextArea Updates
     | StartEditingText Int TextArea
     | SwitchToEditingText Int
@@ -68,20 +68,15 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, keyboardState, drawing } as model) =
+update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardState, drawing } as model) =
     case msg of
         StartDrawing pos ->
             model
                 |> startDrawing pos
                 => []
 
-        FinishDrawing start end ->
-            if isDrawingTooSmall (isSpotlightDrawing model.drawing) start end then
-                model
-                    |> cancelDrawing
-                    => []
-            else
-                finishDrawing start end model
+        FinishDrawing pos ->
+            finishDrawing pos model
 
         StartEditingText index textArea ->
             model.edits.present
@@ -118,7 +113,7 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
 
         ContinueDrawing pos ->
             model
-                |> setMouse pos
+                |> setDrawingPos pos
                 => []
 
         SetImages images ->
@@ -235,8 +230,6 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
 
         StartResizingAnnotation index vertex start ->
             model
-                |> setMouse start
-                |> selectAnnotation index
                 |> startResizingAnnotation index vertex start
                 |> resizeAnnotation start
                 => []
@@ -307,6 +300,16 @@ skipChange model editState =
     { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
+setDrawingPos : Position -> Model -> Model
+setDrawingPos pos model =
+    case model.annotationState of
+        DrawingAnnotation start _ ->
+            { model | annotationState = DrawingAnnotation start pos }
+
+        _ ->
+            model
+
+
 resetSelection : Model -> Model
 resetSelection model =
     { model | annotationState = ReadyToDraw }
@@ -314,7 +317,7 @@ resetSelection model =
 
 startDrawing : StartPosition -> Model -> Model
 startDrawing start model =
-    { model | annotationState = DrawingAnnotation start, mouse = start }
+    { model | annotationState = DrawingAnnotation start start }
 
 
 resetToReadyToDraw : Model -> Model
@@ -394,37 +397,47 @@ finishSpotlightDrawing start end shapeType shapeMode model =
         |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill model.strokeColor model.strokeStyle))
 
 
-finishDrawing : StartPosition -> EndPosition -> Model -> ( Model, List (Cmd Msg) )
-finishDrawing start end ({ fill, strokeColor, strokeStyle, fontSize } as model) =
-    let
-        numAnnotations =
-            Array.length model.edits.present
-
-        initialTextBox =
-            TextBox <| TextArea start end strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations))
-    in
-        case model.drawing of
-            DrawLine lineType lineMode ->
-                finishLineDrawing start end lineType lineMode model
-                    => []
-
-            DrawShape shapeType shapeMode ->
-                finishShapeDrawing start end shapeType shapeMode model
-                    => []
-
-            DrawTextBox ->
+finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
+finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
+    case model.annotationState of
+        DrawingAnnotation start _ ->
+            if isDrawingTooSmall (isSpotlightDrawing model.drawing) start pos then
                 model
-                    |> addAnnotation (TextBox <| TextArea start (calcShapePos start end DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations)))
-                    |> startEditingText numAnnotations
-                    => [ "text-box-edit--"
-                            ++ toString numAnnotations
-                            |> Dom.focus
-                            |> Task.attempt (tryToEdit numAnnotations)
-                       ]
-
-            DrawSpotlight shapeType shapeMode ->
-                finishSpotlightDrawing start end shapeType shapeMode model
+                    |> cancelDrawing
                     => []
+            else
+                case model.drawing of
+                    DrawLine lineType lineMode ->
+                        finishLineDrawing start pos lineType lineMode model
+                            => []
+
+                    DrawShape shapeType shapeMode ->
+                        finishShapeDrawing start pos shapeType shapeMode model
+                            => []
+
+                    DrawTextBox ->
+                        let
+                            numAnnotations =
+                                Array.length model.edits.present
+
+                            initialTextBox =
+                                TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations))
+                        in
+                            model
+                                |> addAnnotation (TextBox <| TextArea start (calcShapePos start pos DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations)))
+                                |> startEditingText numAnnotations
+                                => [ "text-box-edit--"
+                                        ++ toString numAnnotations
+                                        |> Dom.focus
+                                        |> Task.attempt (tryToEdit numAnnotations)
+                                   ]
+
+                    DrawSpotlight shapeType shapeMode ->
+                        finishSpotlightDrawing start pos shapeType shapeMode model
+                            => []
+
+        _ ->
+            model => []
 
 
 startEditingText : Int -> Model -> Model
@@ -552,18 +565,19 @@ startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
 startResizingAnnotation index vertex start model =
     case Array.get index model.edits.present of
         Just annotation ->
-            { model | annotationState = ResizingAnnotation index start vertex (getPositions annotation) }
+            { model | annotationState = ResizingAnnotation (ResizingData index start start vertex (getPositions annotation)) }
 
         Nothing ->
             model
 
 
 resizeAnnotation : Position -> Model -> Model
-resizeAnnotation newPos model =
+resizeAnnotation curPos model =
     case model.annotationState of
-        ResizingAnnotation index start vertex originalCords ->
+        ResizingAnnotation resizingData ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex index (resize start newPos vertex originalCords)) model.edits
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize { resizingData | curPos = curPos })) model.edits
+                , annotationState = ResizingAnnotation { resizingData | curPos = curPos }
             }
 
         _ ->
@@ -573,71 +587,78 @@ resizeAnnotation newPos model =
 finishResizingAnnotation : Model -> Model
 finishResizingAnnotation model =
     case model.annotationState of
-        ResizingAnnotation index _ _ _ ->
+        ResizingAnnotation { index } ->
             { model | annotationState = SelectedAnnotation index }
 
         _ ->
             model
 
 
-resizeVertices : Position -> Vertex -> ( StartPosition, EndPosition ) -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeVertices pos vertex ( start, end ) annotation =
-    case vertex of
-        Start ->
-            { annotation | start = pos }
-
-        Goat.Model.End ->
-            { annotation | end = pos }
-
-        StartPlusX ->
-            { annotation | start = pos, end = Position start.x end.y }
-
-        StartPlusY ->
-            { annotation | start = pos, end = Position end.x start.y }
-
-
-resizeEllipseVertices : Position -> Vertex -> ( StartPosition, EndPosition ) -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeEllipseVertices pos vertex ( start, end ) annotation =
+resizeVertices : ResizingData -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
+resizeVertices { curPos, vertex, originalCoords } annotation =
     let
-        dX =
-            start.x - pos.x
-
-        dY =
-            end.y - pos.y
+        ( start, end ) =
+            originalCoords
     in
         case vertex of
             Start ->
-                { annotation | start = Position (pos.x + ((end.x - pos.x) // 2)) (end.y - (dY // 2)) }
+                { annotation | start = curPos }
 
             Goat.Model.End ->
-                { annotation | end = pos }
+                { annotation | end = curPos }
 
             StartPlusX ->
-                { annotation | start = Position (pos.x + ((end.x - pos.x) // 2) - ((end.x - start.x) // 2)) (end.y - (dY // 2)), end = Position start.x end.y }
+                { annotation | start = curPos, end = Position start.x end.y }
 
             StartPlusY ->
-                { annotation | start = Position (pos.x + ((end.x - pos.x) // 2)) (start.y - ((start.y - pos.y) // 2)), end = Position end.x start.y }
+                { annotation | start = curPos, end = Position end.x start.y }
 
 
-resize : StartPosition -> EndPosition -> Vertex -> ( StartPosition, EndPosition ) -> Annotation -> Annotation
-resize start end vertex originalCoords annotation =
+resizeEllipseVertices : ResizingData -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
+resizeEllipseVertices { curPos, vertex, originalCoords } annotation =
+    let
+        ( start, end ) =
+            originalCoords
+
+        dX =
+            start.x - curPos.x
+
+        dY =
+            end.y - curPos.y
+    in
+        case vertex of
+            Start ->
+                { annotation | start = Position (curPos.x + ((end.x - curPos.x) // 2)) (end.y - (dY // 2)) }
+
+            Goat.Model.End ->
+                { annotation | end = curPos }
+
+            StartPlusX ->
+                { annotation | start = Position (curPos.x + ((end.x - curPos.x) // 2) - ((end.x - start.x) // 2)) (end.y - (dY // 2)), end = Position start.x end.y }
+
+            StartPlusY ->
+                { annotation | start = Position (curPos.x + ((end.x - curPos.x) // 2)) (start.y - ((start.y - curPos.y) // 2)), end = Position end.x start.y }
+
+
+resize : ResizingData -> Annotation -> Annotation
+resize resizingData annotation =
     case annotation of
         Lines lineType line ->
-            Lines lineType (resizeVertices end vertex originalCoords line)
+            Lines lineType (resizeVertices resizingData line)
 
         Shapes shapeType shape ->
             case shapeType of
                 Ellipse ->
-                    Shapes shapeType (resizeEllipseVertices end vertex originalCoords shape)
+                    Shapes shapeType (resizeEllipseVertices resizingData shape)
 
                 _ ->
-                    Shapes shapeType (resizeVertices end vertex originalCoords shape)
+                    Shapes shapeType (resizeVertices resizingData shape)
 
         TextBox textArea ->
-            TextBox (resizeVertices end vertex originalCoords textArea)
+            TextBox (resizeVertices resizingData textArea)
 
         Spotlight shapeType shape ->
-            Spotlight shapeType (resizeVertices end vertex originalCoords shape)
+            Spotlight shapeType (resizeVertices resizingData shape)
 
 
 shift :
@@ -698,11 +719,6 @@ toggleDropdown editOption model =
                 _ ->
                     model.drawing
     }
-
-
-setMouse : Mouse.Position -> Model -> Model
-setMouse mouse model =
-    { model | mouse = mouse }
 
 
 transitionOnShift : Drawing -> Drawing
@@ -947,7 +963,7 @@ alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
                             |> handlePaste controlKey keyChange
                             => []
 
-                    DrawingAnnotation _ ->
+                    DrawingAnnotation _ _ ->
                         alterDrawing controlKey keyChange model
                             => []
 
@@ -961,7 +977,7 @@ alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
                         alterDrawing controlKey keyChange model
                             => []
 
-                    ResizingAnnotation _ _ _ _ ->
+                    ResizingAnnotation _ ->
                         alterDrawing controlKey keyChange model
                             => []
 

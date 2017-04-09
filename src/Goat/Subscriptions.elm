@@ -21,12 +21,12 @@ imageAnnotationSubscriptions model =
     if model.imageSelected then
         Sub.batch <|
             case model.annotationState of
-                DrawingAnnotation drawing ->
+                DrawingAnnotation _ _ ->
                     [ Mouse.moves (ContinueDrawing << toDrawingPosition)
                     , Sub.map KeyboardMsg Keyboard.subscriptions
                     ]
 
-                ResizingAnnotation _ _ _ _ ->
+                ResizingAnnotation _ ->
                     [ Mouse.moves (ResizeAnnotation << toDrawingPosition)
                     , Sub.map KeyboardMsg Keyboard.subscriptions
                     ]

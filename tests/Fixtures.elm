@@ -28,7 +28,6 @@ model =
     , strokeColor = Color.red
     , strokeStyle = SolidMedium
     , fontSize = 14
-    , mouse = Mouse.Position 0 0
     , keyboardState = Keyboard.initialState
     , images = List.Zipper.fromList [ goat ]
     , imageSelected = True

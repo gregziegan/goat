@@ -139,13 +139,13 @@ annotationStateToCursor annotationState =
         ReadyToDraw ->
             "crosshair"
 
-        DrawingAnnotation _ ->
+        DrawingAnnotation _ _ ->
             "crosshair"
 
         MovingAnnotation _ _ _ ->
             "move"
 
-        ResizingAnnotation _ _ _ _ ->
+        ResizingAnnotation _ ->
             "nesw-resize"
 
         EditingATextBox _ ->

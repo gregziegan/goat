@@ -5,6 +5,7 @@ import Fixtures exposing (end, model, start)
 import Goat.Model
     exposing
         ( Annotation(..)
+        , AnnotationState(..)
         , Drawing(..)
         , Line
         , LineMode(..)
@@ -14,7 +15,7 @@ import Goat.Model
         , ShapeMode(..)
         , ShapeType(..)
         )
-import Goat.Update exposing (finishLineDrawing, finishShapeDrawing, finishSpotlightDrawing)
+import Goat.Update exposing (startDrawing, finishLineDrawing, finishShapeDrawing, finishSpotlightDrawing)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
 
@@ -23,6 +24,18 @@ all : Test
 all =
     describe "drawing"
         [ finishDrawingTests ]
+
+
+startDrawingTests : Test
+startDrawingTests =
+    describe "startDrawing"
+        [ test "should change the annotationState to DrawingAnnotation" <|
+            \() ->
+                model
+                    |> startDrawing start
+                    |> .annotationState
+                    |> Expect.equal (DrawingAnnotation start start)
+        ]
 
 
 finishDrawingTests : Test
