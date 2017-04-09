@@ -36,6 +36,8 @@ model =
     , drawing = DrawLine Arrow DrawingLine
     , annotationState = ReadyToDraw
     , operatingSystem = MacOS
+    , annotationMenu = Nothing
+    , showingAnyMenu = False
     }
 
 
