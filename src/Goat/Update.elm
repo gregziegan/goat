@@ -807,6 +807,19 @@ copySelectedAnnotation index model =
             model
 
 
+cutSelectedAnnotation : Int -> Model -> Model
+cutSelectedAnnotation index model =
+    case Array.get index model.edits.present of
+        Just annotation ->
+            { model
+                | clipboard = Just annotation
+                , edits = UndoList.new (removeItem index model.edits.present) model.edits
+            }
+
+        Nothing ->
+            model
+
+
 handleSelectedAnnotationKeyboard : Int -> Key -> KeyChange -> Model -> Model
 handleSelectedAnnotationKeyboard index controlKey keyChange model =
     case keyChange of
@@ -814,7 +827,13 @@ handleSelectedAnnotationKeyboard index controlKey keyChange model =
             case key of
                 CharC ->
                     if isPressed controlKey model.keyboardState then
-                        { model | drawing = selectLine Arrow model.keyboardState }
+                        copySelectedAnnotation index model
+                    else
+                        model
+
+                CharX ->
+                    if isPressed controlKey model.keyboardState then
+                        cutSelectedAnnotation index model
                     else
                         model
 
