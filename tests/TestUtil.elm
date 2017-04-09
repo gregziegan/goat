@@ -2,7 +2,8 @@ module TestUtil exposing (..)
 
 import Array.Hamt as Array
 import Fuzz exposing (Fuzzer)
-import Goat.Model exposing (Annotation, AnnotationState(..), Model)
+import Goat.Model exposing (Annotation, AnnotationState(..), EndPosition, Model, StartPosition)
+import Goat.Update exposing (getPositions, shiftPosition)
 import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
@@ -31,3 +32,21 @@ getDrawingStateCurPos annotationState =
 
         _ ->
             Nothing
+
+
+isAnnotationMovedByCorrectAmount : Position -> Position -> ( StartPosition, EndPosition ) -> Annotation -> Bool
+isAnnotationMovedByCorrectAmount start end ( origStart, origEnd ) shiftedAnnotation =
+    let
+        ( shiftedStart, shiftedEnd ) =
+            getPositions shiftedAnnotation
+
+        dx =
+            shiftedEnd.x - shiftedStart.x
+
+        dy =
+            shiftedEnd.y - shiftedStart.y
+    in
+        shiftPosition dx dy origStart
+            == shiftedStart
+            && shiftPosition dx dy origEnd
+            == shiftedEnd
