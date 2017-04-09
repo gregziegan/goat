@@ -3,18 +3,11 @@ module Fixtures exposing (..)
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color
-import Color.Convert
-import Fuzz exposing (Fuzzer)
-import Goat.Helpers exposing (..)
 import Goat.Model exposing (..)
 import Goat.Update exposing (..)
-import Goat.View exposing (..)
 import Keyboard.Extra as Keyboard
 import List.Zipper
 import Mouse exposing (Position)
-import Random.Pcg as Random
-import Shrink
-import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
 import UndoList
 
 
@@ -61,13 +54,6 @@ line strokeColor strokeStyle =
     Line start end strokeColor strokeStyle
 
 
-position : Fuzzer Position
-position =
-    Fuzz.custom
-        (Random.map2 Position (Random.int -100 100) (Random.int -100 100))
-        (\{ x, y } -> Shrink.map Position (Shrink.int x) |> Shrink.andMap (Shrink.int y))
-
-
 aLine : Line
 aLine =
     Line start end model.strokeColor model.strokeStyle
@@ -81,22 +67,6 @@ aShape =
 aTextArea : TextArea
 aTextArea =
     TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (config 0))
-
-
-svgTextSelector : TextArea -> List Selector
-svgTextSelector { start, end } =
-    [ tag "text"
-    , attribute "x" <| toString <| Basics.min start.y end.y
-    ]
-
-
-tspanSelector : TextArea -> List Selector
-tspanSelector { start, end, fontSize, fill } =
-    [ tag "tspan"
-    , attribute "dy" <| toString <| fontSizeToLineHeight fontSize
-    , attribute "x" <| toString <| Basics.min start.x end.x
-    , attribute "fill" <| Color.Convert.colorToHex fill
-    ]
 
 
 testColor : Color.Color
