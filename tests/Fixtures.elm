@@ -76,14 +76,6 @@ line strokeColor strokeStyle =
     Line start end strokeColor strokeStyle
 
 
-getFirstAnnotation : Model -> Maybe Annotation
-getFirstAnnotation model =
-    model
-        |> .edits
-        |> .present
-        |> Array.get 0
-
-
 position : Fuzzer Position
 position =
     Fuzz.custom
