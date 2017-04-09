@@ -1,6 +1,7 @@
 module Goat.Helpers exposing (..)
 
 import Array.Hamt as Array exposing (Array)
+import Color.Convert
 import Goat.Model
     exposing
         ( Annotation(..)
@@ -295,3 +296,35 @@ svgTextHeight fontSize text =
 linePath : StartPosition -> EndPosition -> String
 linePath start end =
     "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+
+
+fillStyle : Fill -> ( String, Bool )
+fillStyle fill =
+    case fill of
+        SolidFill color ->
+            Color.Convert.colorToHex color => True
+
+        SpotlightFill ->
+            "white" => False
+
+        MaskFill ->
+            "black" => True
+
+        EmptyFill ->
+            "white" => False
+
+
+pointerEvents : Fill -> String
+pointerEvents fill =
+    case fill of
+        EmptyFill ->
+            "pointer-events: visibleStroke;"
+
+        MaskFill ->
+            "pointer-events: none;"
+
+        SolidFill _ ->
+            "pointer-events: auto;"
+
+        SpotlightFill ->
+            "pointer-events: visibleStroke;"

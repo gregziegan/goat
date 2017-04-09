@@ -753,38 +753,6 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, mouse, keyboard
                             Svg.ellipse (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
 
 
-fillStyle : Fill -> ( String, Bool )
-fillStyle fill =
-    case fill of
-        SolidFill color ->
-            Color.Convert.colorToHex color => True
-
-        SpotlightFill ->
-            "white" => False
-
-        MaskFill ->
-            "black" => True
-
-        EmptyFill ->
-            "white" => False
-
-
-pointerEvents : Fill -> String
-pointerEvents fill =
-    case fill of
-        EmptyFill ->
-            "pointer-events: visibleStroke;"
-
-        MaskFill ->
-            "pointer-events: none;"
-
-        SolidFill _ ->
-            "pointer-events: auto;"
-
-        SpotlightFill ->
-            "pointer-events: visibleStroke;"
-
-
 viewShape : List (Svg.Attribute Msg) -> List (Svg Msg) -> ShapeType -> Shape -> List (Svg Msg)
 viewShape attrs vertices shapeType shape =
     let
