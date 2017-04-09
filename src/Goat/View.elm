@@ -373,15 +373,13 @@ drawingStateEvents drawing annotationState =
                    ]
 
         MovingAnnotation index start _ ->
-            [ Html.Events.onMouseLeave ResetToReadyToDraw
-            , onMouseUp <| Json.map (FinishMovingAnnotation index start << toDrawingPosition) Mouse.position
+            [ onMouseUp <| Json.map (FinishMovingAnnotation index start << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation index start << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index start << toDrawingPosition << toPosition)
             ]
 
         ResizingAnnotation _ _ _ _ ->
-            [ Html.Events.onMouseLeave ResetToReadyToDraw
-            , onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
+            [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
             ]
@@ -582,10 +580,10 @@ annotationStateEvents : Int -> Annotation -> AnnotationState -> List (Svg.Attrib
 annotationStateEvents annIndex annotation annotationState =
     case annotationState of
         ReadyToDraw ->
-            [ onMouseDown <| Json.map (SelectAnnotation annIndex << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchStart T.preventAndStop (SelectAnnotation annIndex << toDrawingPosition << toPosition)
+            [ onMouseDown <| Json.map (SelectAndMoveAnnotation annIndex << toDrawingPosition) Mouse.position
             , Attr.class "pointerCursor"
             , Html.attribute "onmousedown" "event.stopPropagation();"
+            , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu annIndex) Mouse.position)
             ]
 
         DrawingAnnotation start ->
@@ -596,6 +594,7 @@ annotationStateEvents annIndex annotation annotationState =
             , onMouseDown <| Json.map (StartMovingAnnotation annIndex << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation annIndex << toDrawingPosition << toPosition)
             , Html.attribute "onmousedown" "event.stopPropagation();"
+            , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu annIndex) Mouse.position)
             ]
 
         MovingAnnotation index start ( dx, dy ) ->
@@ -1053,6 +1052,7 @@ viewAnnotationMenu pos index =
             [ ( "top", toPx pos.y )
             , ( "left", toPx pos.x )
             ]
+        , Html.Events.onMouseEnter (SelectAnnotation index)
         ]
         [ Html.ul [ class "annotation-menu__list" ]
             [ viewAnnotationMenuItem (BringAnnotationToFront index) "Bring to Front"

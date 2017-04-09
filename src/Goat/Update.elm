@@ -37,7 +37,8 @@ type Msg
     | CloseDropdown
       -- Selection Updates
     | ResetToReadyToDraw
-    | SelectAnnotation Int StartPosition
+    | SelectAnnotation Int
+    | SelectAndMoveAnnotation Int StartPosition
       -- Move updates
     | StartMovingAnnotation Int StartPosition
     | MoveAnnotation Int StartPosition Position
@@ -199,7 +200,12 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                 |> closeDropdown
                 => []
 
-        SelectAnnotation index start ->
+        SelectAnnotation index ->
+            model
+                |> selectAnnotation index
+                => []
+
+        SelectAndMoveAnnotation index start ->
             model
                 |> selectAnnotation index
                 |> startMovingAnnotation index start
@@ -963,6 +969,7 @@ bringAnnotationToFront : Int -> Model -> Model
 bringAnnotationToFront index model =
     { model
         | edits = UndoList.new (bringToFront index model.edits.present) model.edits
+        , annotationState = ReadyToDraw
     }
         |> closeAllMenus
 
@@ -979,7 +986,10 @@ sendToBack index annotations =
 
 sendAnnotationToBack : Int -> Model -> Model
 sendAnnotationToBack index model =
-    { model | edits = UndoList.new (sendToBack index model.edits.present) model.edits }
+    { model
+        | edits = UndoList.new (sendToBack index model.edits.present) model.edits
+        , annotationState = ReadyToDraw
+    }
         |> closeAllMenus
 
 
