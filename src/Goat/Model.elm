@@ -230,6 +230,7 @@ type alias Model =
     , operatingSystem : OperatingSystem
     , annotationMenu : Maybe { index : Int, position : Position }
     , showingAnyMenu : Bool
+    , clipboard : Maybe Annotation
     }
 
 
@@ -333,6 +334,7 @@ init flags =
             Windows
     , annotationMenu = Nothing
     , showingAnyMenu = False
+    , clipboard = Nothing
     }
 
 

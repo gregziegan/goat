@@ -27,5 +27,8 @@
     "./index.html",
     "./style.css",
     "./icon_ticket_editor.svg"
-  ]
+  ],
+  "devDependencies": {
+    "pre-commit": "^1.2.2"
+  }
 }

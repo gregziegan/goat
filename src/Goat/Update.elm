@@ -797,25 +797,160 @@ handleKeyboardShortcuts keyChange model =
             model
 
 
-alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
-alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
-    case maybeKeyChange of
-        Just keyChange ->
-            case model.annotationState of
-                ReadyToDraw ->
-                    alterDrawing keyChange model
-                        |> handleKeyboardShortcuts keyChange
-                        => []
-
-                EditingATextBox index ->
-                    alterTextBoxDrawing keyChange index model
-
-                _ ->
-                    alterDrawing keyChange model
-                        => []
+copySelectedAnnotation : Int -> Model -> Model
+copySelectedAnnotation index model =
+    case Array.get index model.edits.present of
+        Just annotation ->
+            { model | clipboard = Just annotation }
 
         Nothing ->
-            model => []
+            model
+
+
+handleSelectedAnnotationKeyboard : Int -> Key -> KeyChange -> Model -> Model
+handleSelectedAnnotationKeyboard index controlKey keyChange model =
+    case keyChange of
+        KeyDown key ->
+            case key of
+                CharC ->
+                    if isPressed controlKey model.keyboardState then
+                        { model | drawing = selectLine Arrow model.keyboardState }
+                    else
+                        model
+
+                Control ->
+                    if model.operatingSystem == MacOS then
+                        model
+                    else if isPressed CharC model.keyboardState then
+                        copySelectedAnnotation index model
+                    else
+                        model
+
+                Super ->
+                    if model.operatingSystem == Windows then
+                        model
+                    else if isPressed CharC model.keyboardState then
+                        copySelectedAnnotation index model
+                    else
+                        model
+
+                _ ->
+                    model
+
+        KeyUp key ->
+            model
+
+
+shiftForPaste : Annotation -> Annotation
+shiftForPaste annotation =
+    case annotation of
+        Lines lineType line ->
+            Lines lineType { line | start = positionMap ((+) 10) line.start, end = positionMap ((+) 10) line.end }
+
+        Shapes shapeType shape ->
+            Shapes shapeType { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
+
+        TextBox textArea ->
+            TextBox { textArea | start = positionMap ((+) 10) textArea.start, end = positionMap ((+) 10) textArea.end }
+
+        Spotlight shapeType shape ->
+            Spotlight shapeType { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
+
+
+pasteAnnotation : Model -> Model
+pasteAnnotation model =
+    case model.clipboard of
+        Just annotation ->
+            { model
+                | edits = UndoList.new (Array.push (shiftForPaste annotation) model.edits.present) model.edits
+                , annotationState = SelectedAnnotation (Array.length model.edits.present)
+                , clipboard = Just (shiftForPaste annotation)
+            }
+
+        Nothing ->
+            model
+
+
+handlePaste : Key -> KeyChange -> Model -> Model
+handlePaste controlKey keyChange model =
+    case keyChange of
+        KeyDown key ->
+            case key of
+                CharV ->
+                    if isPressed controlKey model.keyboardState then
+                        pasteAnnotation model
+                            |> releaseKey CharV
+                    else
+                        model
+
+                Control ->
+                    if model.operatingSystem == MacOS then
+                        model
+                    else if isPressed CharV model.keyboardState then
+                        pasteAnnotation model
+                            |> releaseKey CharV
+                    else
+                        model
+
+                Super ->
+                    if model.operatingSystem == Windows then
+                        model
+                    else if isPressed CharV model.keyboardState then
+                        pasteAnnotation model
+                            |> releaseKey CharV
+                    else
+                        model
+
+                _ ->
+                    model
+
+        KeyUp key ->
+            model
+
+
+alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
+alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
+    let
+        controlKey =
+            case model.operatingSystem of
+                MacOS ->
+                    Super
+
+                Windows ->
+                    Control
+    in
+        case maybeKeyChange of
+            Just keyChange ->
+                case model.annotationState of
+                    ReadyToDraw ->
+                        alterDrawing controlKey keyChange model
+                            |> handleKeyboardShortcuts keyChange
+                            |> handlePaste controlKey keyChange
+                            => []
+
+                    DrawingAnnotation _ ->
+                        alterDrawing controlKey keyChange model
+                            => []
+
+                    SelectedAnnotation index ->
+                        alterDrawing controlKey keyChange model
+                            |> handleSelectedAnnotationKeyboard index controlKey keyChange
+                            |> handlePaste controlKey keyChange
+                            => []
+
+                    MovingAnnotation _ _ _ ->
+                        alterDrawing controlKey keyChange model
+                            => []
+
+                    ResizingAnnotation _ _ _ _ ->
+                        alterDrawing controlKey keyChange model
+                            => []
+
+                    EditingATextBox index ->
+                        alterTextBoxDrawing keyChange index model
+
+            Nothing ->
+                model => []
 
 
 alterTextBoxDrawing : KeyChange -> Int -> Model -> ( Model, List (Cmd Msg) )
@@ -861,70 +996,82 @@ changeDrawing drawing model =
     { model | drawing = drawing }
 
 
-alterDrawing : KeyChange -> Model -> Model
-alterDrawing keyChange ({ keyboardState } as model) =
-    let
-        controlKey =
-            case model.operatingSystem of
-                MacOS ->
-                    Super
+releaseKey : Key -> Model -> Model
+releaseKey key model =
+    { model | keyboardState = Keyboard.forceRelease [ key ] model.keyboardState }
 
-                Windows ->
-                    Control
-    in
-        case keyChange of
-            KeyDown key ->
-                case key of
-                    Shift ->
-                        changeDrawing (transitionOnShift model.drawing) model
 
-                    Escape ->
-                        cancelDrawing model
+undoEdit : Model -> Model
+undoEdit model =
+    { model | edits = UndoList.undo model.edits }
 
-                    Delete ->
-                        deleteSelectedDrawing model
 
-                    BackSpace ->
-                        deleteSelectedDrawing model
+redoEdit : Model -> Model
+redoEdit model =
+    { model | edits = UndoList.redo model.edits }
 
-                    CharZ ->
-                        if isPressed Shift keyboardState && isPressed controlKey keyboardState then
-                            { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                        else if isPressed controlKey keyboardState then
-                            { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                        else
-                            model
 
-                    Control ->
-                        if model.operatingSystem == MacOS then
-                            model
-                        else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
-                            { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                        else if isPressed CharZ keyboardState then
-                            { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                        else
-                            model
+alterDrawing : Key -> KeyChange -> Model -> Model
+alterDrawing controlKey keyChange ({ keyboardState } as model) =
+    case keyChange of
+        KeyDown key ->
+            case key of
+                Shift ->
+                    changeDrawing (transitionOnShift model.drawing) model
 
-                    Super ->
-                        if model.operatingSystem == Windows then
-                            model
-                        else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
-                            { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                        else if isPressed CharZ keyboardState then
-                            { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                        else
-                            model
+                Escape ->
+                    cancelDrawing model
 
-                    _ ->
+                Delete ->
+                    deleteSelectedDrawing model
+
+                BackSpace ->
+                    deleteSelectedDrawing model
+
+                CharZ ->
+                    if isPressed Shift keyboardState && isPressed controlKey keyboardState then
+                        redoEdit model
+                            |> releaseKey CharZ
+                    else if isPressed controlKey keyboardState then
+                        undoEdit model
+                            |> releaseKey CharZ
+                    else
                         model
 
-            KeyUp key ->
-                case key of
-                    Shift ->
-                        changeDrawing (transitionOnShift model.drawing) model
-
-                    _ ->
+                Control ->
+                    if model.operatingSystem == MacOS then
                         model
+                    else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
+                        redoEdit model
+                            |> releaseKey CharZ
+                    else if isPressed CharZ keyboardState then
+                        undoEdit model
+                            |> releaseKey CharZ
+                    else
+                        model
+
+                Super ->
+                    if model.operatingSystem == Windows then
+                        model
+                    else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
+                        redoEdit model
+                            |> releaseKey CharZ
+                    else if isPressed CharZ keyboardState then
+                        undoEdit model
+                            |> releaseKey CharZ
+                    else
+                        model
+
+                _ ->
+                    model
+
+        KeyUp key ->
+            case key of
+                Shift ->
+                    changeDrawing (transitionOnShift model.drawing) model
+
+                _ ->
+                    model
 
 
 tryToEdit : Int -> Result Dom.Error () -> Msg

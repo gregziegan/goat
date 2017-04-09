@@ -83,6 +83,11 @@ positionMapY fn pos =
     { pos | y = fn pos.y }
 
 
+positionMap : (Int -> Int) -> Position -> Position
+positionMap fn { x, y } =
+    Position (fn x) (fn y)
+
+
 stepMouse : StartPosition -> EndPosition -> EndPosition
 stepMouse start curPos =
     arrowAngle start curPos

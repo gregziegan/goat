@@ -38,6 +38,7 @@ model =
     , operatingSystem = MacOS
     , annotationMenu = Nothing
     , showingAnyMenu = False
+    , clipboard = Nothing
     }
 
 
