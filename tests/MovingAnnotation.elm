@@ -15,14 +15,16 @@ import Goat.Model
         , ShapeMode(..)
         , ShapeType(..)
         )
-import Goat.Update exposing (addAnnotation, startMovingAnnotation)
+import Goat.Update exposing (addAnnotation, startMovingAnnotation, moveAnnotation)
 import Test exposing (..)
 
 
 all : Test
 all =
     describe "drawing"
-        [ startMovingTests ]
+        [ startMovingTests
+        , moveAnnotationTests
+        ]
 
 
 startMovingTests : Test
@@ -41,4 +43,18 @@ startMovingTests =
                     |> startMovingAnnotation 0 start
                     |> .annotationState
                     |> Expect.equal model.annotationState
+        ]
+
+
+moveAnnotationTests : Test
+moveAnnotationTests =
+    describe "moveAnnotation"
+        [ test "should change the annotationState to MovingAnnotation" <|
+            \() ->
+                model
+                    |> addAnnotation (Shapes Rect aShape)
+                    |> startMovingAnnotation 0 start
+                    |> moveAnnotation end
+                    |> .annotationState
+                    |> Expect.equal (MovingAnnotation 0 start ( end.x - start.x, end.y - start.y ))
         ]
