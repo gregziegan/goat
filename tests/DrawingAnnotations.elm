@@ -23,7 +23,10 @@ import TestUtil exposing (getFirstAnnotation, getDrawingStateCurPos)
 all : Test
 all =
     describe "drawing"
-        [ finishDrawingTests ]
+        [ startDrawingTests
+        , continueDrawingTests
+        , finishDrawingTests
+        ]
 
 
 startDrawingTests : Test

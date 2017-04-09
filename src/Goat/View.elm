@@ -373,9 +373,9 @@ drawingStateEvents drawing annotationState =
                    ]
 
         MovingAnnotation index start _ ->
-            [ onMouseUp <| Json.map (FinishMovingAnnotation index start << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation index start << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index start << toDrawingPosition << toPosition)
+            [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
             ]
 
         ResizingAnnotation _ ->
@@ -592,9 +592,9 @@ annotationStateEvents annIndex annotation annotationState =
             , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu annIndex) Mouse.position)
             ]
 
-        MovingAnnotation index start ( dx, dy ) ->
-            [ onMouseUp <| Json.map (FinishMovingAnnotation index start << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation index start << toDrawingPosition << toPosition)
+        MovingAnnotation index _ ( dx, dy ) ->
+            [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
             , Attr.class "moveCursor"
             ]
                 ++ if index == annIndex then

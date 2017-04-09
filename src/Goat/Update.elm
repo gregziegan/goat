@@ -41,8 +41,8 @@ type Msg
     | SelectAndMoveAnnotation Int StartPosition
       -- Move updates
     | StartMovingAnnotation Int StartPosition
-    | MoveAnnotation Int StartPosition Position
-    | FinishMovingAnnotation Int StartPosition Position
+    | MoveAnnotation Position
+    | FinishMovingAnnotation EndPosition
       -- Resize updates
     | StartResizingAnnotation Int Vertex StartPosition
     | ResizeAnnotation Position
@@ -217,15 +217,15 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
                 |> startMovingAnnotation index start
                 => []
 
-        MoveAnnotation index start newPos ->
+        MoveAnnotation newPos ->
             model
-                |> moveAnnotation index start newPos
+                |> moveAnnotation newPos
                 => []
 
-        FinishMovingAnnotation index start newPos ->
+        FinishMovingAnnotation endPos ->
             model
-                |> moveAnnotation index start newPos
-                |> finishMovingAnnotation index
+                |> moveAnnotation endPos
+                |> finishMovingAnnotation
                 => []
 
         StartResizingAnnotation index vertex start ->
@@ -372,10 +372,10 @@ resetToReadyToDraw model =
     { model | annotationState = ReadyToDraw }
 
 
-finishMovingAnnotation : Int -> Model -> Model
-finishMovingAnnotation index model =
+finishMovingAnnotation : Model -> Model
+finishMovingAnnotation model =
     case model.annotationState of
-        MovingAnnotation int startPosition translate ->
+        MovingAnnotation index _ translate ->
             { model
                 | annotationState = SelectedAnnotation index
                 , edits = UndoList.new (mapAtIndex index (move translate) model.edits.present) model.edits
@@ -555,8 +555,8 @@ getPositions annotation =
             shape.start => shape.end
 
 
-moveAnnotation : Int -> StartPosition -> Position -> Model -> Model
-moveAnnotation index start newPos model =
+moveAnnotation : Position -> Model -> Model
+moveAnnotation newPos model =
     case model.annotationState of
         MovingAnnotation index start ( dx, dy ) ->
             { model | annotationState = MovingAnnotation index start ( newPos.x - start.x, newPos.y - start.y ) }

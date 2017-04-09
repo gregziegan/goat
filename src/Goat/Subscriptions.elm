@@ -31,8 +31,8 @@ imageAnnotationSubscriptions model =
                     , Sub.map KeyboardMsg Keyboard.subscriptions
                     ]
 
-                MovingAnnotation index start _ ->
-                    [ Mouse.moves (MoveAnnotation index start << toDrawingPosition) ]
+                MovingAnnotation _ _ _ ->
+                    [ Mouse.moves (MoveAnnotation << toDrawingPosition) ]
 
                 _ ->
                     [ Sub.map KeyboardMsg Keyboard.subscriptions ]
