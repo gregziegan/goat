@@ -7,7 +7,7 @@ import Color.Convert
 import Goat.Helpers exposing (..)
 import Goat.Icons as Icons
 import Goat.Model exposing (..)
-import Goat.Update exposing (..)
+import Goat.Update exposing (Msg(..))
 import Html exposing (Attribute, Html, button, div, p, text)
 import Html.Attributes as Html exposing (class, classList, disabled, height, id, readonly, src, start, style, type_, width)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onMouseEnter, onMouseLeave, onWithOptions)
@@ -19,8 +19,7 @@ import Mouse exposing (Position)
 import Rocket exposing ((=>))
 import SingleTouch as ST
 import Svg exposing (..)
-import Svg.Attributes as Attr exposing (..)
-import Svg.Events as SE
+import Svg.Attributes as Attr
 import Touch as T
 import UndoList exposing (UndoList)
 
@@ -99,44 +98,8 @@ viewImageAnnotator ({ edits, fill, strokeColor, strokeStyle, mouse, keyboardStat
                            ]
                     )
                 ]
-            , viewCanvas model selectedImage
+            , viewDrawingArea model selectedImage
             ]
-
-
-drawingsAreEqual : Drawing -> Drawing -> Bool
-drawingsAreEqual drawing drawing2 =
-    case drawing of
-        DrawLine lineType _ ->
-            case drawing2 of
-                DrawLine lineType2 _ ->
-                    lineType == lineType2
-
-                _ ->
-                    False
-
-        DrawShape shapeType _ ->
-            case drawing2 of
-                DrawShape shapeType2 _ ->
-                    shapeType == shapeType2
-
-                _ ->
-                    False
-
-        DrawTextBox ->
-            case drawing2 of
-                DrawTextBox ->
-                    True
-
-                _ ->
-                    False
-
-        DrawSpotlight shapeType shapeMode ->
-            case drawing2 of
-                DrawSpotlight shapeType2 _ ->
-                    shapeType == shapeType2
-
-                _ ->
-                    False
 
 
 viewVanillaDrawingButton : Keyboard.State -> Drawing -> Drawing -> Html Msg
@@ -407,7 +370,7 @@ drawingStateEvents drawing annotationState =
             ]
 
         EditingATextBox index ->
-            [ SE.onMouseDown <| FinishEditingText index
+            [ Html.Events.onMouseDown <| FinishEditingText index
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (\_ -> FinishEditingText index)
             ]
 
@@ -415,8 +378,8 @@ drawingStateEvents drawing annotationState =
 viewMask : Float -> Float -> Svg msg
 viewMask width height =
     rect
-        [ x "0"
-        , y "0"
+        [ Attr.x "0"
+        , Attr.y "0"
         , Attr.height <| toString height
         , Attr.width <| toString width
         , Attr.mask "url(#Mask)"
@@ -524,8 +487,8 @@ viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing
                 justAnnotations
 
 
-viewCanvas : Model -> Image -> Html Msg
-viewCanvas model image =
+viewDrawingArea : Model -> Image -> Html Msg
+viewDrawingArea model image =
     let
         annotations =
             model.edits.present
@@ -559,6 +522,9 @@ viewCanvas model image =
             )
 
 
+{-|
+  TODO: fix these filters for lines. Lines/Arrows render very strangely with this filter.
+-}
 viewSvgFilters : Svg Msg
 viewSvgFilters =
     Svg.filter [ Attr.id "dropShadow", Attr.x "-20%", Attr.y "-20%", Attr.width "200%", Attr.height "200%" ]
@@ -578,35 +544,15 @@ viewArrowHeadDefinition : Color -> Svg Msg
 viewArrowHeadDefinition color =
     marker
         [ Attr.id <| "arrow-head--" ++ Color.Convert.colorToHex color
-        , orient "auto"
-        , markerWidth "2"
-        , markerHeight "4"
-        , refX "0.1"
-        , refY "2"
+        , Attr.orient "auto"
+        , Attr.markerWidth "2"
+        , Attr.markerHeight "4"
+        , Attr.refX "0.1"
+        , Attr.refY "2"
         , Attr.class "pointerCursor"
         ]
-        [ Svg.path [ d "M0,0 V4 L2,2 Z", Attr.fill <| Color.Convert.colorToHex color ] []
+        [ Svg.path [ Attr.d "M0,0 V4 L2,2 Z", Attr.fill <| Color.Convert.colorToHex color ] []
         ]
-
-
-isSpotlightShape : Annotation -> Bool
-isSpotlightShape annotation =
-    case annotation of
-        Spotlight _ _ ->
-            True
-
-        _ ->
-            False
-
-
-spotlightFillToMaskFill : Annotation -> Annotation
-spotlightFillToMaskFill annotation =
-    case annotation of
-        Spotlight shapeType shape ->
-            Spotlight shapeType { shape | fill = MaskFill }
-
-        _ ->
-            annotation
 
 
 annotationStateEvents : Int -> Annotation -> AnnotationState -> List (Svg.Attribute Msg)
@@ -684,7 +630,7 @@ viewAnnotation annotationState index annotation =
         selectState =
             getSelectState index annotationState
 
-        movementEvents =
+        annotationStateAttrs =
             annotationStateEvents index annotation annotationState
 
         toVertexEvents =
@@ -695,26 +641,26 @@ viewAnnotation annotationState index annotation =
     in
         case annotation of
             Lines lineType line ->
-                viewLine movementEvents (vertices Linear line) lineType line
+                viewLine annotationStateAttrs (vertices Linear line) lineType line
 
             Shapes shapeType shape ->
                 case shapeType of
                     Ellipse ->
-                        viewShape movementEvents (vertices Elliptical shape) shapeType shape
+                        viewShape annotationStateAttrs (vertices Elliptical shape) shapeType shape
 
                     _ ->
-                        viewShape movementEvents (vertices Rectangular shape) shapeType shape
+                        viewShape annotationStateAttrs (vertices Rectangular shape) shapeType shape
 
             TextBox textBox ->
-                viewTextBox movementEvents (vertices Rectangular textBox) annotationState selectState index textBox
+                viewTextBox annotationStateAttrs (vertices Rectangular textBox) annotationState selectState index textBox
 
             Spotlight shapeType shape ->
                 case shapeType of
                     Ellipse ->
-                        viewShape movementEvents (vertices Elliptical shape) shapeType shape
+                        viewShape annotationStateAttrs (vertices Elliptical shape) shapeType shape
 
                     _ ->
-                        viewShape movementEvents (vertices Rectangular shape) shapeType shape
+                        viewShape annotationStateAttrs (vertices Rectangular shape) shapeType shape
 
 
 annotationStateVertexEvents : Int -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
@@ -740,12 +686,12 @@ annotationStateVertexEvents index annotationState vertex =
 maskDefinition : AnnotationState -> Float -> Float -> List (Svg Msg) -> Svg Msg
 maskDefinition annotationState width height shapes =
     rect
-        ([ x "0"
-         , y "0"
+        ([ Attr.x "0"
+         , Attr.y "0"
          , Attr.width <| toString width
          , Attr.height <| toString height
-         , opacity "0.5"
-         , fill "white"
+         , Attr.opacity "0.5"
+         , Attr.fill "white"
          ]
         )
         []
@@ -898,18 +844,18 @@ rectAttrs : Shape -> List (Svg.Attribute Msg)
 rectAttrs { start, end } =
     [ Attr.width <| toString <| abs <| end.x - start.x
     , Attr.height <| toString <| abs <| end.y - start.y
-    , x <| toString <| Basics.min start.x end.x
-    , y <| toString <| Basics.min start.y end.y
+    , Attr.x <| toString <| Basics.min start.x end.x
+    , Attr.y <| toString <| Basics.min start.y end.y
     , Attr.filter "url(#dropShadow)"
     ]
 
 
 ellipseAttributes : Shape -> List (Svg.Attribute Msg)
 ellipseAttributes { start, end } =
-    [ rx <| toString <| abs <| end.x - start.x
-    , ry <| toString <| abs <| end.y - start.y
-    , cx <| toString start.x
-    , cy <| toString start.y
+    [ Attr.rx <| toString <| abs <| end.x - start.x
+    , Attr.ry <| toString <| abs <| end.y - start.y
+    , Attr.cx <| toString start.x
+    , Attr.cy <| toString start.y
     , Attr.filter "url(#dropShadow)"
     ]
 
@@ -924,7 +870,7 @@ shapeAttributes shapeType shape =
             if isVisible then
                 [ Attr.fill fillColor ]
             else
-                [ Attr.fill fillColor, fillOpacity "0" ]
+                [ Attr.fill fillColor, Attr.fillOpacity "0" ]
     in
         List.append fillStyles <|
             case shapeType of
@@ -932,7 +878,7 @@ shapeAttributes shapeType shape =
                     shapeAttrs shape ++ rectAttrs shape
 
                 RoundedRect ->
-                    shapeAttrs shape ++ rectAttrs shape ++ [ rx "15", ry "15" ]
+                    shapeAttrs shape ++ rectAttrs shape ++ [ Attr.rx "15", Attr.ry "15" ]
 
                 Ellipse ->
                     shapeAttrs shape ++ ellipseAttributes shape
@@ -957,10 +903,10 @@ lineVertices toVertexEvents start end =
 viewVertex : List (Svg.Attribute Msg) -> Int -> Int -> Svg Msg
 viewVertex vertexEvents x y =
     circle
-        ([ cx <| toString x
-         , cy <| toString y
-         , r "5"
-         , fill <| Color.Convert.colorToHex Color.blue
+        ([ Attr.cx <| toString x
+         , Attr.cy <| toString y
+         , Attr.r "5"
+         , Attr.fill <| Color.Convert.colorToHex Color.blue
          , Attr.stroke "white"
          , Attr.strokeWidth "2"
          , Attr.filter "url(#dropShadow)"
@@ -1007,7 +953,7 @@ viewTextArea index { start, end, text, fill, fontSize, angle, autoexpand } =
                 ]
             , Html.attribute "onclick" "event.stopPropagation();"
             ]
-            [ AutoExpand.view (Goat.Update.config index) (toFloat fontSize * 1.2) autoexpand text
+            [ AutoExpand.view (Goat.Update.config index) (fontSizeToLineHeight fontSize) autoexpand text
             ]
         ]
 
@@ -1022,16 +968,16 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
         NotSelected ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
-                |> Svg.text_ ([ y <| toString <| Basics.min start.y end.y ] ++ attrs)
+                |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
+                |> Svg.text_ ([ Attr.y <| toString <| Basics.min start.y end.y ] ++ attrs)
                 |> List.singleton
 
         SelectedWithVertices ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ dy <| toString fontSize, x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_
-                    ([ y <| toString <| Basics.min start.y end.y
+                    ([ Attr.y <| toString <| Basics.min start.y end.y
                      , Html.Events.onDoubleClick <| StartEditingText index textBox
                      , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> StartEditingText index textBox)
                      , Attr.stroke <|
@@ -1045,14 +991,6 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
                         ++ attrs
                     )
                 |> List.singleton
-
-
-svgTextHeight : Int -> String -> Int
-svgTextHeight fontSize text =
-    text
-        |> String.split "\n"
-        |> List.length
-        |> (*) fontSize
 
 
 viewLine : List (Svg.Attribute Msg) -> List (Svg Msg) -> LineType -> Line -> List (Svg Msg)
@@ -1074,19 +1012,14 @@ simpleLineAttrs : Line -> List (Svg.Attribute Msg)
 simpleLineAttrs ({ start, end } as line) =
     []
         ++ [ Attr.fill "none"
-           , d <| linePath start end
+           , Attr.d <| linePath start end
              --  , Attr.filter "url(#dropShadow)"
            ]
 
 
-linePath : StartPosition -> EndPosition -> String
-linePath start end =
-    "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
-
-
 arrowAttributes : Line -> List (Svg.Attribute Msg)
 arrowAttributes line =
-    [ markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex line.strokeColor ++ ")" ]
+    [ Attr.markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex line.strokeColor ++ ")" ]
 
 
 lineAttributes : LineType -> Line -> List (Svg.Attribute Msg)

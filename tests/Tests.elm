@@ -134,7 +134,7 @@ ellipseSelector shape =
 roundedRectSelector : Shape -> List Selector
 roundedRectSelector shape =
     [ attribute "rx" "15"
-    , attribute "rx" "15"
+    , attribute "ry" "15"
     ]
         ++ rectSelector shape
 
@@ -173,7 +173,7 @@ svgTextSelector { start, end } =
 tspanSelector : TextArea -> List Selector
 tspanSelector { start, end, fontSize, fill } =
     [ tag "tspan"
-    , attribute "dy" <| toString <| fontSize
+    , attribute "dy" <| toString <| fontSizeToLineHeight fontSize
     , attribute "x" <| toString <| Basics.min start.x end.x
     , attribute "fill" <| Color.Convert.colorToHex fill
     ]

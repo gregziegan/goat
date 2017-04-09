@@ -208,3 +208,77 @@ mapAtIndex index fn xs =
 
         Nothing ->
             xs
+
+
+drawingsAreEqual : Drawing -> Drawing -> Bool
+drawingsAreEqual drawing drawing2 =
+    case drawing of
+        DrawLine lineType _ ->
+            case drawing2 of
+                DrawLine lineType2 _ ->
+                    lineType == lineType2
+
+                _ ->
+                    False
+
+        DrawShape shapeType _ ->
+            case drawing2 of
+                DrawShape shapeType2 _ ->
+                    shapeType == shapeType2
+
+                _ ->
+                    False
+
+        DrawTextBox ->
+            case drawing2 of
+                DrawTextBox ->
+                    True
+
+                _ ->
+                    False
+
+        DrawSpotlight shapeType shapeMode ->
+            case drawing2 of
+                DrawSpotlight shapeType2 _ ->
+                    shapeType == shapeType2
+
+                _ ->
+                    False
+
+
+isSpotlightShape : Annotation -> Bool
+isSpotlightShape annotation =
+    case annotation of
+        Spotlight _ _ ->
+            True
+
+        _ ->
+            False
+
+
+spotlightFillToMaskFill : Annotation -> Annotation
+spotlightFillToMaskFill annotation =
+    case annotation of
+        Spotlight shapeType shape ->
+            Spotlight shapeType { shape | fill = MaskFill }
+
+        _ ->
+            annotation
+
+
+fontSizeToLineHeight : Int -> Float
+fontSizeToLineHeight fontSize =
+    toFloat fontSize * 1.2
+
+
+svgTextHeight : Int -> String -> Int
+svgTextHeight fontSize text =
+    text
+        |> String.split "\n"
+        |> List.length
+        |> (*) fontSize
+
+
+linePath : StartPosition -> EndPosition -> String
+linePath start end =
+    "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
