@@ -668,15 +668,6 @@ toggleDropdown editOption model =
     }
 
 
-selectShape : ShapeType -> Keyboard.State -> Drawing
-selectShape shapeType keyboardState =
-    DrawShape shapeType <|
-        if isPressed Shift keyboardState then
-            DrawingEqualizedShape
-        else
-            DrawingShape
-
-
 setMouse : Mouse.Position -> Model -> Model
 setMouse mouse model =
     { model | mouse = mouse }
@@ -723,39 +714,95 @@ finishEditingText index model =
     { model | annotationState = ReadyToDraw }
 
 
+handleKeyboardShortcuts : KeyChange -> Model -> Model
+handleKeyboardShortcuts keyChange model =
+    case keyChange of
+        KeyDown key ->
+            case key of
+                Number1 ->
+                    { model | drawing = selectLine Arrow model.keyboardState }
+
+                Number2 ->
+                    { model | drawing = selectLine StraightLine model.keyboardState }
+
+                Number3 ->
+                    { model | drawing = selectShape Rect model.keyboardState }
+
+                Number4 ->
+                    { model | drawing = selectShape RoundedRect model.keyboardState }
+
+                Number5 ->
+                    { model | drawing = selectShape Ellipse model.keyboardState }
+
+                Number6 ->
+                    { model | drawing = DrawTextBox }
+
+                Number7 ->
+                    { model | drawing = selectSpotlight Rect model.keyboardState }
+
+                Number8 ->
+                    { model | drawing = selectSpotlight RoundedRect model.keyboardState }
+
+                Number9 ->
+                    { model | drawing = selectSpotlight Ellipse model.keyboardState }
+
+                CharQ ->
+                    toggleDropdown Fonts model
+
+                CharW ->
+                    toggleDropdown StrokeColors model
+
+                CharE ->
+                    toggleDropdown Fills model
+
+                CharR ->
+                    toggleDropdown Strokes model
+
+                _ ->
+                    model
+
+        KeyUp key ->
+            model
+
+
 alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
 alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
-    case model.annotationState of
-        EditingATextBox index ->
-            alterTextBoxDrawing maybeKeyChange index model
-
-        _ ->
-            alterDrawing maybeKeyChange model
-                => []
-
-
-alterTextBoxDrawing : Maybe KeyChange -> Int -> Model -> ( Model, List (Cmd Msg) )
-alterTextBoxDrawing maybeKeyChange index model =
     case maybeKeyChange of
         Just keyChange ->
-            case keyChange of
-                KeyDown key ->
-                    case key of
-                        Escape ->
-                            finishEditingText index model
-                                => [ "text-box-edit--"
-                                        ++ toString index
-                                        |> Dom.blur
-                                        |> Task.attempt tryToBlur
-                                   ]
+            case model.annotationState of
+                ReadyToDraw ->
+                    alterDrawing keyChange model
+                        |> handleKeyboardShortcuts keyChange
+                        => []
 
-                        _ ->
-                            model => []
+                EditingATextBox index ->
+                    alterTextBoxDrawing keyChange index model
 
-                KeyUp key ->
-                    model => []
+                _ ->
+                    alterDrawing keyChange model
+                        => []
 
         Nothing ->
+            model => []
+
+
+alterTextBoxDrawing : KeyChange -> Int -> Model -> ( Model, List (Cmd Msg) )
+alterTextBoxDrawing keyChange index model =
+    case keyChange of
+        KeyDown key ->
+            case key of
+                Escape ->
+                    finishEditingText index model
+                        => [ "text-box-edit--"
+                                ++ toString index
+                                |> Dom.blur
+                                |> Task.attempt tryToBlur
+                           ]
+
+                _ ->
+                    model => []
+
+        KeyUp key ->
             model => []
 
 
@@ -782,8 +829,8 @@ changeDrawing drawing model =
     { model | drawing = drawing }
 
 
-alterDrawing : Maybe KeyChange -> Model -> Model
-alterDrawing maybeKeyChange ({ keyboardState } as model) =
+alterDrawing : KeyChange -> Model -> Model
+alterDrawing keyChange ({ keyboardState } as model) =
     let
         controlKey =
             case model.operatingSystem of
@@ -793,64 +840,59 @@ alterDrawing maybeKeyChange ({ keyboardState } as model) =
                 Windows ->
                     Control
     in
-        case maybeKeyChange of
-            Just keyChange ->
-                case keyChange of
-                    KeyDown key ->
-                        case key of
-                            Shift ->
-                                changeDrawing (transitionOnShift model.drawing) model
+        case keyChange of
+            KeyDown key ->
+                case key of
+                    Shift ->
+                        changeDrawing (transitionOnShift model.drawing) model
 
-                            Escape ->
-                                cancelDrawing model
+                    Escape ->
+                        cancelDrawing model
 
-                            Delete ->
-                                deleteSelectedDrawing model
+                    Delete ->
+                        deleteSelectedDrawing model
 
-                            BackSpace ->
-                                deleteSelectedDrawing model
+                    BackSpace ->
+                        deleteSelectedDrawing model
 
-                            CharZ ->
-                                if isPressed Shift keyboardState && isPressed controlKey keyboardState then
-                                    { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                                else if isPressed controlKey keyboardState then
-                                    { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                                else
-                                    model
+                    CharZ ->
+                        if isPressed Shift keyboardState && isPressed controlKey keyboardState then
+                            { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
+                        else if isPressed controlKey keyboardState then
+                            { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
+                        else
+                            model
 
-                            Control ->
-                                if model.operatingSystem == MacOS then
-                                    model
-                                else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
-                                    { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                                else if isPressed CharZ keyboardState then
-                                    { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                                else
-                                    model
+                    Control ->
+                        if model.operatingSystem == MacOS then
+                            model
+                        else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
+                            { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
+                        else if isPressed CharZ keyboardState then
+                            { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
+                        else
+                            model
 
-                            Super ->
-                                if model.operatingSystem == Windows then
-                                    model
-                                else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
-                                    { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                                else if isPressed CharZ keyboardState then
-                                    { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
-                                else
-                                    model
+                    Super ->
+                        if model.operatingSystem == Windows then
+                            model
+                        else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
+                            { model | edits = UndoList.redo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
+                        else if isPressed CharZ keyboardState then
+                            { model | edits = UndoList.undo model.edits, keyboardState = Keyboard.forceRelease [ CharZ ] model.keyboardState }
+                        else
+                            model
 
-                            _ ->
-                                model
+                    _ ->
+                        model
 
-                    KeyUp key ->
-                        case key of
-                            Shift ->
-                                changeDrawing (transitionOnShift model.drawing) model
+            KeyUp key ->
+                case key of
+                    Shift ->
+                        changeDrawing (transitionOnShift model.drawing) model
 
-                            _ ->
-                                model
-
-            Nothing ->
-                model
+                    _ ->
+                        model
 
 
 tryToEdit : Int -> Result Dom.Error () -> Msg

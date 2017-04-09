@@ -2,23 +2,11 @@ module Goat.Helpers exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Color.Convert
-import Goat.Model
-    exposing
-        ( Annotation(..)
-        , AnnotationState(..)
-        , Drawing(..)
-        , EndPosition
-        , Fill(..)
-        , Image
-        , LineMode(..)
-        , ShapeMode(..)
-        , StartPosition
-        , StrokeStyle(..)
-        , controlUIWidth
-        )
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), EndPosition, Fill(..), Image, LineMode(..), LineType(..), ShapeMode(..), ShapeType(..), StartPosition, StrokeStyle(..), controlUIWidth)
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import Json.Decode as Json
+import Keyboard.Extra as Keyboard exposing (Key(Shift), isPressed)
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
 import SingleTouch as ST
@@ -328,3 +316,30 @@ pointerEvents fill =
 
         SpotlightFill ->
             "pointer-events: visibleStroke;"
+
+
+selectLine : LineType -> Keyboard.State -> Drawing
+selectLine lineType keyboardState =
+    DrawLine lineType <|
+        if isPressed Shift keyboardState then
+            DrawingDiscreteLine
+        else
+            DrawingLine
+
+
+selectShape : ShapeType -> Keyboard.State -> Drawing
+selectShape shapeType keyboardState =
+    DrawShape shapeType <|
+        if isPressed Shift keyboardState then
+            DrawingEqualizedShape
+        else
+            DrawingShape
+
+
+selectSpotlight : ShapeType -> Keyboard.State -> Drawing
+selectSpotlight shapeType keyboardState =
+    DrawSpotlight shapeType <|
+        if isPressed Shift keyboardState then
+            DrawingEqualizedShape
+        else
+            DrawingShape
