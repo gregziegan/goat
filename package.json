@@ -5,15 +5,13 @@
   "description": "Minimal image annotation tool",
   "author": "greg.ziegan@gmail.com",
   "license": "MIT",
-  "scripts": {
-    "test": "elm-test"
-  },
   "config": {
     "port": "4567"
   },
   "scripts": {
     "start": "zendency development",
-    "bundle": "zendency bundle $1"
+    "bundle": "zendency bundle $1",
+    "test": "elm-test"
   },
   "main": "./",
   "compiler": [],
