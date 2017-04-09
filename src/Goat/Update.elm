@@ -121,7 +121,8 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
                 => []
 
         ReturnToImageSelection ->
-            { model | imageSelected = False, edits = UndoList.reset model.edits }
+            model
+                |> returnToImageSelection
                 => []
 
         KeyboardMsg keyMsg ->
@@ -138,22 +139,13 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
                 => []
 
         SelectImage image ->
-            case model.images of
-                Just images ->
-                    { model
-                        | images =
-                            images
-                                |> List.Zipper.first
-                                |> List.Zipper.find ((==) image.url << .url)
-                        , imageSelected = True
-                    }
-                        => []
-
-                Nothing ->
-                    model => []
+            model
+                |> selectImage image
+                => []
 
         ChangeDrawing drawing ->
-            { model | drawing = drawing }
+            model
+                |> changeDrawing drawing
                 |> closeDropdown
                 => []
 
@@ -261,11 +253,11 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
                 => []
 
         Undo ->
-            { model | edits = UndoList.undo model.edits }
+            undoEdit model
                 => []
 
         Redo ->
-            { model | edits = UndoList.redo model.edits }
+            redoEdit model
                 => []
 
         Save ->
@@ -1182,6 +1174,27 @@ sendAnnotationToBack index model =
 closeAllMenus : Model -> Model
 closeAllMenus model =
     { model | showingAnyMenu = False, annotationMenu = Nothing }
+
+
+selectImage : Image -> Model -> Model
+selectImage image model =
+    case model.images of
+        Just images ->
+            { model
+                | images =
+                    images
+                        |> List.Zipper.first
+                        |> List.Zipper.find ((==) image.url << .url)
+                , imageSelected = True
+            }
+
+        Nothing ->
+            model
+
+
+returnToImageSelection : Model -> Model
+returnToImageSelection model =
+    { model | imageSelected = False, edits = UndoList.reset model.edits }
 
 
 config : Int -> AutoExpand.Config Msg
