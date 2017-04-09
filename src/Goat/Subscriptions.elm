@@ -26,13 +26,13 @@ imageAnnotationSubscriptions model =
                     , Sub.map KeyboardMsg Keyboard.subscriptions
                     ]
 
-                ResizingAnnotation index annotation start vertex ->
-                    [ Mouse.moves (ResizeAnnotation index annotation vertex start << toDrawingPosition)
+                ResizingAnnotation _ _ _ _ ->
+                    [ Mouse.moves (ResizeAnnotation << toDrawingPosition)
                     , Sub.map KeyboardMsg Keyboard.subscriptions
                     ]
 
-                MovingAnnotation index annotation start ->
-                    [ Mouse.moves (MoveAnnotation index annotation start << toDrawingPosition) ]
+                MovingAnnotation index start _ ->
+                    [ Mouse.moves (MoveAnnotation index start << toDrawingPosition) ]
 
                 _ ->
                     [ Sub.map KeyboardMsg Keyboard.subscriptions ]

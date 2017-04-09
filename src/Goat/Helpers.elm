@@ -138,7 +138,7 @@ annotationStateToCursor annotationState =
         MovingAnnotation _ _ _ ->
             "move"
 
-        ResizingAnnotation _ _ _ vertex ->
+        ResizingAnnotation _ _ _ _ ->
             "nesw-resize"
 
         EditingATextBox _ ->
@@ -200,8 +200,8 @@ onMouseUpOrLeave decodeToMsg =
     [ on "mouseleave" decodeToMsg, onMouseUp decodeToMsg ]
 
 
-mapAtIndex : (a -> a) -> Int -> Array a -> Array a
-mapAtIndex fn index xs =
+mapAtIndex : Int -> (a -> a) -> Array a -> Array a
+mapAtIndex index fn xs =
     case Array.get index xs of
         Just x ->
             Array.set index (fn x) xs

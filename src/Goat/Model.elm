@@ -139,9 +139,9 @@ type OperatingSystem
 type AnnotationState
     = ReadyToDraw
     | DrawingAnnotation StartPosition
-    | SelectedAnnotation Int Annotation
-    | MovingAnnotation Int Annotation StartPosition
-    | ResizingAnnotation Int Annotation StartPosition Vertex
+    | SelectedAnnotation Int
+    | MovingAnnotation Int StartPosition ( Int, Int )
+    | ResizingAnnotation Int StartPosition Vertex ( StartPosition, EndPosition )
     | EditingATextBox Int
 
 

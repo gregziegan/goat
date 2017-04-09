@@ -37,15 +37,15 @@ type Msg
     | CloseDropdown
       -- Selection Updates
     | ResetToReadyToDraw
-    | SelectAnnotation Int Annotation StartPosition
+    | SelectAnnotation Int StartPosition
       -- Move updates
-    | StartMovingAnnotation Int Annotation StartPosition
-    | MoveAnnotation Int Annotation StartPosition EndPosition
-    | FinishMovingAnnotation Int Annotation StartPosition EndPosition
+    | StartMovingAnnotation Int StartPosition
+    | MoveAnnotation Int StartPosition Position
+    | FinishMovingAnnotation Int StartPosition Position
       -- Resize updates
-    | StartResizingAnnotation Int Annotation Vertex StartPosition
-    | ResizeAnnotation Int Annotation Vertex StartPosition EndPosition
-    | FinishResizingAnnotation Int Annotation Vertex StartPosition EndPosition
+    | StartResizingAnnotation Int Vertex StartPosition
+    | ResizeAnnotation Position
+    | FinishResizingAnnotation Position
       -- History updates
     | Undo
     | Redo
@@ -202,10 +202,10 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                     |> closeDropdown
                     => []
 
-            SelectAnnotation index annotation start ->
+            SelectAnnotation index start ->
                 model
-                    |> selectAnnotation index annotation
-                    |> startMovingAnnotation index annotation start
+                    |> selectAnnotation index
+                    |> startMovingAnnotation index start
                     => []
 
             ResetToReadyToDraw ->
@@ -213,41 +213,40 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
                     |> resetToReadyToDraw
                     => []
 
-            StartMovingAnnotation index annotation start ->
+            StartMovingAnnotation index start ->
+                model
+                    |> selectAnnotation index
+                    |> startMovingAnnotation index start
+                    => []
+
+            MoveAnnotation index start newPos ->
+                model
+                    |> moveAnnotation index start newPos
+                    => []
+
+            FinishMovingAnnotation index start newPos ->
+                model
+                    |> moveAnnotation index start newPos
+                    |> finishMovingAnnotation index
+                    => []
+
+            StartResizingAnnotation index vertex start ->
                 model
                     |> setMouse start
-                    |> selectAnnotation index annotation
-                    |> startMovingAnnotation index annotation start
+                    |> selectAnnotation index
+                    |> startResizingAnnotation index vertex start
+                    |> resizeAnnotation start
                     => []
 
-            MoveAnnotation index annotation oldPos newPos ->
+            ResizeAnnotation pos ->
                 model
-                    |> moveAnnotation index annotation oldPos newPos
+                    |> resizeAnnotation pos
                     => []
 
-            FinishMovingAnnotation index annotation start end ->
+            FinishResizingAnnotation pos ->
                 model
-                    |> moveAnnotation index annotation start end
-                    |> finishMovingAnnotation index (move start end annotation)
-                    => []
-
-            StartResizingAnnotation index annotation vertex start ->
-                model
-                    |> setMouse start
-                    |> selectAnnotation index annotation
-                    |> startResizingAnnotation index annotation vertex start
-                    |> resizeAnnotation index annotation vertex start start
-                    => []
-
-            ResizeAnnotation index annotation vertex start end ->
-                model
-                    |> resizeAnnotation index annotation vertex start end
-                    => []
-
-            FinishResizingAnnotation index annotation vertex start end ->
-                model
-                    |> resizeAnnotation index annotation vertex start end
-                    |> selectAnnotation index (resize start end vertex annotation)
+                    |> resizeAnnotation pos
+                    |> finishResizingAnnotation
                     => []
 
             Undo ->
@@ -312,23 +311,31 @@ resetToReadyToDraw model =
     { model | annotationState = ReadyToDraw }
 
 
-finishMovingAnnotation : Int -> Annotation -> Model -> Model
-finishMovingAnnotation index annotation model =
-    { model | annotationState = SelectedAnnotation index annotation }
+finishMovingAnnotation : Int -> Model -> Model
+finishMovingAnnotation index model =
+    case model.annotationState of
+        MovingAnnotation int startPosition translate ->
+            { model
+                | annotationState = SelectedAnnotation index
+                , edits = UndoList.new (mapAtIndex index (move translate) model.edits.present) model.edits
+            }
+
+        _ ->
+            model
 
 
 updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
 updateAnySelectedAnnotations fn model =
     case model.annotationState of
-        SelectedAnnotation index annotation ->
+        SelectedAnnotation index ->
             { model
-                | edits = UndoList.new (Array.set index (fn annotation) model.edits.present) model.edits
-                , annotationState = SelectedAnnotation index (fn annotation)
+                | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
+                , annotationState = SelectedAnnotation index
             }
 
         EditingATextBox index ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex fn index) model.edits
+                | edits = UndoList.mapPresent (mapAtIndex index fn) model.edits
             }
 
         _ ->
@@ -345,9 +352,9 @@ autoExpandAnnotation state textValue annotation =
             annotation
 
 
-selectAnnotation : Int -> Annotation -> Model -> Model
-selectAnnotation index annotation model =
-    { model | annotationState = SelectedAnnotation index annotation }
+selectAnnotation : Int -> Model -> Model
+selectAnnotation index model =
+    { model | annotationState = SelectedAnnotation index }
 
 
 addAnnotation : Annotation -> Model -> Model
@@ -492,32 +499,78 @@ setStrokeColor strokeColor model =
     { model | strokeColor = strokeColor }
 
 
-startMovingAnnotation : Int -> Annotation -> StartPosition -> Model -> Model
-startMovingAnnotation index annotation start model =
-    { model | annotationState = MovingAnnotation index annotation start }
+startMovingAnnotation : Int -> Position -> Model -> Model
+startMovingAnnotation index newPos model =
+    case Array.get index model.edits.present of
+        Just annotation ->
+            { model
+                | annotationState = MovingAnnotation index newPos ( 0, 0 )
+            }
+
+        Nothing ->
+            model
 
 
-moveAnnotation : Int -> Annotation -> StartPosition -> EndPosition -> Model -> Model
-moveAnnotation index annotation oldPos newPos model =
-    { model
-        | edits = UndoList.mapPresent (Array.set index (move oldPos newPos annotation)) model.edits
-    }
+getPositions : Annotation -> ( StartPosition, EndPosition )
+getPositions annotation =
+    case annotation of
+        Lines lineType line ->
+            line.start => line.end
+
+        Shapes shapeType shape ->
+            shape.start => shape.end
+
+        TextBox textArea ->
+            textArea.start => textArea.end
+
+        Spotlight shapeType shape ->
+            shape.start => shape.end
 
 
-startResizingAnnotation : Int -> Annotation -> Vertex -> StartPosition -> Model -> Model
-startResizingAnnotation index annotation vertex start model =
-    { model | annotationState = ResizingAnnotation index annotation start vertex }
+moveAnnotation : Int -> StartPosition -> Position -> Model -> Model
+moveAnnotation index start newPos model =
+    case model.annotationState of
+        MovingAnnotation index start ( dx, dy ) ->
+            { model | annotationState = MovingAnnotation index start ( newPos.x - start.x, newPos.y - start.y ) }
+
+        _ ->
+            model
 
 
-resizeAnnotation : Int -> Annotation -> Vertex -> StartPosition -> EndPosition -> Model -> Model
-resizeAnnotation index annotation vertex oldPos newPos model =
-    { model
-        | edits = UndoList.mapPresent (Array.set index (resize oldPos newPos vertex annotation)) model.edits
-    }
+startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
+startResizingAnnotation index vertex start model =
+    case Array.get index model.edits.present of
+        Just annotation ->
+            { model | annotationState = ResizingAnnotation index start vertex (getPositions annotation) }
+
+        Nothing ->
+            model
 
 
-resizeVertices : Position -> Vertex -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeVertices pos vertex annotation =
+resizeAnnotation : Position -> Model -> Model
+resizeAnnotation newPos model =
+    case model.annotationState of
+        ResizingAnnotation index start vertex originalCords ->
+            { model
+                | edits = UndoList.mapPresent (mapAtIndex index (resize start newPos vertex originalCords)) model.edits
+            }
+
+        _ ->
+            model
+
+
+finishResizingAnnotation : Model -> Model
+finishResizingAnnotation model =
+    case model.annotationState of
+        ResizingAnnotation index _ _ _ ->
+            { model | annotationState = SelectedAnnotation index }
+
+        _ ->
+            model
+
+
+resizeVertices : Position -> Vertex -> ( StartPosition, EndPosition ) -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
+resizeVertices pos vertex ( start, end ) annotation =
     case vertex of
         Start ->
             { annotation | start = pos }
@@ -526,18 +579,15 @@ resizeVertices pos vertex annotation =
             { annotation | end = pos }
 
         StartPlusX ->
-            { annotation | start = pos, end = Position annotation.start.x annotation.end.y }
+            { annotation | start = pos, end = Position start.x end.y }
 
         StartPlusY ->
-            { annotation | start = pos, end = Position annotation.end.x annotation.start.y }
+            { annotation | start = pos, end = Position end.x start.y }
 
 
-resizeEllipseVertices : Position -> Vertex -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeEllipseVertices pos vertex annotation =
+resizeEllipseVertices : Position -> Vertex -> ( StartPosition, EndPosition ) -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
+resizeEllipseVertices pos vertex ( start, end ) annotation =
     let
-        { start, end } =
-            annotation
-
         dX =
             start.x - pos.x
 
@@ -558,51 +608,52 @@ resizeEllipseVertices pos vertex annotation =
                 { annotation | start = Position (pos.x + ((end.x - pos.x) // 2)) (start.y - ((start.y - pos.y) // 2)), end = Position end.x start.y }
 
 
-resize : StartPosition -> EndPosition -> Vertex -> Annotation -> Annotation
-resize start end vertex annotation =
+resize : StartPosition -> EndPosition -> Vertex -> ( StartPosition, EndPosition ) -> Annotation -> Annotation
+resize start end vertex originalCoords annotation =
     case annotation of
         Lines lineType line ->
-            Lines lineType (resizeVertices end vertex line)
+            Lines lineType (resizeVertices end vertex originalCoords line)
 
         Shapes shapeType shape ->
             case shapeType of
                 Ellipse ->
-                    Shapes shapeType (resizeEllipseVertices end vertex shape)
+                    Shapes shapeType (resizeEllipseVertices end vertex originalCoords shape)
 
                 _ ->
-                    Shapes shapeType (resizeVertices end vertex shape)
+                    Shapes shapeType (resizeVertices end vertex originalCoords shape)
 
         TextBox textArea ->
-            TextBox (resizeVertices end vertex textArea)
+            TextBox (resizeVertices end vertex originalCoords textArea)
 
         Spotlight shapeType shape ->
-            Spotlight shapeType (resizeVertices end vertex shape)
+            Spotlight shapeType (resizeVertices end vertex originalCoords shape)
 
 
-move : StartPosition -> EndPosition -> Annotation -> Annotation
-move oldPos newPos annotation =
-    let
-        dX =
-            newPos.x - oldPos.x
+shift :
+    ( Int, Int )
+    -> { a | start : Position, end : Position }
+    -> { a | end : Position, start : Position }
+shift ( dx, dy ) drawing =
+    { drawing
+        | start = shiftPosition dx dy drawing.start
+        , end = shiftPosition dx dy drawing.end
+    }
 
-        dY =
-            newPos.y - oldPos.y
 
-        shift drawing =
-            { drawing | start = shiftPosition dX dY drawing.start, end = shiftPosition dX dY drawing.end }
-    in
-        case annotation of
-            Lines lineType line ->
-                Lines lineType (shift line)
+move : ( Int, Int ) -> Annotation -> Annotation
+move translate annotation =
+    case annotation of
+        Lines lineType line ->
+            Lines lineType (shift translate line)
 
-            Shapes shapeType shape ->
-                Shapes shapeType (shift shape)
+        Shapes shapeType shape ->
+            Shapes shapeType (shift translate shape)
 
-            TextBox textArea ->
-                TextBox (shift textArea)
+        TextBox textArea ->
+            TextBox (shift translate textArea)
 
-            Spotlight shapeType shape ->
-                Spotlight shapeType (shift shape)
+        Spotlight shapeType shape ->
+            Spotlight shapeType (shift translate shape)
 
 
 shiftPosition : Int -> Int -> Mouse.Position -> Mouse.Position
@@ -746,7 +797,7 @@ alterTextBoxDrawing maybeKeyChange index model =
 deleteSelectedDrawing : Model -> Model
 deleteSelectedDrawing model =
     case model.annotationState of
-        SelectedAnnotation index _ ->
+        SelectedAnnotation index ->
             { model
                 | edits = UndoList.new (removeItem index model.edits.present) model.edits
                 , annotationState = ReadyToDraw
