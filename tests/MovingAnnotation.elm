@@ -10,7 +10,7 @@ import TestUtil exposing (getFirstAnnotation, isAnnotationMovedByCorrectAmount)
 
 all : Test
 all =
-    describe "drawing"
+    describe "MovingAnnotation state"
         [ startMovingTests
         , moveAnnotationTests
         , finishMovingAnnotationTests

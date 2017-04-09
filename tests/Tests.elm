@@ -3,6 +3,7 @@ module Tests exposing (..)
 import DrawingAnnotations
 import Helpers
 import MovingAnnotation
+import ResizingAnnotation
 import SelectedAnnotation
 import Test exposing (..)
 import View.Annotation
@@ -14,6 +15,7 @@ all =
         [ DrawingAnnotations.all
         , SelectedAnnotation.all
         , MovingAnnotation.all
+        , ResizingAnnotation.all
         , View.Annotation.all
         , Helpers.all
         ]
