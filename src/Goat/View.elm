@@ -415,10 +415,9 @@ viewMask width height =
 viewSpotlights : AnnotationState -> Array Annotation -> List (Svg Msg)
 viewSpotlights annotationState annotations =
     annotations
-        |> Array.filter isSpotlightShape
-        |> Array.map spotlightFillToMaskFill
-        |> Array.toList
-        |> List.indexedMap (viewMaskAnnotation annotationState)
+        |> Array.toIndexedList
+        |> List.filter (isSpotlightShape << Tuple.second)
+        |> List.map (uncurry (viewMaskAnnotation annotationState) << Tuple.mapSecond spotlightFillToMaskFill)
         |> List.concat
 
 

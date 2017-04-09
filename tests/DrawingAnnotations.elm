@@ -2,7 +2,6 @@ module DrawingAnnotations exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (end, model, start)
-import Fuzz exposing (Fuzzer)
 import Goat.Model
     exposing
         ( Annotation(..)
