@@ -65,7 +65,7 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
     case msg of
         StartDrawing pos ->
             model
-                |> startAnnotation pos images
+                |> startDrawing pos
                 => []
 
         FinishDrawing start end ->
@@ -275,13 +275,6 @@ skipChange model editState =
     { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
-startAnnotation : Position -> Maybe (Zipper Image) -> Model -> Model
-startAnnotation start images model =
-    model
-        |> startDrawing start
-        |> updateMouse images start
-
-
 resetSelection : Model -> Model
 resetSelection model =
     { model | annotationState = ReadyToDraw }
@@ -289,7 +282,7 @@ resetSelection model =
 
 startDrawing : StartPosition -> Model -> Model
 startDrawing start model =
-    { model | annotationState = DrawingAnnotation start }
+    { model | annotationState = DrawingAnnotation start, mouse = start }
 
 
 resetToReadyToDraw : Model -> Model
@@ -682,20 +675,6 @@ selectShape shapeType keyboardState =
             DrawingEqualizedShape
         else
             DrawingShape
-
-
-updateMouse : Maybe (Zipper Image) -> Position -> Model -> Model
-updateMouse maybeImages mouse model =
-    case maybeImages of
-        Nothing ->
-            model
-
-        Just images ->
-            let
-                { width, height } =
-                    List.Zipper.current images
-            in
-                { model | mouse = mouse }
 
 
 setMouse : Mouse.Position -> Model -> Model
