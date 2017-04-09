@@ -89,7 +89,7 @@ viewImageAnnotator ({ edits, fill, strokeColor, strokeStyle, keyboardState, curr
             , div
                 [ Html.class "controls" ]
                 [ div [ Html.class "columns" ]
-                    [ button [ onClick Cancel, Html.class "cancel-button" ] [ Html.text "Cancel" ]
+                    [ button [ onClick ReturnToImageSelection, Html.class "cancel-button" ] [ Html.text "Cancel" ]
                     , button [ onClick Save, Html.class "save-button" ] [ Html.text "Save" ]
                     ]
                 , viewHistoryControls edits

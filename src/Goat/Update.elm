@@ -58,7 +58,7 @@ type Msg
       -- Image Selection updates
     | SelectImage Image
     | SetImages (List Image)
-    | Cancel
+    | ReturnToImageSelection
       -- Keyboard updates
     | KeyboardMsg Keyboard.Msg
       -- Modal updates
@@ -73,6 +73,11 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
         StartDrawing pos ->
             model
                 |> startDrawing pos
+                => []
+
+        ContinueDrawing pos ->
+            model
+                |> continueDrawing pos
                 => []
 
         FinishDrawing pos ->
@@ -111,16 +116,11 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
                 |> skipChange model
                 => []
 
-        ContinueDrawing pos ->
-            model
-                |> continueDrawing pos
-                => []
-
         SetImages images ->
             { model | images = List.Zipper.fromList images }
                 => []
 
-        Cancel ->
+        ReturnToImageSelection ->
             { model | imageSelected = False, edits = UndoList.reset model.edits }
                 => []
 
@@ -300,6 +300,15 @@ skipChange model editState =
     { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
+
+-- DRAWING
+
+
+startDrawing : StartPosition -> Model -> Model
+startDrawing start model =
+    { model | annotationState = DrawingAnnotation start start }
+
+
 continueDrawing : Position -> Model -> Model
 continueDrawing pos model =
     case model.annotationState of
@@ -310,14 +319,52 @@ continueDrawing pos model =
             model
 
 
+finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
+finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
+    case model.annotationState of
+        DrawingAnnotation start _ ->
+            if isDrawingTooSmall (isSpotlightDrawing model.drawing) start pos then
+                model
+                    |> cancelDrawing
+                    => []
+            else
+                case model.drawing of
+                    DrawLine lineType lineMode ->
+                        finishLineDrawing start pos lineType lineMode model
+                            => []
+
+                    DrawShape shapeType shapeMode ->
+                        finishShapeDrawing start pos shapeType shapeMode model
+                            => []
+
+                    DrawTextBox ->
+                        let
+                            numAnnotations =
+                                Array.length model.edits.present
+
+                            initialTextBox =
+                                TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations))
+                        in
+                            model
+                                |> addAnnotation (TextBox <| TextArea start (calcShapePos start pos DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations)))
+                                |> startEditingText numAnnotations
+                                => [ "text-box-edit--"
+                                        ++ toString numAnnotations
+                                        |> Dom.focus
+                                        |> Task.attempt (tryToEdit numAnnotations)
+                                   ]
+
+                    DrawSpotlight shapeType shapeMode ->
+                        finishSpotlightDrawing start pos shapeType shapeMode model
+                            => []
+
+        _ ->
+            model => []
+
+
 resetSelection : Model -> Model
 resetSelection model =
     { model | annotationState = ReadyToDraw }
-
-
-startDrawing : StartPosition -> Model -> Model
-startDrawing start model =
-    { model | annotationState = DrawingAnnotation start start }
 
 
 resetToReadyToDraw : Model -> Model
@@ -395,49 +442,6 @@ finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> ShapeMode 
 finishSpotlightDrawing start end shapeType shapeMode model =
     model
         |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill model.strokeColor model.strokeStyle))
-
-
-finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
-finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
-    case model.annotationState of
-        DrawingAnnotation start _ ->
-            if isDrawingTooSmall (isSpotlightDrawing model.drawing) start pos then
-                model
-                    |> cancelDrawing
-                    => []
-            else
-                case model.drawing of
-                    DrawLine lineType lineMode ->
-                        finishLineDrawing start pos lineType lineMode model
-                            => []
-
-                    DrawShape shapeType shapeMode ->
-                        finishShapeDrawing start pos shapeType shapeMode model
-                            => []
-
-                    DrawTextBox ->
-                        let
-                            numAnnotations =
-                                Array.length model.edits.present
-
-                            initialTextBox =
-                                TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations))
-                        in
-                            model
-                                |> addAnnotation (TextBox <| TextArea start (calcShapePos start pos DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations)))
-                                |> startEditingText numAnnotations
-                                => [ "text-box-edit--"
-                                        ++ toString numAnnotations
-                                        |> Dom.focus
-                                        |> Task.attempt (tryToEdit numAnnotations)
-                                   ]
-
-                    DrawSpotlight shapeType shapeMode ->
-                        finishSpotlightDrawing start pos shapeType shapeMode model
-                            => []
-
-        _ ->
-            model => []
 
 
 startEditingText : Int -> Model -> Model
