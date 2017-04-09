@@ -268,3 +268,59 @@ button:active, button:focus, button:hover {
   margin-left: 3px;
   height: 40px;
 }
+
+
+.annotation-menu {
+  position: fixed;
+  z-index: 4;
+  background-color: white;
+}
+
+.annotation-menu__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #DDDDDD;
+  border-radius: 5px;
+}
+
+.annotation-menu__item {
+  overflow: hidden;
+}
+
+.annotation-menu__item:hover {
+  background-color: rgb(230, 230, 230);
+  color: white;
+}
+
+.annotation-menu__item:first-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.annotation-menu__item:last-child {
+  border-radius: 0 0 4px 4px;
+}
+
+.annotation-menu__button {
+  width: 100%;
+  border: 0px;
+  background-color: inherit;
+  text-align: left;
+  padding: 5px;
+  color: inherit;
+}
+
+.modal-mask {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+}
+
+.hidden {
+  visibility: hidden;
+}

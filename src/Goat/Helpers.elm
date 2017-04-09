@@ -343,3 +343,8 @@ selectSpotlight shapeType keyboardState =
             DrawingEqualizedShape
         else
             DrawingShape
+
+
+defaultPrevented : Html.Events.Options
+defaultPrevented =
+    Html.Events.Options False True
