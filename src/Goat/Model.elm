@@ -228,6 +228,8 @@ type alias Model =
     , currentDropdown : Maybe AttributeDropdown
     , drawing : Drawing
     , operatingSystem : OperatingSystem
+    , annotationMenu : Maybe { index : Int, position : Position }
+    , showingAnyMenu : Bool
     }
 
 
@@ -329,6 +331,8 @@ init flags =
             MacOS
         else
             Windows
+    , annotationMenu = Nothing
+    , showingAnyMenu = False
     }
 
 

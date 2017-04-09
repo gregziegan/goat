@@ -47,6 +47,7 @@ type Msg
     | ResizeAnnotation Position
     | FinishResizingAnnotation Position
       -- Annotation menu updates
+    | ToggleAnnotationMenu Int Position
     | BringAnnotationToFront Int
       -- History updates
     | Undo
@@ -58,6 +59,8 @@ type Msg
     | Cancel
       -- Keyboard updates
     | KeyboardMsg Keyboard.Msg
+      -- Modal updates
+    | CloseAllMenus
       -- !!! GOATS !!!
     | ShowMeTheGoats
 
@@ -131,6 +134,11 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
             in
                 { model | keyboardState = keyboardState }
                     |> alterDrawingsWithKeyboard maybeKeyChange
+
+        CloseAllMenus ->
+            model
+                |> closeAllMenus
+                => []
 
         SelectImage image ->
             case model.images of
@@ -239,6 +247,12 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
 
         BringAnnotationToFront index ->
             model
+                |> bringAnnotationToFront index
+                => []
+
+        ToggleAnnotationMenu index pos ->
+            model
+                |> toggleAnnotationMenu index pos
                 => []
 
         Undo ->
@@ -919,6 +933,37 @@ tryToBlur result =
 
         Err _ ->
             Undo
+
+
+toggleAnnotationMenu : Int -> Position -> Model -> Model
+toggleAnnotationMenu index position model =
+    if model.annotationMenu == Nothing then
+        { model | annotationMenu = Just { index = index, position = position }, showingAnyMenu = True }
+    else
+        { model | showingAnyMenu = False }
+
+
+bringToFront : Int -> Array Annotation -> Array Annotation
+bringToFront index annotations =
+    case Array.get index annotations of
+        Just annotation ->
+            Array.push annotation (Array.append (Array.slice 0 index annotations) (Array.slice (index + 1) (Array.length annotations) annotations))
+
+        Nothing ->
+            annotations
+
+
+bringAnnotationToFront : Int -> Model -> Model
+bringAnnotationToFront index model =
+    { model
+        | edits = UndoList.new (bringToFront index model.edits.present) model.edits
+    }
+        |> closeAllMenus
+
+
+closeAllMenus : Model -> Model
+closeAllMenus model =
+    { model | showingAnyMenu = False, annotationMenu = Nothing }
 
 
 config : Int -> AutoExpand.Config Msg
