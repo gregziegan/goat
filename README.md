@@ -1,4 +1,4 @@
-# G.O.A.T. ![Travis](https://travis-ci.org/thebritican/annotation-editor.svg?branch=master)
+# G.O.A.T. ![Travis](https://travis-ci.org/thebritican/goat.svg?branch=master)
 ### Graphics Ornamentation and Annotation Tool
 ### a.k.a. Greatest Of All Time
 
