@@ -1049,7 +1049,6 @@ viewAnnotationMenu : Position -> Int -> Html Msg
 viewAnnotationMenu pos index =
     div
         [ id "annotation-menu"
-          -- , onWithOptions "contextmenu" defaultPrevented
         , class "annotation-menu"
         , Html.style
             [ ( "top", toPx pos.y )
@@ -1058,6 +1057,7 @@ viewAnnotationMenu pos index =
         ]
         [ Html.ul [ class "annotation-menu__list" ]
             [ viewAnnotationMenuItem (BringAnnotationToFront index) "Bring to Front"
+            , viewAnnotationMenuItem (SendAnnotationToBack index) "Send to Back"
             ]
         ]
 

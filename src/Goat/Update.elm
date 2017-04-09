@@ -49,6 +49,7 @@ type Msg
       -- Annotation menu updates
     | ToggleAnnotationMenu Int Position
     | BringAnnotationToFront Int
+    | SendAnnotationToBack Int
       -- History updates
     | Undo
     | Redo
@@ -248,6 +249,11 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, mouse, images, ke
         BringAnnotationToFront index ->
             model
                 |> bringAnnotationToFront index
+                => []
+
+        SendAnnotationToBack index ->
+            model
+                |> sendAnnotationToBack index
                 => []
 
         ToggleAnnotationMenu index pos ->
@@ -958,6 +964,22 @@ bringAnnotationToFront index model =
     { model
         | edits = UndoList.new (bringToFront index model.edits.present) model.edits
     }
+        |> closeAllMenus
+
+
+sendToBack : Int -> Array Annotation -> Array Annotation
+sendToBack index annotations =
+    case Array.get index annotations of
+        Just annotation ->
+            Array.append (Array.fromList [ annotation ]) (Array.append (Array.slice 0 index annotations) (Array.slice (index + 1) (Array.length annotations) annotations))
+
+        Nothing ->
+            annotations
+
+
+sendAnnotationToBack : Int -> Model -> Model
+sendAnnotationToBack index model =
+    { model | edits = UndoList.new (sendToBack index model.edits.present) model.edits }
         |> closeAllMenus
 
 
