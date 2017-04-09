@@ -7,17 +7,17 @@ import Goat.Model
         ( Annotation(..)
         , AnnotationState(..)
         , Drawing(..)
+        , Fill(..)
         , Line
         , LineMode(..)
         , LineType(..)
-        , Fill(..)
         , Shape
         , ShapeMode(..)
         , ShapeType(..)
         )
-import Goat.Update exposing (startDrawing, finishLineDrawing, finishShapeDrawing, finishSpotlightDrawing)
+import Goat.Update exposing (continueDrawing, finishLineDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
 import Test exposing (..)
-import TestUtil exposing (getFirstAnnotation)
+import TestUtil exposing (getFirstAnnotation, getDrawingStateCurPos)
 
 
 all : Test
@@ -35,6 +35,26 @@ startDrawingTests =
                     |> startDrawing start
                     |> .annotationState
                     |> Expect.equal (DrawingAnnotation start start)
+        ]
+
+
+continueDrawingTests : Test
+continueDrawingTests =
+    describe "continueDrawing"
+        [ test "should update the current mouse position in DrawingAnnotation" <|
+            \() ->
+                model
+                    |> startDrawing start
+                    |> continueDrawing end
+                    |> .annotationState
+                    |> Expect.equal (DrawingAnnotation start end)
+        , test "should not update the mouse position if not drawing an annotation" <|
+            \() ->
+                model
+                    |> continueDrawing end
+                    |> .annotationState
+                    |> getDrawingStateCurPos
+                    |> Expect.equal Nothing
         ]
 
 

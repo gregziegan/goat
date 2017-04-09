@@ -1,8 +1,8 @@
 module TestUtil exposing (..)
 
-import Fuzz exposing (Fuzzer)
 import Array.Hamt as Array
-import Goat.Model exposing (Annotation, Model)
+import Fuzz exposing (Fuzzer)
+import Goat.Model exposing (Annotation, AnnotationState(..), Model)
 import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
@@ -21,3 +21,13 @@ position =
     Fuzz.custom
         (Random.map2 Position (Random.int -100 100) (Random.int -100 100))
         (\{ x, y } -> Shrink.map Position (Shrink.int x) |> Shrink.andMap (Shrink.int y))
+
+
+getDrawingStateCurPos : AnnotationState -> Maybe Position
+getDrawingStateCurPos annotationState =
+    case annotationState of
+        DrawingAnnotation _ curPos ->
+            Just curPos
+
+        _ ->
+            Nothing

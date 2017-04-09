@@ -113,7 +113,7 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
 
         ContinueDrawing pos ->
             model
-                |> setDrawingPos pos
+                |> continueDrawing pos
                 => []
 
         SetImages images ->
@@ -300,8 +300,8 @@ skipChange model editState =
     { model | edits = UndoList.mapPresent (always editState) model.edits }
 
 
-setDrawingPos : Position -> Model -> Model
-setDrawingPos pos model =
+continueDrawing : Position -> Model -> Model
+continueDrawing pos model =
     case model.annotationState of
         DrawingAnnotation start _ ->
             { model | annotationState = DrawingAnnotation start pos }
