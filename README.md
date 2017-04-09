@@ -2,22 +2,22 @@
 ### Graphics Ornamentation and Annotation Tool
 ### a.k.a. Greatest Of All Time
 
-### Draw Lines
+## Draw Lines
 ![screen recording 2017-04-09 at 02 11 pm](https://cloud.githubusercontent.com/assets/3099999/24841113/f31151be-1d30-11e7-88ba-7d4a384e28ff.gif)
 
-### Draw Shapes
+## Draw Shapes
 ![screen recording 2017-04-09 at 02 13 pm](https://cloud.githubusercontent.com/assets/3099999/24841122/023be50a-1d31-11e7-86d1-6718a6897f2d.gif)
 
 
-### Draw Spotlights
+## Draw Spotlights
 ![screen recording 2017-04-09 at 02 18 pm](https://cloud.githubusercontent.com/assets/3099999/24841124/125ad2fc-1d31-11e7-8b1f-af2b10f5cb14.gif)
 
 
-### Move, Resize, Alter
+## Move, Resize, Alter
 ![screen recording 2017-04-09 at 02 21 pm](https://cloud.githubusercontent.com/assets/3099999/24841127/29f2df72-1d31-11e7-907f-43dee861d1cf.gif)
 
 
-### Change Stacking Order, Copy/Cut/Paste
+## Change Stacking Order, Copy/Cut/Paste
 ![screen recording 2017-04-09 at 02 28 pm](https://cloud.githubusercontent.com/assets/3099999/24841133/3ae7e368-1d31-11e7-9e45-25db7a31544d.gif)
 
 
