@@ -3,7 +3,7 @@ module MovingAnnotation exposing (all)
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), Fill(..), Line, LineMode(..), LineType(..), Shape, ShapeMode(..), ShapeType(..))
-import Goat.Update exposing (addAnnotation, finishMovingAnnotation, getPositions, moveAnnotation, startMovingAnnotation)
+import Goat.Update exposing (addAnnotation, finishMovingAnnotation, getPositions, move, moveAnnotation, startMovingAnnotation)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation, isAnnotationMovedByCorrectAmount)
 
@@ -39,7 +39,7 @@ startMovingTests =
 moveAnnotationTests : Test
 moveAnnotationTests =
     describe "moveAnnotation"
-        [ test "should change the annotationState to MovingAnnotation" <|
+        [ test "should update the MovingAnnotation state with new position" <|
             \() ->
                 model
                     |> addAnnotation (Shapes Rect aShape)
@@ -61,7 +61,7 @@ finishMovingAnnotationTests =
                     |> finishMovingAnnotation
                     |> .annotationState
                     |> Expect.equal (SelectedAnnotation 0)
-        , test "should move the original annotation by the correct amount" <|
+        , test "should move annotation by updating its start and end with move fn" <|
             \() ->
                 model
                     |> addAnnotation (Shapes Rect aShape)
@@ -69,6 +69,6 @@ finishMovingAnnotationTests =
                     |> moveAnnotation end
                     |> finishMovingAnnotation
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.true "annotation shifted properly" << isAnnotationMovedByCorrectAmount start end ( aShape.start, aShape.end ))
+                    |> Maybe.map (Expect.equal (move ( end.x - start.x, end.y - start.y ) (Shapes Rect aShape)))
                     |> Maybe.withDefault (Expect.fail "moved annotation is missing!")
         ]

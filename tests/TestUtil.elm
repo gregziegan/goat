@@ -2,7 +2,7 @@ module TestUtil exposing (..)
 
 import Array.Hamt as Array
 import Fuzz exposing (Fuzzer)
-import Goat.Model exposing (Annotation, AnnotationState(..), EndPosition, Model, StartPosition)
+import Goat.Model exposing (Annotation, AnnotationState(..), EndPosition, Model, ResizingData, StartPosition, Vertex(..))
 import Goat.Update exposing (getPositions, shiftPosition)
 import Mouse exposing (Position)
 import Random.Pcg as Random
@@ -50,3 +50,28 @@ isAnnotationMovedByCorrectAmount start end ( origStart, origEnd ) shiftedAnnotat
             == shiftedStart
             && shiftPosition dx dy origEnd
             == shiftedEnd
+
+
+
+-- isAnnotationResizedByCorrectAmount : ResizingData -> Annotation -> ( StartPosition, EndPosition )
+-- isAnnotationResizedByCorrectAmount { start, curPos, vertex, originalCoords } annotation =
+--     let
+--         ( origStart, origEnd ) =
+--             originalCoords
+--
+--         ( resizedStart, resizedEnd ) =
+--             getPositions annotation
+--
+--         dx =
+--             curPos.x - start.x
+--
+--         dy =
+--             curPos.y - start.y
+--     in
+--         case vertex of
+--             Start ->
+--                 ( shiftPosition dx dy origStart, origEnd )
+--
+--             _ ->
+--                 -- TODO: implement test
+--                 ( origStart, origEnd )
