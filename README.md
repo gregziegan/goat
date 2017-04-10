@@ -51,3 +51,18 @@ elm-live src/Main.elm --output=elm.js --open --debug
 ```
 
 This will open a browser tab with CSS hot reloading and page refreshing on Elm code changes.
+
+
+#### Testing
+
+Use `npm test` to run the `elm-test` unit, fuzz, and view tests.
+
+## Contributing
+
+This project is welcome to any PRs, first time Elm programmer or not!
+
+If it's a change requiring a decent amount of work, let's chat first!
+
+DM me on [The Elm Language Slack](https://elmlang.herokuapp.com) (**@greg.ziegan**)
+
+Or, make an issue!
