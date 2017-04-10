@@ -38,7 +38,7 @@ This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/
 
 Get yourself the [Elm programming language](http://elm-lang.org/):
 
-On node 6+: `npm i -g elm`
+On node 6+: `npm i -g elm && npm i`
 
 Then you can just do `elm-make src/Main.elm --output=elm.js --debug` and open `index.html`.
 
