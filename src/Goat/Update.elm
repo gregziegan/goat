@@ -21,11 +21,10 @@ type Msg
     | ContinueDrawing Position
     | FinishDrawing Position
       -- TextArea Updates
-    | StartEditingText Int TextArea
-    | SwitchToEditingText Int
+    | FocusTextArea Int
+    | StartEditingText Int
+    | TextBoxInput Int { textValue : String, state : AutoExpand.State }
     | FinishEditingText Int
-    | SetText Int TextArea String
-    | AutoExpandInput Int { textValue : String, state : AutoExpand.State }
       -- Annotation Attribute updates
     | SelectFill Fill
     | SelectStrokeColor Color
@@ -83,10 +82,8 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
         FinishDrawing pos ->
             finishDrawing pos model
 
-        StartEditingText index textArea ->
-            model.edits.present
-                |> Array.set index (TextBox textArea)
-                |> logChange model
+        FocusTextArea index ->
+            model
                 |> startEditingText index
                 => [ "text-box-edit--"
                         ++ toString index
@@ -94,26 +91,19 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
                         |> Task.attempt (tryToEdit index)
                    ]
 
-        SwitchToEditingText index ->
+        StartEditingText index ->
             model
                 |> startEditingText index
                 => []
 
-        SetText index textBox newText ->
-            model.edits.present
-                |> Array.set index (TextBox { textBox | text = newText })
-                |> skipChange model
+        TextBoxInput index { state, textValue } ->
+            model
+                |> editTextBoxAnnotation index state textValue
                 => []
 
         FinishEditingText index ->
             model
                 |> finishEditingText index
-                => []
-
-        AutoExpandInput index { state, textValue } ->
-            model.edits.present
-                |> mapAtIndex index (autoExpandAnnotation state textValue)
-                |> skipChange model
                 => []
 
         SetImages images ->
@@ -278,18 +268,11 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
                 => []
 
 
-{-| Add this editState change to app history
--}
-logChange : Model -> Array Annotation -> Model
-logChange model editState =
-    { model | edits = UndoList.new editState model.edits }
-
-
-{-| Do not add this editState change to app history
+{-| Do not add this annotations array change change to undo history
 -}
 skipChange : Model -> Array Annotation -> Model
-skipChange model editState =
-    { model | edits = UndoList.mapPresent (always editState) model.edits }
+skipChange model annotations =
+    { model | edits = UndoList.mapPresent (\_ -> annotations) model.edits }
 
 
 
@@ -439,6 +422,13 @@ finishSpotlightDrawing start end shapeType shapeMode model =
 startEditingText : Int -> Model -> Model
 startEditingText index model =
     { model | annotationState = EditingATextBox index }
+
+
+editTextBoxAnnotation : Int -> AutoExpand.State -> String -> Model -> Model
+editTextBoxAnnotation index autoExpandState autoExpandText model =
+    model.edits.present
+        |> mapAtIndex index (autoExpandAnnotation autoExpandState autoExpandText)
+        |> skipChange model
 
 
 updateStrokeColor : Color -> Annotation -> Annotation
@@ -755,7 +745,10 @@ cancelDrawing model =
 
 finishEditingText : Int -> Model -> Model
 finishEditingText index model =
-    { model | annotationState = ReadyToDraw }
+    { model
+        | annotationState = ReadyToDraw
+        , edits = UndoList.new (removeItemIf isEmptyTextBox index model.edits.present) model.edits
+    }
 
 
 handleKeyboardShortcuts : KeyChange -> Model -> Model
@@ -1017,11 +1010,6 @@ deleteSelectedDrawing model =
             model
 
 
-removeItem : Int -> Array a -> Array a
-removeItem index arr =
-    Array.append (Array.slice 0 index arr) (Array.slice (index + 1) (Array.length arr) arr)
-
-
 changeDrawing : Drawing -> Model -> Model
 changeDrawing drawing model =
     { model | drawing = drawing }
@@ -1109,7 +1097,7 @@ tryToEdit : Int -> Result Dom.Error () -> Msg
 tryToEdit index result =
     case result of
         Ok _ ->
-            SwitchToEditingText index
+            StartEditingText index
 
         Err _ ->
             Undo
@@ -1200,7 +1188,7 @@ returnToImageSelection model =
 config : Int -> AutoExpand.Config Msg
 config index =
     AutoExpand.config
-        { onInput = AutoExpandInput index
+        { onInput = TextBoxInput index
         , padding = 2
         , minRows = 1
         , maxRows = 4

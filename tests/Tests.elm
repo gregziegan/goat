@@ -1,6 +1,7 @@
 module Tests exposing (..)
 
 import DrawingAnnotations
+import EditingATextBox
 import Helpers
 import MovingAnnotation
 import ResizingAnnotation
@@ -16,6 +17,7 @@ all =
         , SelectedAnnotation.all
         , MovingAnnotation.all
         , ResizingAnnotation.all
+        , EditingATextBox.all
         , View.Annotation.all
         , Helpers.all
         ]

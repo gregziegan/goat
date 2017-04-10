@@ -71,6 +71,11 @@ aTextArea =
     TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (config 0))
 
 
+autoExpand : AutoExpand.State
+autoExpand =
+    AutoExpand.initState (config 0)
+
+
 testColor : Color.Color
 testColor =
     Color.blue

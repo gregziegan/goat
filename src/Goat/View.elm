@@ -972,8 +972,8 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
                 |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_
                     ([ Attr.y <| toString <| Basics.min start.y end.y
-                     , Html.Events.onDoubleClick <| StartEditingText index textBox
-                     , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> StartEditingText index textBox)
+                     , Html.Events.onDoubleClick <| FocusTextArea index
+                     , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FocusTextArea index)
                      , Attr.stroke <|
                         if fill == Color.black then
                             "white"
