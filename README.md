@@ -38,13 +38,13 @@ This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/
 
 Get yourself the [Elm programming language](http://elm-lang.org/):
 
-On node 6+: `npm i -g elm && npm i`
+On node 6+: `npm install -g elm && npm install`
 
 Then you can just do `elm-make src/Main.elm --output=elm.js --debug` and open `index.html`.
 
 #### Nicer workflow
 
-Use `elm-live` (`npm i -g elm-live`)
+Use `elm-live` (`npm install -g elm-live`)
 
 ```
 elm-live src/Main.elm --output=elm.js --open --debug
@@ -54,6 +54,10 @@ This will open a browser tab with CSS hot reloading and page refreshing on Elm c
 
 
 #### Testing
+
+Setup for first time Elm testers:
+
+`npm i -g elm-test`
 
 Use `npm test` to run the `elm-test` unit, fuzz, and view tests.
 
