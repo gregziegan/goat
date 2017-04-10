@@ -3,7 +3,7 @@ module MovingAnnotation exposing (all)
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), Fill(..), Line, LineMode(..), LineType(..), Shape, ShapeMode(..), ShapeType(..))
-import Goat.Update exposing (addAnnotation, finishMovingAnnotation, getPositions, move, moveAnnotation, startMovingAnnotation)
+import Goat.Update exposing (addAnnotation, finishMovingAnnotation, getPositions, move, moveAnnotation, startMovingAnnotation, shiftPosition)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation, isAnnotationMovedByCorrectAmount)
 
@@ -12,6 +12,7 @@ all : Test
 all =
     describe "MovingAnnotation state"
         [ startMovingTests
+        , moveTests
         , moveAnnotationTests
         , finishMovingAnnotationTests
         ]
@@ -33,6 +34,25 @@ startMovingTests =
                     |> startMovingAnnotation 0 start
                     |> .annotationState
                     |> Expect.equal model.annotationState
+        ]
+
+
+moveTests : Test
+moveTests =
+    describe "move"
+        [ test "should move an annotation by the correct amount" <|
+            \() ->
+                let
+                    dx =
+                        end.x - start.x
+
+                    dy =
+                        end.y - start.y
+                in
+                    (Shapes Rect aShape)
+                        |> move ( dx, dy )
+                        |> getPositions
+                        |> Expect.equal ( shiftPosition dx dy aShape.start, shiftPosition dx dy aShape.end )
         ]
 
 
