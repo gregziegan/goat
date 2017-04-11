@@ -2,7 +2,7 @@ module ResizingAnnotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), Fill(..), Line, LineMode(..), LineType(..), ResizingData, AnnotationState(SelectedAnnotation), Shape, ShapeMode(..), ShapeType(..), Vertex(..))
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineMode(..), LineType(..), ResizingData, AnnotationState(SelectedAnnotation), Shape, ShapeMode(..), ShapeType(..), Vertex(..))
 import Goat.Update exposing (addAnnotation, finishMovingAnnotation, finishResizingAnnotation, getPositions, moveAnnotation, resize, resizeAnnotation, startMovingAnnotation, startResizingAnnotation)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
@@ -33,7 +33,7 @@ startResizingTests =
         [ test "should change the annotationState to ResizingAnnotation" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startResizingAnnotation 0 Start start
                     |> .annotationState
                     |> Expect.equal (ResizingAnnotation resizingData)
@@ -52,7 +52,7 @@ resizeAnnotationTests =
         [ test "should update the ResizingAnnotation state with new position" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startResizingAnnotation 0 Start start
                     |> resizeAnnotation end
                     |> .annotationState
@@ -60,11 +60,11 @@ resizeAnnotationTests =
         , test "should resize annotation by updating its start and end with resize" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startResizingAnnotation 0 Start start
                     |> resizeAnnotation end
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (resize { resizingData | curPos = end } (Shapes Rect aShape)))
+                    |> Maybe.map (Expect.equal (resize { resizingData | curPos = end } (Lines Arrow aShape)))
                     |> Maybe.withDefault (Expect.fail "resized annotation is missing!")
         ]
 
@@ -75,7 +75,7 @@ finishResizingAnnotationTests =
         [ test "should set the annotationState to SelectedAnnotation" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startResizingAnnotation 0 Start start
                     |> resizeAnnotation end
                     |> finishResizingAnnotation
@@ -84,11 +84,11 @@ finishResizingAnnotationTests =
         , test "should resize annotation by updating its start and end with resize fn" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startResizingAnnotation 0 Start start
                     |> resizeAnnotation end
                     |> finishResizingAnnotation
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (resize { resizingData | curPos = end } (Shapes Rect aShape)))
+                    |> Maybe.map (Expect.equal (resize { resizingData | curPos = end } (Lines Arrow aShape)))
                     |> Maybe.withDefault (Expect.fail "resized annotation is missing!")
         ]

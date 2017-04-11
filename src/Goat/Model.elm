@@ -38,13 +38,6 @@ type Drawing
     | DrawSpotlight ShapeType ShapeMode
 
 
-type Fill
-    = SolidFill Color
-    | EmptyFill
-    | MaskFill
-    | SpotlightFill
-
-
 type StrokeStyle
     = SolidThin
     | SolidMedium
@@ -56,18 +49,9 @@ type StrokeStyle
     | DashedVeryThick
 
 
-type alias Line =
-    { start : Position
-    , end : Position
-    , strokeColor : Color
-    , strokeStyle : StrokeStyle
-    }
-
-
 type alias Shape =
     { start : Position
     , end : Position
-    , fill : Fill
     , strokeColor : Color
     , strokeStyle : StrokeStyle
     }
@@ -118,8 +102,8 @@ type Vertices
 
 
 type Annotation
-    = Lines LineType Line
-    | Shapes ShapeType Shape
+    = Lines LineType Shape
+    | Shapes ShapeType (Maybe Color) Shape
     | TextBox TextArea
     | Spotlight ShapeType Shape
 
@@ -227,7 +211,7 @@ type SelectState
 type alias Model =
     { edits : UndoList (Array Annotation)
     , annotationState : AnnotationState
-    , fill : Fill
+    , fill : Maybe Color
     , strokeColor : Color
     , strokeStyle : StrokeStyle
     , fontSize : Int
@@ -257,18 +241,18 @@ strokeColorOptions =
     ]
 
 
-fillOptions : List Fill
+fillOptions : List (Maybe Color)
 fillOptions =
-    [ EmptyFill
-    , SolidFill (Color.rgb 255 0 0)
-    , SolidFill (Color.rgb 255 0 212)
-    , SolidFill (Color.rgb 73 0 255)
-    , SolidFill (Color.rgb 0 202 255)
-    , SolidFill (Color.rgb 16 255 0)
-    , SolidFill (Color.rgb 255 226 0)
-    , SolidFill (Color.rgb 255 129 0)
-    , SolidFill Color.black
-    , SolidFill Color.white
+    [ Nothing
+    , Just (Color.rgb 255 0 0)
+    , Just (Color.rgb 255 0 212)
+    , Just (Color.rgb 73 0 255)
+    , Just (Color.rgb 0 202 255)
+    , Just (Color.rgb 16 255 0)
+    , Just (Color.rgb 255 226 0)
+    , Just (Color.rgb 255 129 0)
+    , Just Color.black
+    , Just Color.white
     ]
 
 
@@ -325,7 +309,7 @@ fontSizes =
 init : Flags -> Model
 init flags =
     { edits = UndoList.fresh Array.empty
-    , fill = EmptyFill
+    , fill = Nothing
     , strokeColor = Color.rgb 255 0 0
     , strokeStyle = SolidMedium
     , fontSize = 20

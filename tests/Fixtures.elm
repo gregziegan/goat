@@ -24,7 +24,7 @@ goat =
 model : Model
 model =
     { edits = UndoList.fresh Array.empty
-    , fill = EmptyFill
+    , fill = Nothing
     , strokeColor = Color.red
     , strokeStyle = SolidMedium
     , fontSize = 14
@@ -51,19 +51,14 @@ end =
     Mouse.Position 76 88
 
 
-line : Color.Color -> StrokeStyle -> Line
+line : Color.Color -> StrokeStyle -> Shape
 line strokeColor strokeStyle =
-    Line start end strokeColor strokeStyle
-
-
-aLine : Line
-aLine =
-    Line start end model.strokeColor model.strokeStyle
+    Shape start end strokeColor strokeStyle
 
 
 aShape : Shape
 aShape =
-    Shape start end model.fill model.strokeColor model.strokeStyle
+    Shape start end model.strokeColor model.strokeStyle
 
 
 aTextArea : TextArea

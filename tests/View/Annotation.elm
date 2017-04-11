@@ -3,17 +3,15 @@ module View.Annotation exposing (all)
 import Color exposing (Color)
 import Color.Convert
 import Expect exposing (Expectation)
-import Fixtures exposing (end, model, start, aLine, aShape, aTextArea)
-import Goat.Helpers exposing (linePath, toLineStyle, fontSizeToLineHeight, fillStyle)
+import Fixtures exposing (end, model, start, aShape, aTextArea, testColor)
+import Goat.Helpers exposing (linePath, toLineStyle, fontSizeToLineHeight)
 import Goat.Model
     exposing
         ( Annotation(..)
         , AnnotationState(..)
         , Drawing(..)
-        , Line
         , LineMode(..)
         , LineType(..)
-        , Fill(..)
         , Shape
         , ShapeMode(..)
         , ShapeType(..)
@@ -32,12 +30,12 @@ all =
         [ viewAnnotationTests ]
 
 
-lineSelector : Line -> List Selector
-lineSelector line =
+lineSelector : Shape -> List Selector
+lineSelector shape =
     [ attribute "fill" "none"
-    , attribute "d" (linePath line.start line.end)
+    , attribute "d" (linePath shape.start shape.end)
     ]
-        ++ (uncurry strokeSelectors (toLineStyle line.strokeStyle)) line.strokeColor
+        ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
 
 
 strokeSelectors : String -> String -> Color -> List Selector
@@ -67,23 +65,20 @@ roundedRectSelector shape =
         ++ rectSelector shape
 
 
-fillSelectors : Fill -> List Selector
+fillSelectors : Maybe Color -> List Selector
 fillSelectors fill =
-    let
-        ( fillColor, isVisible ) =
-            fillStyle fill
-    in
-        if isVisible then
-            [ attribute "fill" fillColor ]
-        else
-            [ attribute "fill" fillColor, attribute "fill-opacity" "0" ]
+    case fill of
+        Just fillColor ->
+            [ attribute "fill" (Color.Convert.colorToHex fillColor) ]
+
+        Nothing ->
+            [ attribute "fill-opacity" "0" ]
 
 
 rectSelector : Shape -> List Selector
 rectSelector shape =
     attribute "filter" "url(#dropShadow)"
-        :: fillSelectors shape.fill
-        ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
+        :: (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
 
 
 svgTextSelector : TextArea -> List Selector
@@ -107,26 +102,26 @@ viewAnnotationTests =
     describe "annotations"
         [ test "A straight line has the appropriate view attributes" <|
             \() ->
-                aLine
+                aShape
                     |> Lines StraightLine
                     |> viewAnnotation ReadyToDraw 0
                     |> svgDrawspace
                     |> Query.fromHtml
                     |> Query.find [ tag "path" ]
-                    |> Query.has (lineSelector aLine)
+                    |> Query.has (lineSelector aShape)
         , test "An arrow has the appropriate view attributes" <|
             \() ->
-                aLine
+                aShape
                     |> Lines Arrow
                     |> viewAnnotation ReadyToDraw 0
                     |> svgDrawspace
                     |> Query.fromHtml
                     |> Query.find [ tag "path" ]
-                    |> Query.has (lineSelector aLine)
+                    |> Query.has (lineSelector aShape)
         , test "A rectangle has the appropriate view attributes" <|
             \() ->
                 aShape
-                    |> Shapes Rect
+                    |> Shapes Rect (Just testColor)
                     |> viewAnnotation ReadyToDraw 0
                     |> svgDrawspace
                     |> Query.fromHtml
@@ -135,7 +130,7 @@ viewAnnotationTests =
         , test "A rounded rectangle has the appropriate view attributes" <|
             \() ->
                 aShape
-                    |> Shapes RoundedRect
+                    |> Shapes RoundedRect (Just testColor)
                     |> viewAnnotation ReadyToDraw 0
                     |> svgDrawspace
                     |> Query.fromHtml
@@ -144,7 +139,7 @@ viewAnnotationTests =
         , test "An ellipse has the appropriate view attributes" <|
             \() ->
                 aShape
-                    |> Shapes Ellipse
+                    |> Shapes Ellipse (Just testColor)
                     |> viewAnnotation ReadyToDraw 0
                     |> svgDrawspace
                     |> Query.fromHtml

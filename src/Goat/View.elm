@@ -182,7 +182,7 @@ viewFontSizeOptions fontSize =
         |> div [ Html.class "dropdown-options" ]
 
 
-viewFillOptions : Fill -> Html Msg
+viewFillOptions : Maybe Color -> Html Msg
 viewFillOptions fill =
     fillOptions
         |> List.map (viewFillOption fill)
@@ -196,7 +196,7 @@ viewStrokeColorOptions strokeColor =
         |> div [ Html.class "dropdown-options" ]
 
 
-viewFillOption : Fill -> Fill -> Html Msg
+viewFillOption : Maybe Color -> Maybe Color -> Html Msg
 viewFillOption selectedFill fill =
     button
         [ Html.classList
@@ -247,7 +247,7 @@ viewLineStrokeDropdown toDropdownMenu strokeStyle =
         ]
 
 
-viewFillDropdown : (AttributeDropdown -> Html Msg) -> Fill -> Html Msg
+viewFillDropdown : (AttributeDropdown -> Html Msg) -> Maybe Color -> Html Msg
 viewFillDropdown toDropdownMenu fill =
     div
         [ Html.class "dropdown-things" ]
@@ -414,8 +414,7 @@ viewSpotlights : AnnotationState -> Array Annotation -> List (Svg Msg)
 viewSpotlights annotationState annotations =
     annotations
         |> Array.toIndexedList
-        |> List.filter (isSpotlightShape << Tuple.second)
-        |> List.map (uncurry (viewMaskAnnotation annotationState) << Tuple.mapSecond spotlightFillToMaskFill)
+        |> List.filterMap (Maybe.map (viewMaskCutOut annotationState) << spotlightToMaskCutout)
         |> List.concat
 
 
@@ -573,8 +572,8 @@ viewArrowHeadDefinition color =
         ]
 
 
-annotationStateEvents : Int -> Annotation -> AnnotationState -> List (Svg.Attribute Msg)
-annotationStateEvents annIndex annotation annotationState =
+annotationStateEvents : Int -> AnnotationState -> List (Svg.Attribute Msg)
+annotationStateEvents annIndex annotationState =
     case annotationState of
         ReadyToDraw ->
             [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (SelectAndMoveAnnotation annIndex << toDrawingPosition) Mouse.position
@@ -641,14 +640,9 @@ getSelectState annIndex annotationState =
             NotSelected
 
 
-viewMaskAnnotation : AnnotationState -> Int -> Annotation -> List (Svg Msg)
-viewMaskAnnotation annotationState index annotation =
-    case annotation of
-        Spotlight shapeType shape ->
-            viewShape (annotationStateEvents index annotation annotationState) [] shapeType shape
-
-        _ ->
-            []
+viewMaskCutOut : AnnotationState -> ( Int, ShapeType, Shape ) -> List (Svg Msg)
+viewMaskCutOut annotationState ( index, shapeType, shape ) =
+    viewShape (annotationStateEvents index annotationState) shapeType (Just Color.black) shape
 
 
 viewAnnotation : AnnotationState -> Int -> Annotation -> List (Svg Msg)
@@ -658,7 +652,7 @@ viewAnnotation annotationState index annotation =
             getSelectState index annotationState
 
         annotationStateAttrs =
-            annotationStateEvents index annotation annotationState
+            annotationStateEvents index annotationState
 
         toVertexEvents =
             annotationStateVertexEvents index annotationState
@@ -667,27 +661,32 @@ viewAnnotation annotationState index annotation =
             viewVertices verticesType start end toVertexEvents selectState
     in
         case annotation of
-            Lines lineType line ->
-                viewLine annotationStateAttrs (vertices Linear line) lineType line
+            Lines lineType shape ->
+                viewLine annotationStateAttrs lineType shape
+                    |> flip List.append (vertices Linear shape)
 
-            Shapes shapeType shape ->
+            Shapes shapeType fill shape ->
                 case shapeType of
                     Ellipse ->
-                        viewShape annotationStateAttrs (vertices Elliptical shape) shapeType shape
+                        viewShape annotationStateAttrs shapeType fill shape
+                            |> flip List.append (vertices Elliptical shape)
 
                     _ ->
-                        viewShape annotationStateAttrs (vertices Rectangular shape) shapeType shape
+                        viewShape annotationStateAttrs shapeType fill shape
+                            |> flip List.append (vertices Rectangular shape)
 
             TextBox textBox ->
-                viewTextBox annotationStateAttrs (vertices Rectangular textBox) annotationState selectState index textBox
+                viewTextBox annotationStateAttrs annotationState selectState index textBox
 
             Spotlight shapeType shape ->
                 case shapeType of
                     Ellipse ->
-                        viewShape annotationStateAttrs (vertices Elliptical shape) shapeType shape
+                        viewShape annotationStateAttrs shapeType Nothing shape
+                            |> flip List.append (vertices Elliptical shape)
 
                     _ ->
-                        viewShape annotationStateAttrs (vertices Rectangular shape) shapeType shape
+                        viewShape annotationStateAttrs shapeType Nothing shape
+                            |> flip List.append (vertices Rectangular shape)
 
 
 annotationStateVertexEvents : Int -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
@@ -729,13 +728,17 @@ viewDrawing : Model -> StartPosition -> Position -> Bool -> Svg Msg
 viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, keyboardState } start curPos isInMask =
     let
         lineAttrs lineType lineMode =
-            lineAttributes lineType <| Line start (calcLinePos start curPos lineMode) strokeColor strokeStyle
+            lineAttributes lineType <| Shape start (calcLinePos start curPos lineMode) strokeColor strokeStyle
 
         shapeAttrs shapeType shapeMode =
-            shapeAttributes shapeType <| Shape start (calcShapePos start curPos shapeMode) fill strokeColor strokeStyle
+            shapeAttributes shapeType (Shape start (calcShapePos start curPos shapeMode) strokeColor strokeStyle) fill
 
-        spotlightAttrs shapeType shapeMode spotlightFill spotlightColor =
-            shapeAttributes shapeType <| Shape start (calcShapePos start curPos shapeMode) spotlightFill spotlightColor strokeStyle
+        spotlightAttrs shapeType shapeMode =
+            if isInMask then
+                -- maskAttributes shapeType (Shape start (calcShapePos start curPos shapeMode))
+                shapeAttributes shapeType (Shape start (calcShapePos start curPos shapeMode) strokeColor strokeStyle) (Just Color.black)
+            else
+                shapeAttributes shapeType (Shape start (calcShapePos start curPos shapeMode) strokeColor strokeStyle) Nothing
     in
         case drawing of
             DrawLine lineType lineMode ->
@@ -758,43 +761,36 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, keyboardState }
                         Svg.ellipse (shapeAttrs shapeType shapeMode) []
 
             DrawTextBox ->
-                Svg.rect ((shapeAttributes Rect <| Shape start curPos EmptyFill (Color.rgb 230 230 230) SolidThin) ++ [ Attr.strokeWidth "1" ]) []
+                Svg.rect ((shapeAttributes Rect <| Shape start curPos (Color.rgb 230 230 230) SolidThin) Nothing ++ [ Attr.strokeWidth "1" ]) []
 
             DrawSpotlight shapeType shapeMode ->
-                let
-                    ( fillDependentOnMask, strokeDependentOnMask ) =
-                        if isInMask then
-                            MaskFill => Color.white
-                        else
-                            EmptyFill => strokeColor
-                in
-                    case shapeType of
-                        Rect ->
-                            Svg.rect (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
+                case shapeType of
+                    Rect ->
+                        Svg.rect (spotlightAttrs shapeType shapeMode) []
 
-                        RoundedRect ->
-                            Svg.rect (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
+                    RoundedRect ->
+                        Svg.rect (spotlightAttrs shapeType shapeMode) []
 
-                        Ellipse ->
-                            Svg.ellipse (spotlightAttrs shapeType shapeMode fillDependentOnMask strokeDependentOnMask) []
+                    Ellipse ->
+                        Svg.ellipse (spotlightAttrs shapeType shapeMode) []
 
 
-viewShape : List (Svg.Attribute Msg) -> List (Svg Msg) -> ShapeType -> Shape -> List (Svg Msg)
-viewShape attrs vertices shapeType shape =
-    let
-        allAttrs =
-            shapeAttributes shapeType shape ++ attrs
-    in
-        flip List.append vertices <|
-            case shapeType of
-                Rect ->
-                    [ Svg.rect allAttrs [] ]
+maskAttributes : ShapeType -> Shape -> List (Svg.Attribute Msg)
+maskAttributes shapeType shape =
+    shapeAttributes shapeType shape (Just Color.white)
 
-                RoundedRect ->
-                    [ Svg.rect allAttrs [] ]
 
-                Ellipse ->
-                    [ Svg.ellipse allAttrs [] ]
+viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> List (Svg Msg)
+viewShape attrs shapeType fill shape =
+    case shapeType of
+        Rect ->
+            [ Svg.rect (shapeAttributes shapeType shape fill ++ attrs) [] ]
+
+        RoundedRect ->
+            [ Svg.rect (shapeAttributes shapeType shape fill ++ attrs) [] ]
+
+        Ellipse ->
+            [ Svg.ellipse (shapeAttributes shapeType shape fill ++ attrs) [] ]
 
 
 viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
@@ -815,11 +811,6 @@ viewVertices vertices start end toVertexEvents selectState =
             toVertices toVertexEvents start end
         else
             []
-
-
-shapeAttrs : Shape -> List (Svg.Attribute Msg)
-shapeAttrs ({ strokeStyle, strokeColor, fill } as shape) =
-    (Attr.style <| pointerEvents fill) :: strokeAttrs strokeStyle strokeColor
 
 
 strokeAttrs : StrokeStyle -> Color -> List (Svg.Attribute Msg)
@@ -854,28 +845,33 @@ ellipseAttributes { start, end } =
     ]
 
 
-shapeAttributes : ShapeType -> Shape -> List (Svg.Attribute Msg)
-shapeAttributes shapeType shape =
-    let
-        ( fillColor, isVisible ) =
-            fillStyle shape.fill
+fillAttrs : Maybe Color -> List (Svg.Attribute Msg)
+fillAttrs fill =
+    case fill of
+        Just color ->
+            [ Attr.fill <| Color.Convert.colorToHex color
+            , Attr.pointerEvents "auto"
+            ]
 
-        fillStyles =
-            if isVisible then
-                [ Attr.fill fillColor ]
-            else
-                [ Attr.fill fillColor, Attr.fillOpacity "0" ]
-    in
-        List.append fillStyles <|
-            case shapeType of
-                Rect ->
-                    shapeAttrs shape ++ rectAttrs shape
+        Nothing ->
+            [ Attr.fillOpacity "0"
+            , Attr.pointerEvents "visibleStroke"
+            ]
 
-                RoundedRect ->
-                    shapeAttrs shape ++ rectAttrs shape ++ [ Attr.rx "15", Attr.ry "15" ]
 
-                Ellipse ->
-                    shapeAttrs shape ++ ellipseAttributes shape
+shapeAttributes : ShapeType -> Shape -> Maybe Color -> List (Svg.Attribute Msg)
+shapeAttributes shapeType shape fill =
+    fillAttrs fill
+        ++ strokeAttrs shape.strokeStyle shape.strokeColor
+        ++ case shapeType of
+            Rect ->
+                rectAttrs shape
+
+            RoundedRect ->
+                rectAttrs shape ++ [ Attr.rx "15", Attr.ry "15" ]
+
+            Ellipse ->
+                ellipseAttributes shape
 
 
 shapeVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
@@ -952,8 +948,8 @@ viewTextArea index { start, end, text, fill, fontSize, angle, autoexpand } =
         ]
 
 
-viewTextBox : List (Svg.Attribute Msg) -> List (Svg Msg) -> AnnotationState -> SelectState -> Int -> TextArea -> List (Svg Msg)
-viewTextBox attrs vertices annotationState selectState index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) =
+viewTextBox : List (Svg.Attribute Msg) -> AnnotationState -> SelectState -> Int -> TextArea -> List (Svg Msg)
+viewTextBox attrs annotationState selectState index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) =
     case selectState of
         Selected ->
             (viewTextArea index textBox)
@@ -987,43 +983,37 @@ viewTextBox attrs vertices annotationState selectState index ({ start, end, text
                 |> List.singleton
 
 
-viewLine : List (Svg.Attribute Msg) -> List (Svg Msg) -> LineType -> Line -> List (Svg Msg)
-viewLine attrs vertices lineType line =
-    let
-        allAttrs =
-            lineAttributes lineType line ++ attrs
-    in
-        flip List.append vertices <|
-            case lineType of
-                StraightLine ->
-                    [ Svg.path allAttrs [] ]
+viewLine : List (Svg.Attribute Msg) -> LineType -> Shape -> List (Svg Msg)
+viewLine attrs lineType shape =
+    case lineType of
+        StraightLine ->
+            [ Svg.path (lineAttributes lineType shape ++ attrs) [] ]
 
-                Arrow ->
-                    [ Svg.path allAttrs [] ]
+        Arrow ->
+            [ Svg.path (lineAttributes lineType shape ++ attrs) [] ]
 
 
-simpleLineAttrs : Line -> List (Svg.Attribute Msg)
-simpleLineAttrs ({ start, end } as line) =
-    []
-        ++ [ Attr.fill "none"
-           , Attr.d <| linePath start end
-             --  , Attr.filter "url(#dropShadow)"
-           ]
+simpleLineAttrs : Shape -> List (Svg.Attribute Msg)
+simpleLineAttrs { start, end } =
+    [ Attr.fill "none"
+    , Attr.d <| linePath start end
+      --  , Attr.filter "url(#dropShadow)"
+    ]
 
 
-arrowAttributes : Line -> List (Svg.Attribute Msg)
-arrowAttributes line =
-    [ Attr.markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex line.strokeColor ++ ")" ]
+arrowAttributes : Shape -> List (Svg.Attribute Msg)
+arrowAttributes shape =
+    [ Attr.markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex shape.strokeColor ++ ")" ]
 
 
-lineAttributes : LineType -> Line -> List (Svg.Attribute Msg)
-lineAttributes lineType line =
+lineAttributes : LineType -> Shape -> List (Svg.Attribute Msg)
+lineAttributes lineType shape =
     case lineType of
         Arrow ->
-            arrowAttributes line ++ simpleLineAttrs line ++ strokeAttrs line.strokeStyle line.strokeColor
+            arrowAttributes shape ++ simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
 
         StraightLine ->
-            simpleLineAttrs line ++ strokeAttrs line.strokeStyle line.strokeColor
+            simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
 
 
 viewImage : Image -> Html Msg

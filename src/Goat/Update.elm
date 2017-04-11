@@ -26,7 +26,7 @@ type Msg
     | TextBoxInput Int { textValue : String, state : AutoExpand.State }
     | FinishEditingText Int
       -- Annotation Attribute updates
-    | SelectFill Fill
+    | SelectFill (Maybe Color)
     | SelectStrokeColor Color
     | SelectStrokeStyle StrokeStyle
     | SelectFontSize Int
@@ -404,19 +404,19 @@ addAnnotation annotation model =
 finishLineDrawing : StartPosition -> EndPosition -> LineType -> LineMode -> Model -> Model
 finishLineDrawing start end lineType lineMode model =
     model
-        |> addAnnotation (Lines lineType (Line start (calcLinePos start end lineMode) model.strokeColor model.strokeStyle))
+        |> addAnnotation (Lines lineType (Shape start (calcLinePos start end lineMode) model.strokeColor model.strokeStyle))
 
 
 finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> ShapeMode -> Model -> Model
 finishShapeDrawing start end shapeType shapeMode model =
     model
-        |> addAnnotation (Shapes shapeType (Shape start (calcShapePos start end shapeMode) model.fill model.strokeColor model.strokeStyle))
+        |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos start end shapeMode) model.strokeColor model.strokeStyle))
 
 
 finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> ShapeMode -> Model -> Model
 finishSpotlightDrawing start end shapeType shapeMode model =
     model
-        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos start end shapeMode) SpotlightFill model.strokeColor model.strokeStyle))
+        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos start end shapeMode) model.strokeColor model.strokeStyle))
 
 
 startEditingText : Int -> Model -> Model
@@ -437,8 +437,8 @@ updateStrokeColor strokeColor annotation =
         Lines lineType line ->
             Lines lineType { line | strokeColor = strokeColor }
 
-        Shapes shapeType shape ->
-            Shapes shapeType { shape | strokeColor = strokeColor }
+        Shapes shapeType fill shape ->
+            Shapes shapeType fill { shape | strokeColor = strokeColor }
 
         TextBox textBox ->
             TextBox { textBox | fill = strokeColor }
@@ -447,14 +447,14 @@ updateStrokeColor strokeColor annotation =
             Spotlight shapeType { shape | strokeColor = strokeColor }
 
 
-updateFill : Fill -> Annotation -> Annotation
+updateFill : Maybe Color -> Annotation -> Annotation
 updateFill fill annotation =
     case annotation of
         Lines _ _ ->
             annotation
 
-        Shapes shapeType shape ->
-            Shapes shapeType { shape | fill = fill }
+        Shapes shapeType _ shape ->
+            Shapes shapeType fill shape
 
         TextBox textBox ->
             annotation
@@ -469,8 +469,8 @@ updateStrokeStyle strokeStyle annotation =
         Lines lineType line ->
             Lines lineType { line | strokeStyle = strokeStyle }
 
-        Shapes shapeType shape ->
-            Shapes shapeType { shape | strokeStyle = strokeStyle }
+        Shapes shapeType fill shape ->
+            Shapes shapeType fill { shape | strokeStyle = strokeStyle }
 
         TextBox textBox ->
             annotation
@@ -489,7 +489,7 @@ updateFontSize fontSize annotation =
             annotation
 
 
-setFill : Fill -> Model -> Model
+setFill : Maybe Color -> Model -> Model
 setFill fill model =
     { model | fill = fill }
 
@@ -527,7 +527,7 @@ getPositions annotation =
         Lines lineType line ->
             line.start => line.end
 
-        Shapes shapeType shape ->
+        Shapes shapeType _ shape ->
             shape.start => shape.end
 
         TextBox textArea ->
@@ -629,16 +629,16 @@ resizeEllipseVertices { curPos, vertex, originalCoords } annotation =
 resize : ResizingData -> Annotation -> Annotation
 resize resizingData annotation =
     case annotation of
-        Lines lineType line ->
-            Lines lineType (resizeVertices resizingData line)
+        Lines lineType shape ->
+            Lines lineType (resizeVertices resizingData shape)
 
-        Shapes shapeType shape ->
+        Shapes shapeType fill shape ->
             case shapeType of
                 Ellipse ->
-                    Shapes shapeType (resizeEllipseVertices resizingData shape)
+                    Shapes shapeType fill (resizeEllipseVertices resizingData shape)
 
                 _ ->
-                    Shapes shapeType (resizeVertices resizingData shape)
+                    Shapes shapeType fill (resizeVertices resizingData shape)
 
         TextBox textArea ->
             TextBox (resizeVertices resizingData textArea)
@@ -664,8 +664,8 @@ move translate annotation =
         Lines lineType line ->
             Lines lineType (shift translate line)
 
-        Shapes shapeType shape ->
-            Shapes shapeType (shift translate shape)
+        Shapes shapeType fill shape ->
+            Shapes shapeType fill (shift translate shape)
 
         TextBox textArea ->
             TextBox (shift translate textArea)
@@ -871,8 +871,8 @@ shiftForPaste annotation =
         Lines lineType line ->
             Lines lineType { line | start = positionMap ((+) 10) line.start, end = positionMap ((+) 10) line.end }
 
-        Shapes shapeType shape ->
-            Shapes shapeType { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
+        Shapes shapeType fill shape ->
+            Shapes shapeType fill { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
 
         TextBox textArea ->
             TextBox { textArea | start = positionMap ((+) 10) textArea.start, end = positionMap ((+) 10) textArea.end }

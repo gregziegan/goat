@@ -2,7 +2,7 @@ module MovingAnnotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), Fill(..), Line, LineMode(..), LineType(..), Shape, ShapeMode(..), ShapeType(..))
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineMode(..), LineType(..), Shape, ShapeMode(..), ShapeType(..))
 import Goat.Update exposing (addAnnotation, finishMovingAnnotation, getPositions, move, moveAnnotation, startMovingAnnotation, shiftPosition)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation, isAnnotationMovedByCorrectAmount)
@@ -24,7 +24,7 @@ startMovingTests =
         [ test "should change the annotationState to MovingAnnotation" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startMovingAnnotation 0 start
                     |> .annotationState
                     |> Expect.equal (MovingAnnotation 0 start ( 0, 0 ))
@@ -49,7 +49,7 @@ moveTests =
                     dy =
                         end.y - start.y
                 in
-                    (Shapes Rect aShape)
+                    (Lines Arrow aShape)
                         |> move ( dx, dy )
                         |> getPositions
                         |> Expect.equal ( shiftPosition dx dy aShape.start, shiftPosition dx dy aShape.end )
@@ -62,7 +62,7 @@ moveAnnotationTests =
         [ test "should update the MovingAnnotation state with new position" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startMovingAnnotation 0 start
                     |> moveAnnotation end
                     |> .annotationState
@@ -76,7 +76,7 @@ finishMovingAnnotationTests =
         [ test "should set the annotationState to SelectedAnnotation" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startMovingAnnotation 0 start
                     |> finishMovingAnnotation
                     |> .annotationState
@@ -84,11 +84,11 @@ finishMovingAnnotationTests =
         , test "should move annotation by updating its start and end with move fn" <|
             \() ->
                 model
-                    |> addAnnotation (Shapes Rect aShape)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> startMovingAnnotation 0 start
                     |> moveAnnotation end
                     |> finishMovingAnnotation
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (move ( end.x - start.x, end.y - start.y ) (Shapes Rect aShape)))
+                    |> Maybe.map (Expect.equal (move ( end.x - start.x, end.y - start.y ) (Lines Arrow aShape)))
                     |> Maybe.withDefault (Expect.fail "moved annotation is missing!")
         ]

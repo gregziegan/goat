@@ -1,8 +1,7 @@
 module Goat.Helpers exposing (..)
 
 import Array.Hamt as Array exposing (Array)
-import Color.Convert
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), EndPosition, Fill(..), Image, LineMode(..), LineType(..), ShapeMode(..), ShapeType(..), StartPosition, StrokeStyle(..), controlUIWidth)
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), EndPosition, Image, LineMode(..), LineType(..), ShapeMode(..), Shape, ShapeType(..), StartPosition, StrokeStyle(..), controlUIWidth)
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import Json.Decode as Json
@@ -263,16 +262,6 @@ isSpotlightShape annotation =
             False
 
 
-spotlightFillToMaskFill : Annotation -> Annotation
-spotlightFillToMaskFill annotation =
-    case annotation of
-        Spotlight shapeType shape ->
-            Spotlight shapeType { shape | fill = MaskFill }
-
-        _ ->
-            annotation
-
-
 fontSizeToLineHeight : Int -> Float
 fontSizeToLineHeight fontSize =
     toFloat fontSize * 1.2
@@ -291,36 +280,14 @@ linePath start end =
     "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
 
 
-fillStyle : Fill -> ( String, Bool )
-fillStyle fill =
-    case fill of
-        SolidFill color ->
-            Color.Convert.colorToHex color => True
+spotlightToMaskCutout : ( Int, Annotation ) -> Maybe ( Int, ShapeType, Shape )
+spotlightToMaskCutout ( index, annotation ) =
+    case annotation of
+        Spotlight shapeType shape ->
+            Just ( index, shapeType, shape )
 
-        SpotlightFill ->
-            "white" => False
-
-        MaskFill ->
-            "black" => True
-
-        EmptyFill ->
-            "white" => False
-
-
-pointerEvents : Fill -> String
-pointerEvents fill =
-    case fill of
-        EmptyFill ->
-            "pointer-events: visibleStroke;"
-
-        MaskFill ->
-            "pointer-events: none;"
-
-        SolidFill _ ->
-            "pointer-events: auto;"
-
-        SpotlightFill ->
-            "pointer-events: visibleStroke;"
+        _ ->
+            Nothing
 
 
 selectLine : LineType -> Keyboard.State -> Drawing

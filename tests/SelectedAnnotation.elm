@@ -2,15 +2,13 @@ module SelectedAnnotation exposing (..)
 
 import Array.Hamt as Array
 import Expect exposing (Expectation)
-import Fixtures exposing (end, model, start, aLine, aShape, testColor)
+import Fixtures exposing (end, model, start, aShape, testColor)
 import Goat.Model
     exposing
         ( Annotation(..)
         , Drawing(..)
-        , Line
         , LineMode(..)
         , LineType(..)
-        , Fill(..)
         , Shape
         , ShapeMode(..)
         , ShapeType(..)
@@ -32,31 +30,31 @@ updateAnySelectedAnnotationsTests =
         [ test "updates a Selected annotation" <|
             \() ->
                 model
-                    |> addAnnotation (Lines Arrow aLine)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> selectAnnotation 0
                     |> updateAnySelectedAnnotations (updateStrokeColor testColor)
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (Lines Arrow <| Line start end testColor model.strokeStyle))
+                    |> Maybe.map (Expect.equal (Lines Arrow <| Shape start end testColor model.strokeStyle))
                     |> Maybe.withDefault (Expect.fail "Array missing desired annotation")
         , test "does not update a NotSelected annotation" <|
             \() ->
                 model
-                    |> addAnnotation (Lines Arrow aLine)
+                    |> addAnnotation (Lines Arrow aShape)
                     |> updateAnySelectedAnnotations (updateStrokeStyle DashedMedium)
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (Lines Arrow aLine))
+                    |> Maybe.map (Expect.equal (Lines Arrow aShape))
                     |> Maybe.withDefault (Expect.fail "Array missing desired annotation")
         , test "only updates the Selected annotation" <|
             \() ->
                 model
-                    |> addAnnotation (Lines Arrow aLine)
-                    |> addAnnotation (Shapes Rect aShape)
-                    |> addAnnotation (Shapes Ellipse aShape)
+                    |> addAnnotation (Lines Arrow aShape)
+                    |> addAnnotation (Shapes Rect (Just testColor) aShape)
+                    |> addAnnotation (Shapes Ellipse (Just testColor) aShape)
                     |> selectAnnotation 1
-                    |> updateAnySelectedAnnotations (updateFill (SolidFill testColor))
+                    |> updateAnySelectedAnnotations (updateFill (Just testColor))
                     |> .edits
                     |> .present
                     |> Array.get 2
-                    |> Maybe.map (Expect.equal (Shapes Ellipse aShape))
+                    |> Maybe.map (Expect.equal (Shapes Ellipse (Just testColor) aShape))
                     |> Maybe.withDefault (Expect.fail "Array missing desired annotation")
         ]

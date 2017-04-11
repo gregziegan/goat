@@ -2,7 +2,7 @@ module Goat.Icons exposing (..)
 
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
-import Goat.Model exposing (Fill(..), StrokeStyle(..))
+import Goat.Model exposing (StrokeStyle(..))
 import Html exposing (Html)
 import Svg exposing (circle, g, line, polygon, svg)
 import Svg.Attributes exposing (class, cx, cy, d, fill, fillRule, height, path, points, r, stroke, viewBox, width, strokeLinecap)
@@ -58,11 +58,11 @@ viewEllipse =
         [ Svg.path [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill "#555" ] [] ]
 
 
-viewFill : Fill -> Html msg
+viewFill : Maybe Color -> Html msg
 viewFill aFill =
     svg [ width "14", height "14", viewBox "0 0 14 14" ]
         [ case aFill of
-            SolidFill color ->
+            Just color ->
                 if color == Color.white then
                     circle [ cx "7", cy "7", r "6", stroke "#555", fill "white" ] []
                 else
@@ -74,13 +74,7 @@ viewFill aFill =
                         ]
                         []
 
-            SpotlightFill ->
-                Svg.text ""
-
-            MaskFill ->
-                Svg.text ""
-
-            EmptyFill ->
+            Nothing ->
                 Svg.path [ d "M0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7zm9.793-4.207l-7.07 7.07 1.413 1.415 7.07-7.07-1.413-1.415z", fill "#555", fillRule "evenodd" ] []
         ]
 
