@@ -74,35 +74,33 @@ viewInfoScreen =
 
 
 viewImageAnnotator : Model -> Image -> Html Msg
-viewImageAnnotator ({ edits, fill, strokeColor, strokeStyle, keyboardState, currentDropdown, drawing } as model) selectedImage =
-    let
-        toDropdownMenu =
-            viewDropdownMenu currentDropdown drawing model
+viewImageAnnotator model selectedImage =
+    div
+        [ Html.class "annotation-app" ]
+        [ viewModals model
+        , viewModalMask model.showingAnyMenu
+        , viewControls model (viewDropdownMenu model.currentDropdown model.drawing model)
+        , viewDrawingArea model selectedImage
+        ]
 
-        shiftPressed =
-            isPressed Shift keyboardState
-    in
-        div
-            [ Html.class "annotation-app" ]
-            [ viewModals model
-            , viewModalMask model.showingAnyMenu
-            , div
-                [ Html.class "controls" ]
-                [ div [ Html.class "columns" ]
-                    [ button [ onClick ReturnToImageSelection, Html.class "cancel-button" ] [ Html.text "Cancel" ]
-                    , button [ onClick Save, Html.class "save-button" ] [ Html.text "Save" ]
-                    ]
-                , viewHistoryControls edits
-                , div [ Html.class "columns" ]
-                    (List.map (viewDrawingButton keyboardState drawing toDropdownMenu) (drawingOptions shiftPressed)
-                        ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
-                           , viewFillDropdown toDropdownMenu fill
-                           , viewLineStrokeDropdown toDropdownMenu strokeStyle
-                           ]
-                    )
-                ]
-            , viewDrawingArea model selectedImage
+
+viewControls : Model -> (AttributeDropdown -> Html Msg) -> Html Msg
+viewControls { edits, keyboardState, drawing, fill, strokeColor, strokeStyle } toDropdownMenu =
+    div
+        [ Html.class "controls" ]
+        [ div [ Html.class "columns" ]
+            [ button [ onClick ReturnToImageSelection, Html.class "cancel-button" ] [ Html.text "Cancel" ]
+            , button [ onClick Save, Html.class "save-button" ] [ Html.text "Save" ]
             ]
+        , viewHistoryControls edits
+        , div [ Html.class "columns" ]
+            (List.map (viewDrawingButton keyboardState drawing toDropdownMenu) (drawingOptions (isPressed Shift keyboardState))
+                ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
+                   , viewFillDropdown toDropdownMenu fill
+                   , viewLineStrokeDropdown toDropdownMenu strokeStyle
+                   ]
+            )
+        ]
 
 
 viewModals : Model -> Html Msg
