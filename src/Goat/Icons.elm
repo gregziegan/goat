@@ -5,7 +5,7 @@ import Color.Convert exposing (colorToHex)
 import Goat.Model exposing (StrokeStyle(..))
 import Html exposing (Html)
 import Svg exposing (circle, g, line, polygon, svg)
-import Svg.Attributes exposing (class, cx, cy, rx, d, fill, fillOpacity, fillRule, height, path, points, r, stroke, viewBox, width, strokeLinecap, x, y)
+import Svg.Attributes exposing (class, cx, cy, rx, ry, d, fill, fillOpacity, fillRule, height, path, points, r, stroke, viewBox, width, strokeLinecap, x, y)
 
 
 viewUndoArrow : Html msg
@@ -39,8 +39,8 @@ viewSpotlightRect =
 viewSpotlightEllipse : Html msg
 viewSpotlightEllipse =
     svg [ width "20", height "20", viewBox "0 0 20 20" ]
-        [ Svg.path [ d "M0,0 L20,0 L20,20 L0,20 L0,0 Z M3,7.9999433 L3,9.0000567 C3,11.2003465 4.78899235,13 6.99582624,13 L11.0041738,13 C13.2034788,13 15,11.2091644 15,9.0000567 L15,7.9999433 C15,5.79965349 13.2110077,4 11.0041738,4 L6.99582624,4 C4.79652125,4 3,5.79083562 3,7.9999433 Z", fillOpacity "0.337494339", fill "#000000" ] []
-        , Svg.rect [ stroke "#000000", x "3.5", y "4.5", width "11", height "8", rx "4", fill "white" ] []
+        [ Svg.path [ d "M0,0 L20,0 L20,20 L0,20 L0,0 Z M9,13 C12.3137085,13 15,10.9852814 15,8.5 C15,6.01471863 12.3137085,4 9,4 C5.6862915,4 3,6.01471863 3,8.5 C3,10.9852814 5.6862915,13 9,13 Z", fillOpacity "0.337494339", fill "#000000" ] []
+        , Svg.ellipse [ cx "9", cy "8.5", rx "5.5", ry "4", stroke "#000000", fill "white" ] []
         ]
 
 
