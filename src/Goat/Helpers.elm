@@ -4,6 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), EndPosition, Image, LineMode(..), LineType(..), ShapeMode(..), Shape, ShapeType(..), StartPosition, StrokeStyle(..), controlUIWidth)
 import Html exposing (Attribute)
 import Html.Events exposing (on)
+import List.Extra
 import Json.Decode as Json
 import Keyboard.Extra as Keyboard exposing (Key(Shift), isPressed)
 import Mouse exposing (Position)
@@ -201,11 +202,6 @@ onMouseUp decodeToMsg =
     on "mouseup" decodeToMsg
 
 
-onMouseUpOrLeave : Json.Decoder msg -> List (Attribute msg)
-onMouseUpOrLeave decodeToMsg =
-    [ on "mouseleave" decodeToMsg, onMouseUp decodeToMsg ]
-
-
 mapAtIndex : Int -> (a -> a) -> Array a -> Array a
 mapAtIndex index fn xs =
     case Array.get index xs of
@@ -353,3 +349,11 @@ isEmptyTextBox annotation =
 
         _ ->
             False
+
+
+getFirstSpotlightIndex : Array Annotation -> Int
+getFirstSpotlightIndex annotations =
+    annotations
+        |> Array.toList
+        |> List.Extra.findIndex isSpotlightShape
+        |> Maybe.withDefault 0

@@ -13,7 +13,6 @@ import Html.Attributes as Html exposing (class, classList, disabled, height, id,
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onMouseEnter, onMouseLeave, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra as Keyboard exposing (Key(Shift), KeyChange, KeyChange(..), isPressed)
-import List.Extra
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
@@ -76,7 +75,8 @@ viewInfoScreen =
 viewImageAnnotator : Model -> Image -> Html Msg
 viewImageAnnotator model selectedImage =
     div
-        [ Html.class "annotation-app" ]
+        [ Html.class "annotation-app"
+        ]
         [ viewModals model
         , viewModalMask model.showingAnyMenu
         , viewControls model (viewDropdownMenu model.currentDropdown model.drawing model)
@@ -98,7 +98,7 @@ viewControls { edits, keyboardState, drawing, fill, strokeColor, strokeStyle } t
                 ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
                    , viewFillDropdown toDropdownMenu fill
                    , viewLineStrokeDropdown toDropdownMenu strokeStyle
-                   , viewTextSizeDropdown drawing toDropdownMenu
+                   , viewFontSizeDropdown drawing toDropdownMenu
                    ]
             )
         ]
@@ -129,6 +129,14 @@ viewDrawingButton selectedDrawing drawing =
         [ Html.classList
             [ "drawing-button" => True
             , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
+              -- , "drawing-button--spotlight"
+              --     => (case drawing of
+              --             DrawSpotlight shapeType shapeMode ->
+              --                 True
+              --
+              --             _ ->
+              --                 False
+              --        )
             ]
         , onClick <| ChangeDrawing drawing
         ]
@@ -143,14 +151,14 @@ viewHistoryControls edits =
         ]
 
 
-viewTextSizeDropdown : Drawing -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewTextSizeDropdown drawing toDropdownMenu =
+viewFontSizeDropdown : Drawing -> (AttributeDropdown -> Html Msg) -> Html Msg
+viewFontSizeDropdown drawing toDropdownMenu =
     div [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
             , Html.class "drawing-button"
             ]
-            [ Icons.viewText
+            [ Icons.viewFontSize
             , Icons.viewCornerArrow
             ]
         , toDropdownMenu Fonts
@@ -349,10 +357,10 @@ drawingStateEvents drawing annotationState =
             ]
 
         DrawingAnnotation _ _ ->
-            onMouseUpOrLeave (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
-                ++ [ ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
-                   , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
-                   ]
+            [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
+            ]
 
         MovingAnnotation index start _ ->
             [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
@@ -428,14 +436,6 @@ viewDefinitions width height annotationState cutOuts =
         |> (::) viewSvgFilters
         |> defs []
         |> List.singleton
-
-
-getFirstSpotlightIndex : Array Annotation -> Int
-getFirstSpotlightIndex annotations =
-    annotations
-        |> Array.toList
-        |> List.Extra.findIndex isSpotlightShape
-        |> Maybe.withDefault 0
 
 
 getAnnotations : Image -> Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Bool -> List (Svg Msg)

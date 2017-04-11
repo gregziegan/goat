@@ -5,7 +5,7 @@ import Color.Convert exposing (colorToHex)
 import Goat.Model exposing (StrokeStyle(..))
 import Html exposing (Html)
 import Svg exposing (circle, g, line, polygon, svg)
-import Svg.Attributes exposing (class, cx, cy, d, fill, fillRule, height, path, points, r, stroke, viewBox, width, strokeLinecap)
+import Svg.Attributes exposing (class, cx, cy, rx, d, fill, fillOpacity, fillRule, height, path, points, r, stroke, viewBox, width, strokeLinecap, x, y)
 
 
 viewUndoArrow : Html msg
@@ -30,20 +30,26 @@ viewRectangle =
 
 viewSpotlightRect : Html msg
 viewSpotlightRect =
-    svg [ width "14", height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M4 10h6V4H4v6zM0 0h14v14H0V0z", fillRule "nonzero", fill "#555" ] [] ]
+    svg [ width "20", height "20", viewBox "0 0 20 20" ]
+        [ Svg.path [ d "M0,0 L20,0 L20,20 L0,20 L0,0 Z M3,4 L3,13 L15,13 L15,4 L3,4 Z", fillOpacity "0.337494339", fill "#000000" ] []
+        , Svg.rect [ stroke "#000000", x "3.5", y "4.5", width "11", height "8", fill "white" ] []
+        ]
 
 
 viewSpotlightEllipse : Html msg
 viewSpotlightEllipse =
-    svg [ width "14", height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M4 7c0 1.652 1.347 3 3 3 1.652 0 3-1.347 3-3 0-1.652-1.347-3-3-3-1.652 0-3 1.347-3 3zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill "#555" ] [] ]
+    svg [ width "20", height "20", viewBox "0 0 20 20" ]
+        [ Svg.path [ d "M0,0 L20,0 L20,20 L0,20 L0,0 Z M3,7.9999433 L3,9.0000567 C3,11.2003465 4.78899235,13 6.99582624,13 L11.0041738,13 C13.2034788,13 15,11.2091644 15,9.0000567 L15,7.9999433 C15,5.79965349 13.2110077,4 11.0041738,4 L6.99582624,4 C4.79652125,4 3,5.79083562 3,7.9999433 Z", fillOpacity "0.337494339", fill "#000000" ] []
+        , Svg.rect [ stroke "#000000", x "3.5", y "4.5", width "11", height "8", rx "4", fill "white" ] []
+        ]
 
 
 viewSpotlightRoundedRect : Html msg
 viewSpotlightRoundedRect =
-    svg [ width "14", height "14", viewBox "0 0 14 14" ]
-        [ Svg.path [ d "M4 10h6V4H4v6zM0 3.003C0 1.345 1.342 0 3.003 0h7.994C12.655 0 14 1.342 14 3.003v7.994C14 12.655 12.658 14 10.997 14H3.003C1.345 14 0 12.658 0 10.997V3.003z", fillRule "nonzero", fill "#555" ] [] ]
+    svg [ width "20", height "20", viewBox "0 0 20 20" ]
+        [ Svg.path [ d "M0,0 L20,0 L20,20 L0,20 L0,0 Z M3,7.9999433 L3,9.0000567 C3,11.2003465 4.78899235,13 6.99582624,13 L11.0041738,13 C13.2034788,13 15,11.2091644 15,9.0000567 L15,7.9999433 C15,5.79965349 13.2110077,4 11.0041738,4 L6.99582624,4 C4.79652125,4 3,5.79083562 3,7.9999433 Z", fillOpacity "0.337494339", fill "#000000" ] []
+        , Svg.rect [ stroke "#000000", x "3.5", y "4.5", width "11", height "8", rx "4", fill "white" ] []
+        ]
 
 
 viewRoundedRectangle : Html msg
@@ -118,6 +124,13 @@ viewText : Html msg
 viewText =
     svg [ viewBox "0 0 12 15", height "12", width "15" ]
         [ Svg.path [ d "M0 0v4l2-2h3v10.03H3l-1 2h8l-1-2H7V2h3l2 2V0z", fillRule "evenodd" ] []
+        ]
+
+
+viewFontSize : Html msg
+viewFontSize =
+    svg [ viewBox "0 0 20 20", height "20", width "20" ]
+        [ Svg.path [ d "M4.99902344,13.3544922 L4.01904297,10.5024414 L2.97753906,13.3544922 L4.99902344,13.3544922 Z M3.56201172,9.54443359 L4.55078125,9.54443359 L6.89306641,16 L5.93505859,16 L5.28027344,14.0664062 L2.72705078,14.0664062 L2.02832031,16 L1.13183594,16 L3.56201172,9.54443359 Z M15.0009766,10.7089844 L13.0410156,5.00488281 L10.9580078,10.7089844 L15.0009766,10.7089844 Z M12.1269531,3.08886719 L14.1044922,3.08886719 L18.7890625,16 L16.8730469,16 L15.5634766,12.1328125 L10.4570312,12.1328125 L9.05957031,16 L7.26660156,16 L12.1269531,3.08886719 Z" ] []
         ]
 
 

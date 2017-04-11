@@ -324,3 +324,7 @@ button:active, button:focus, button:hover {
 .hidden {
   visibility: hidden;
 }
+
+.drawing-button--spotlight {
+  background-color: rgba(0, 0, 0, 0.337494339);
+}
