@@ -94,10 +94,11 @@ viewControls { edits, keyboardState, drawing, fill, strokeColor, strokeStyle } t
             ]
         , viewHistoryControls edits
         , div [ Html.class "columns" ]
-            (List.map (viewDrawingButton keyboardState drawing toDropdownMenu) (drawingOptions (isPressed Shift keyboardState))
+            (List.map (viewDrawingButton drawing) (drawingOptions (isPressed Shift keyboardState))
                 ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
                    , viewFillDropdown toDropdownMenu fill
                    , viewLineStrokeDropdown toDropdownMenu strokeStyle
+                   , viewTextSizeDropdown drawing toDropdownMenu
                    ]
             )
         ]
@@ -122,33 +123,16 @@ viewModalMask showingAnyMenu =
         []
 
 
-viewVanillaDrawingButton : Keyboard.State -> Drawing -> Drawing -> Html Msg
-viewVanillaDrawingButton keyboardState selectedDrawing drawing =
+viewDrawingButton : Drawing -> Drawing -> Html Msg
+viewDrawingButton selectedDrawing drawing =
     button
         [ Html.classList
             [ "drawing-button" => True
             , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
-            , "drawing-button--alternate" => drawingsAreEqual selectedDrawing drawing && isPressed Shift keyboardState
             ]
         , onClick <| ChangeDrawing drawing
         ]
         [ viewShapeSvg drawing ]
-
-
-viewDrawingButton : Keyboard.State -> Drawing -> (AttributeDropdown -> Html Msg) -> Drawing -> Html Msg
-viewDrawingButton keyboardState selectedDrawing toDropdownMenu drawing =
-    case drawing of
-        DrawLine _ _ ->
-            viewVanillaDrawingButton keyboardState selectedDrawing drawing
-
-        DrawShape _ _ ->
-            viewVanillaDrawingButton keyboardState selectedDrawing drawing
-
-        DrawTextBox ->
-            viewTextSizeDropdown selectedDrawing toDropdownMenu
-
-        DrawSpotlight _ _ ->
-            viewVanillaDrawingButton keyboardState selectedDrawing drawing
 
 
 viewHistoryControls : UndoList (Array Annotation) -> Html Msg
@@ -164,7 +148,7 @@ viewTextSizeDropdown drawing toDropdownMenu =
     div [ Html.class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
-            , Html.classList [ "drawing-button" => True, "drawing-button--selected" => drawingsAreEqual drawing DrawTextBox ]
+            , Html.class "drawing-button"
             ]
             [ Icons.viewText
             , Icons.viewCornerArrow
