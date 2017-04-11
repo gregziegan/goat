@@ -129,14 +129,6 @@ viewDrawingButton selectedDrawing drawing =
         [ Html.classList
             [ "drawing-button" => True
             , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
-              -- , "drawing-button--spotlight"
-              --     => (case drawing of
-              --             DrawSpotlight shapeType shapeMode ->
-              --                 True
-              --
-              --             _ ->
-              --                 False
-              --        )
             ]
         , onClick <| ChangeDrawing drawing
         ]
@@ -354,36 +346,39 @@ drawingStateEvents drawing annotationState =
         ReadyToDraw ->
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
         DrawingAnnotation _ _ ->
             [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
         MovingAnnotation index start _ ->
             [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
         ResizingAnnotation _ ->
             [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
         SelectedAnnotation index ->
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
-            , Html.contextmenu "annotation-menu"
-            , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu index) Mouse.position)
             ]
 
         EditingATextBox index ->
             [ Html.Events.onMouseDown <| FinishEditingText index
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (\_ -> FinishEditingText index)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
 
@@ -417,6 +412,7 @@ canvasAttributes image drawing annotationState =
         , "height" => toString (round image.height) ++ "px"
         , "cursor" => annotationStateToCursor annotationState
         ]
+    , Html.contextmenu "annotation-menu"
     ]
         ++ drawingStateEvents drawing annotationState
 
@@ -560,7 +556,7 @@ annotationStateEvents annIndex annotationState =
         ReadyToDraw ->
             [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (SelectAndMoveAnnotation annIndex << toDrawingPosition) Mouse.position
             , Attr.class "pointerCursor"
-            , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu annIndex) Mouse.position)
+            , onWithOptions "contextmenu" (Html.Events.Options True True) (Json.map (ToggleSelectedAnnotationMenu annIndex) Mouse.position)
             ]
 
         DrawingAnnotation _ _ ->
@@ -570,7 +566,7 @@ annotationStateEvents annIndex annotationState =
             [ Attr.class "moveCursor"
             , Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartMovingAnnotation annIndex << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation annIndex << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleAnnotationMenu annIndex) Mouse.position)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleSelectedAnnotationMenu annIndex) Mouse.position)
             ]
 
         MovingAnnotation index _ ( dx, dy ) ->
@@ -1009,8 +1005,8 @@ viewImage { width, height, url } =
         []
 
 
-viewAnnotationMenu : Position -> Int -> Html Msg
-viewAnnotationMenu pos index =
+viewAnnotationMenu : Position -> Maybe Int -> Html Msg
+viewAnnotationMenu pos selectedIndex =
     div
         [ id "annotation-menu"
         , class "annotation-menu"
@@ -1018,12 +1014,30 @@ viewAnnotationMenu pos index =
             [ ( "top", toPx pos.y )
             , ( "left", toPx pos.x )
             ]
-        , Html.Events.onMouseEnter (SelectAnnotation index)
         ]
         [ Html.ul [ class "annotation-menu__list" ]
-            [ viewAnnotationMenuItem (BringAnnotationToFront index) "Bring to Front"
-            , viewAnnotationMenuItem (SendAnnotationToBack index) "Send to Back"
+            (case selectedIndex of
+                Just index ->
+                    [ viewAnnotationMenuItem (BringAnnotationToFront index) "Bring to Front"
+                    , viewAnnotationMenuItem (SendAnnotationToBack index) "Send to Back"
+                    ]
+
+                Nothing ->
+                    [ viewDisabledAnnotationMenuItem "Bring to Front"
+                    , viewDisabledAnnotationMenuItem "Send to Back"
+                    ]
+            )
+        ]
+
+
+viewDisabledAnnotationMenuItem : String -> Html Msg
+viewDisabledAnnotationMenuItem buttonText =
+    Html.li [ class "annotation-menu__item" ]
+        [ button
+            [ Html.class "annotation-menu__button"
+            , Html.disabled True
             ]
+            [ Html.text buttonText ]
         ]
 
 

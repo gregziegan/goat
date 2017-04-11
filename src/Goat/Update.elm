@@ -47,7 +47,8 @@ type Msg
     | ResizeAnnotation Position
     | FinishResizingAnnotation Position
       -- Annotation menu updates
-    | ToggleAnnotationMenu Int Position
+    | ToggleAnnotationMenu Position
+    | ToggleSelectedAnnotationMenu Int Position
     | BringAnnotationToFront Int
     | SendAnnotationToBack Int
       -- History updates
@@ -237,9 +238,15 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
                 |> sendAnnotationToBack index
                 => []
 
-        ToggleAnnotationMenu index pos ->
+        ToggleAnnotationMenu pos ->
             model
-                |> toggleAnnotationMenu index pos
+                |> toggleAnnotationMenu Nothing pos
+                => []
+
+        ToggleSelectedAnnotationMenu index pos ->
+            model
+                |> toggleAnnotationMenu (Just index) pos
+                |> selectAnnotation index
                 => []
 
         Undo ->
@@ -1113,12 +1120,30 @@ tryToBlur result =
             Undo
 
 
-toggleAnnotationMenu : Int -> Position -> Model -> Model
-toggleAnnotationMenu index position model =
-    if model.annotationMenu == Nothing then
-        { model | annotationMenu = Just { index = index, position = position }, showingAnyMenu = True }
-    else
-        { model | showingAnyMenu = False }
+toggleAnnotationMenu : Maybe Int -> Position -> Model -> Model
+toggleAnnotationMenu selectedIndex position model =
+    case model.annotationMenu of
+        Just menu ->
+            if menu.index == selectedIndex then
+                { model | showingAnyMenu = False, annotationMenu = Nothing }
+            else
+                { model
+                    | showingAnyMenu = True
+                    , annotationMenu = Just { index = selectedIndex, position = position }
+                }
+
+        Nothing ->
+            { model
+                | annotationMenu = Just { index = selectedIndex, position = position }
+                , showingAnyMenu = True
+                , annotationState =
+                    case selectedIndex of
+                        Just index ->
+                            SelectedAnnotation index
+
+                        Nothing ->
+                            model.annotationState
+            }
 
 
 bringToFront : Int -> Array Annotation -> Array Annotation

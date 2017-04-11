@@ -221,7 +221,7 @@ type alias Model =
     , currentDropdown : Maybe AttributeDropdown
     , drawing : Drawing
     , operatingSystem : OperatingSystem
-    , annotationMenu : Maybe { index : Int, position : Position }
+    , annotationMenu : Maybe { index : Maybe Int, position : Position }
     , showingAnyMenu : Bool
     , clipboard : Maybe Annotation
     }

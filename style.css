@@ -310,6 +310,13 @@ button:active, button:focus, button:hover {
   text-align: left;
   padding: 5px;
   color: inherit;
+  cursor: pointer;
+}
+
+.annotation-menu__button:disabled {
+  background: #eee;
+  color: black;
+  cursor: not-allowed;
 }
 
 .modal-mask {
@@ -323,8 +330,4 @@ button:active, button:focus, button:hover {
 
 .hidden {
   visibility: hidden;
-}
-
-.drawing-button--spotlight {
-  background-color: rgba(0, 0, 0, 0.337494339);
 }
