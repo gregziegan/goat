@@ -13,7 +13,8 @@ import UndoList
 
 goat : Image
 goat =
-    { url = "goat.jpg"
+    { id = "0"
+    , url = "goat.jpg"
     , width = 100.0
     , height = 100.0
     , originalWidth = 200.0

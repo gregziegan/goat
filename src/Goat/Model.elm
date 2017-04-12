@@ -69,7 +69,8 @@ type alias TextArea =
 
 
 type alias Image =
-    { url : String
+    { id : String
+    , url : String
     , width : Float
     , height : Float
     , originalWidth : Float

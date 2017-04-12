@@ -182,8 +182,8 @@ calcDistance a b =
 
 theGoats : List Image
 theGoats =
-    [ Image "images/goat.jpg" 235 276 639 751
-    , Image "images/goat2.jpg" 235 276 639 751
+    [ Image "0" "images/goat.jpg" 235 276 639 751
+    , Image "1" "images/goat2.jpg" 235 276 639 751
     ]
 
 

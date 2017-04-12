@@ -161,6 +161,8 @@ button:active, button:focus, button:hover {
 
 .image-selector {
   display: flex;
+  max-width: 700px;
+  flex-wrap: wrap;
 }
 
 .image-option {
@@ -170,6 +172,11 @@ button:active, button:focus, button:hover {
   margin: 3px;
   cursor: pointer;
   position: relative;
+}
+
+.image-option > img {
+  width: 120px;
+  height: auto;
 }
 
 .image-option:hover > .image-edit-pencil {
