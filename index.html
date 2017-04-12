@@ -170,14 +170,15 @@
             canvas.height = image.height
             ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.width, Math.round(image.height))
             ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height))
-            client.invoke('ticket.editor.inlineImage', canvas.toDataURL())
 
             client.get('ticket.comment').then(function(zaf) {
               var div = document.createElement('div')
               var comment = zaf['ticket.comment'].text
               div.innerHTML = comment
               div.querySelector('img[data-imageuploadid="' + image.id + '"]').outerHTML = ''
-              // client.set('ticket.comment.html', div.innerHTML) -- need to replace html
+              client.set('ticket.comment.text', div.innerHTML).then(function() {
+                client.invoke('ticket.editor.inlineImage', canvas.toDataURL())
+              })
             })
           } else {
             ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.originalWidth, image.originalHeight, 0, 0, image.width, Math.round(image.height))
