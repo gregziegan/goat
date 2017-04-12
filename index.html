@@ -178,6 +178,7 @@
               div.querySelector('img[data-imageuploadid="' + image.id + '"]').outerHTML = ''
               client.set('ticket.comment.text', div.innerHTML).then(function() {
                 client.invoke('ticket.editor.inlineImage', canvas.toDataURL())
+                client.invoke('app.close')
               })
             })
           } else {
