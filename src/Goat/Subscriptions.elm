@@ -42,9 +42,7 @@ imageAnnotationSubscriptions model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.images of
-        Nothing ->
-            imageUploadSubscriptions model
-
-        Just images ->
-            imageAnnotationSubscriptions model
+    if model.imageSelected then
+        imageAnnotationSubscriptions model
+    else
+        imageUploadSubscriptions model
