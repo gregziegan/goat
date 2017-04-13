@@ -8,8 +8,8 @@ import Goat.Helpers exposing (..)
 import Goat.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..))
-import Html exposing (Attribute, Html, button, div, p, text)
-import Html.Attributes as Html exposing (class, classList, disabled, height, id, readonly, src, start, style, type_, width)
+import Html exposing (Attribute, Html, button, div, p, text, ul, li)
+import Html.Attributes exposing (class, classList, disabled, height, id, readonly, src, start, style, type_, width, map)
 import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onMouseEnter, onMouseLeave, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra as Keyboard exposing (Key(Shift), KeyChange, KeyChange(..), isPressed)
@@ -17,7 +17,7 @@ import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
 import SingleTouch as ST
-import Svg exposing (..)
+import Svg exposing (circle, defs, foreignObject, marker, Svg, svg, rect)
 import Svg.Attributes as Attr
 import Touch as T
 import UndoList exposing (UndoList)
@@ -41,19 +41,19 @@ viewImageSelector images =
     images
         |> List.Zipper.toList
         |> List.map (viewImageOption images)
-        |> div [ Html.class "image-selector" ]
+        |> div [ class "image-selector" ]
 
 
 viewImageOption : Zipper Image -> Image -> Html Msg
 viewImageOption zipper image =
     button
-        [ Html.class "image-option"
-        , Html.width <| round image.width
-        , Html.height <| round image.height
+        [ class "image-option"
+        , width <| round image.width
+        , height <| round image.height
         , onClick <| SelectImage image
         ]
-        [ Html.img [ src image.url, Html.height <| round image.height, Html.width <| round image.width ] []
-        , Html.div [ onClick <| SelectImage image, Html.class "image-edit-pencil" ]
+        [ Html.img [ src image.url, height <| round image.height, width <| round image.width ] []
+        , Html.div [ onClick <| SelectImage image, class "image-edit-pencil" ]
             [ Icons.viewPencil
             ]
         ]
@@ -61,12 +61,12 @@ viewImageOption zipper image =
 
 viewInfoScreen : Html Msg
 viewInfoScreen =
-    div [ Html.class "droparea" ]
-        [ div [ Html.class "info-text" ]
+    div [ class "droparea" ]
+        [ div [ class "info-text" ]
             [ Html.h2 [] [ Html.text "Please drag and drop an image onto the page" ]
-            , div [ Html.class "goat-time" ]
+            , div [ class "goat-time" ]
                 [ p [] [ Html.text "Or, show me the goats!" ]
-                , button [ Html.class "goat-button", onClick ShowMeTheGoats ] [ Html.text "🐐" ]
+                , button [ class "goat-button", onClick ShowMeTheGoats ] [ Html.text "🐐" ]
                 ]
             ]
         ]
@@ -75,7 +75,7 @@ viewInfoScreen =
 viewImageAnnotator : Model -> Image -> Html Msg
 viewImageAnnotator model selectedImage =
     div
-        [ Html.class "annotation-app"
+        [ class "annotation-app"
         ]
         [ viewModals model
         , viewModalMask model.showingAnyMenu
@@ -87,13 +87,13 @@ viewImageAnnotator model selectedImage =
 viewControls : Model -> (AttributeDropdown -> Html Msg) -> Html Msg
 viewControls { edits, keyboardState, drawing, fill, strokeColor, strokeStyle } toDropdownMenu =
     div
-        [ Html.class "controls" ]
-        [ div [ Html.class "columns" ]
-            [ button [ onClick ReturnToImageSelection, Html.class "cancel-button" ] [ Html.text "Cancel" ]
-            , button [ onClick Save, Html.class "save-button" ] [ Html.text "Save" ]
+        [ class "controls" ]
+        [ div [ class "columns" ]
+            [ button [ onClick ReturnToImageSelection, class "cancel-button" ] [ Html.text "Cancel" ]
+            , button [ onClick Save, class "save-button" ] [ Html.text "Save" ]
             ]
         , viewHistoryControls edits
-        , div [ Html.class "columns" ]
+        , div [ class "columns" ]
             (List.map (viewDrawingButton drawing) (drawingOptions (isPressed Shift keyboardState))
                 ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
                    , viewFillDropdown toDropdownMenu fill
@@ -126,7 +126,7 @@ viewModalMask showingAnyMenu =
 viewDrawingButton : Drawing -> Drawing -> Html Msg
 viewDrawingButton selectedDrawing drawing =
     button
-        [ Html.classList
+        [ classList
             [ "drawing-button" => True
             , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
             ]
@@ -137,18 +137,18 @@ viewDrawingButton selectedDrawing drawing =
 
 viewHistoryControls : UndoList (Array Annotation) -> Html Msg
 viewHistoryControls edits =
-    div [ Html.class "history-controls" ]
-        [ button [ onClick Undo, Html.class "history-button", disabled <| not <| UndoList.hasPast edits ] [ Icons.viewUndoArrow ]
-        , button [ onClick Redo, Html.class "history-button flip", disabled <| not <| UndoList.hasFuture edits ] [ Icons.viewUndoArrow ]
+    div [ class "history-controls" ]
+        [ button [ onClick Undo, class "history-button", disabled <| not <| UndoList.hasPast edits ] [ Icons.viewUndoArrow ]
+        , button [ onClick Redo, class "history-button flip", disabled <| not <| UndoList.hasFuture edits ] [ Icons.viewUndoArrow ]
         ]
 
 
 viewFontSizeDropdown : Drawing -> (AttributeDropdown -> Html Msg) -> Html Msg
 viewFontSizeDropdown drawing toDropdownMenu =
-    div [ Html.class "dropdown-things" ]
+    div [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
-            , Html.class "drawing-button"
+            , class "drawing-button"
             ]
             [ Icons.viewFontSize
             , Icons.viewCornerArrow
@@ -161,27 +161,27 @@ viewFontSizeOptions : Int -> Html Msg
 viewFontSizeOptions fontSize =
     fontSizes
         |> List.map (viewFontSizeOption fontSize)
-        |> div [ Html.class "dropdown-options" ]
+        |> div [ class "dropdown-options" ]
 
 
 viewFillOptions : Maybe Color -> Html Msg
 viewFillOptions fill =
     fillOptions
         |> List.map (viewFillOption fill)
-        |> div [ Html.class "dropdown-options" ]
+        |> div [ class "dropdown-options" ]
 
 
 viewStrokeColorOptions : Color -> Html Msg
 viewStrokeColorOptions strokeColor =
     strokeColorOptions
         |> List.map (viewStrokeColorOption strokeColor)
-        |> div [ Html.class "dropdown-options" ]
+        |> div [ class "dropdown-options" ]
 
 
 viewFillOption : Maybe Color -> Maybe Color -> Html Msg
 viewFillOption selectedFill fill =
     button
-        [ Html.classList
+        [ classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedFill == fill
             ]
@@ -193,7 +193,7 @@ viewFillOption selectedFill fill =
 viewStrokeColorOption : Color -> Color -> Html Msg
 viewStrokeColorOption selectedColor color =
     button
-        [ Html.classList
+        [ classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedColor == color
             ]
@@ -205,7 +205,7 @@ viewStrokeColorOption selectedColor color =
 viewFontSizeOption : Int -> Int -> Html Msg
 viewFontSizeOption selectedFontSize fontSize =
     button
-        [ Html.classList
+        [ classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedFontSize == fontSize
             ]
@@ -217,10 +217,10 @@ viewFontSizeOption selectedFontSize fontSize =
 viewLineStrokeDropdown : (AttributeDropdown -> Html Msg) -> StrokeStyle -> Html Msg
 viewLineStrokeDropdown toDropdownMenu strokeStyle =
     div
-        [ Html.class "dropdown-things" ]
+        [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Strokes
-            , Html.class "drawing-button"
+            , class "drawing-button"
             ]
             [ Icons.viewStrokeStyle strokeStyle
             , Icons.viewCornerArrow
@@ -232,10 +232,10 @@ viewLineStrokeDropdown toDropdownMenu strokeStyle =
 viewFillDropdown : (AttributeDropdown -> Html Msg) -> Maybe Color -> Html Msg
 viewFillDropdown toDropdownMenu fill =
     div
-        [ Html.class "dropdown-things" ]
+        [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fills
-            , Html.class "drawing-button"
+            , class "drawing-button"
             ]
             [ Icons.viewFill fill
             , Icons.viewCornerArrow
@@ -247,10 +247,10 @@ viewFillDropdown toDropdownMenu fill =
 viewStrokeColorDropdown : (AttributeDropdown -> Html Msg) -> Color -> Html Msg
 viewStrokeColorDropdown toDropdownMenu strokeColor =
     div
-        [ Html.class "dropdown-things" ]
+        [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown StrokeColors
-            , Html.class "drawing-button"
+            , class "drawing-button"
             ]
             [ Icons.viewStrokeColor strokeColor
             , Icons.viewCornerArrow
@@ -325,13 +325,13 @@ viewLineStrokeOptions : StrokeStyle -> Html Msg
 viewLineStrokeOptions strokeStyle =
     strokeStyleOptions
         |> List.map (viewStrokeStyleOption strokeStyle)
-        |> div [ Html.class "dropdown-options" ]
+        |> div [ class "dropdown-options" ]
 
 
 viewStrokeStyleOption : StrokeStyle -> StrokeStyle -> Html Msg
 viewStrokeStyleOption selectedStrokeStyle strokeStyle =
     button
-        [ Html.classList
+        [ classList
             [ "dropdown-button" => True
             , "dropdown-button--selected" => selectedStrokeStyle == strokeStyle
             ]
@@ -405,14 +405,14 @@ viewSpotlights annotationState annotations =
 
 canvasAttributes : Image -> Drawing -> AnnotationState -> List (Svg.Attribute Msg)
 canvasAttributes image drawing annotationState =
-    [ Html.id "canvas"
-    , Html.class "image-edit"
-    , Html.style
+    [ id "canvas"
+    , class "image-edit"
+    , style
         [ "width" => toString (round image.width) ++ "px"
         , "height" => toString (round image.height) ++ "px"
         , "cursor" => annotationStateToCursor annotationState
         ]
-    , Html.contextmenu "annotation-menu"
+    , Html.Attributes.contextmenu "annotation-menu"
     ]
         ++ drawingStateEvents drawing annotationState
 
@@ -510,7 +510,7 @@ viewDrawingArea model image =
                         , Attr.class "drawing"
                         , Attr.width <| toString <| round image.width
                         , Attr.height <| toString <| round image.height
-                        , Html.attribute "xmlns" "http://www.w3.org/2000/svg"
+                        , Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg"
                         ]
                         (viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing model.drawing model.annotationState)
                    ]
@@ -911,15 +911,15 @@ viewTextArea index { start, end, text, fill, fontSize, angle, autoexpand } =
     foreignObject
         []
         [ div
-            [ Html.class "text-box-container"
-            , Html.style
+            [ class "text-box-container"
+            , style
                 [ "top" => toPx (Basics.min start.y end.y)
                 , "left" => toPx (Basics.min start.x end.x)
                 , "width" => toPx (abs (end.x - start.x))
                 , "font-size" => toPx fontSize
                 , "color" => Color.Convert.colorToHex fill
                 ]
-            , Html.attribute "onmousedown" "evt ? evt.stopPropagation() : event.stopPropagation();"
+            , Html.Events.onWithOptions "mousedown" stopPropagation (Json.succeed PreventTextMouseDown)
             ]
             [ AutoExpand.view (Goat.Update.config index) (fontSizeToLineHeight fontSize) autoexpand text
             ]
@@ -997,9 +997,9 @@ lineAttributes lineType shape =
 viewImage : Image -> Html Msg
 viewImage { width, height, url } =
     Html.img
-        [ Html.class "image-to-annotate"
-        , Html.width (round width)
-        , Html.height (round height)
+        [ class "image-to-annotate"
+        , Html.Attributes.width (round width)
+        , Html.Attributes.height (round height)
         , src url
         ]
         []
@@ -1010,12 +1010,12 @@ viewAnnotationMenu pos selectedIndex =
     div
         [ id "annotation-menu"
         , class "annotation-menu"
-        , Html.style
+        , style
             [ ( "top", toPx pos.y )
             , ( "left", toPx pos.x )
             ]
         ]
-        [ Html.ul [ class "annotation-menu__list" ]
+        [ ul [ class "annotation-menu__list" ]
             (case selectedIndex of
                 Just index ->
                     [ viewAnnotationMenuItem (BringAnnotationToFront index) "Bring to Front"
@@ -1032,10 +1032,10 @@ viewAnnotationMenu pos selectedIndex =
 
 viewDisabledAnnotationMenuItem : String -> Html Msg
 viewDisabledAnnotationMenuItem buttonText =
-    Html.li [ class "annotation-menu__item" ]
+    li [ class "annotation-menu__item" ]
         [ button
-            [ Html.class "annotation-menu__button"
-            , Html.disabled True
+            [ class "annotation-menu__button"
+            , disabled True
             ]
             [ Html.text buttonText ]
         ]
@@ -1043,9 +1043,9 @@ viewDisabledAnnotationMenuItem buttonText =
 
 viewAnnotationMenuItem : Msg -> String -> Html Msg
 viewAnnotationMenuItem msg buttonText =
-    Html.li [ class "annotation-menu__item" ]
+    li [ class "annotation-menu__item" ]
         [ button
-            [ Html.class "annotation-menu__button"
+            [ class "annotation-menu__button"
             , onClick msg
             ]
             [ Html.text buttonText ]

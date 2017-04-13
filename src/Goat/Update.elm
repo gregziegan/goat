@@ -23,6 +23,7 @@ type Msg
       -- TextArea Updates
     | FocusTextArea Int
     | StartEditingText Int
+    | PreventTextMouseDown
     | TextBoxInput Int { textValue : String, state : AutoExpand.State }
     | FinishEditingText Int
       -- Annotation Attribute updates
@@ -95,6 +96,10 @@ update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardS
         StartEditingText index ->
             model
                 |> startEditingText index
+                => []
+
+        PreventTextMouseDown ->
+            model
                 => []
 
         TextBoxInput index { state, textValue } ->
