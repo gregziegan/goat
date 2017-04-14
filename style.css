@@ -233,8 +233,12 @@ button:active, button:focus, button:hover {
   cursor: crosshair;
 }
 
-.resizeCursor {
+.northWestCursor {
   cursor: nwse-resize;
+}
+
+.northEastCursor {
+  cursor: nesw-resize;
 }
 
 .moveCursor {

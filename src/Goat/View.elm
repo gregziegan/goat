@@ -691,11 +691,11 @@ viewAnnotation annotationState index annotation =
                             |> flip List.append (vertices Rectangular shape)
 
 
-annotationStateVertexEvents : Int -> AnnotationState -> Vertex -> List (Svg.Attribute Msg)
-annotationStateVertexEvents index annotationState vertex =
+annotationStateVertexEvents : Int -> AnnotationState -> Vertex -> ResizeDirection -> List (Svg.Attribute Msg)
+annotationStateVertexEvents index annotationState vertex direction =
     [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartResizingAnnotation index vertex << toDrawingPosition) Mouse.position
     , ST.onSingleTouch T.TouchStart T.preventAndStop (StartResizingAnnotation index vertex << toDrawingPosition << toPosition)
-    , Attr.class "resizeCursor"
+    , Attr.class (directionToCursor direction)
     ]
         ++ case annotationState of
             MovingAnnotation _ _ ( dx, dy ) _ ->
@@ -789,7 +789,7 @@ viewShape attrs shapeType fill shape =
             [ Svg.ellipse (shapeAttributes shapeType shape fill ++ attrs) [] ]
 
 
-viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
+viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
 viewVertices vertices start end toVertexEvents selectState =
     let
         toVertices =
@@ -870,19 +870,30 @@ shapeAttributes shapeType shape fill =
                 ellipseAttributes shape
 
 
-shapeVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
+shapeVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
 shapeVertices toVertexEvents start end =
-    [ viewVertex (toVertexEvents Start) start.x start.y
-    , viewVertex (toVertexEvents StartPlusX) end.x start.y
-    , viewVertex (toVertexEvents StartPlusY) start.x end.y
-    , viewVertex (toVertexEvents End) end.x end.y
-    ]
+    let
+        ( resizeDir1, resizeDir2, resizeDir3, resizeDir4 ) =
+            if start.x < end.x && start.y > end.y then
+                ( NESW, NWSE, NWSE, NESW )
+            else if start.x < end.x && start.y < end.y then
+                ( NWSE, NESW, NESW, NWSE )
+            else if start.x > end.x && start.y > end.y then
+                ( NWSE, NESW, NESW, NWSE )
+            else
+                ( NESW, NWSE, NWSE, NESW )
+    in
+        [ viewVertex (toVertexEvents Start resizeDir1) start.x start.y
+        , viewVertex (toVertexEvents StartPlusX resizeDir2) end.x start.y
+        , viewVertex (toVertexEvents StartPlusY resizeDir3) start.x end.y
+        , viewVertex (toVertexEvents End resizeDir4) end.x end.y
+        ]
 
 
-lineVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
+lineVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
 lineVertices toVertexEvents start end =
-    [ viewVertex (toVertexEvents Start) start.x start.y
-    , viewVertex (toVertexEvents End) end.x end.y
+    [ viewVertex (toVertexEvents Start Move) start.x start.y
+    , viewVertex (toVertexEvents End Move) end.x end.y
     ]
 
 
@@ -902,7 +913,7 @@ viewVertex vertexEvents x y =
         []
 
 
-ellipseVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
+ellipseVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
 ellipseVertices toVertexEvents start end =
     let
         dX =

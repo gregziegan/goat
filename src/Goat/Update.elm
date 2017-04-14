@@ -1,4 +1,4 @@
-module Goat.Update exposing (Msg(..), update, autoExpandConfig, addAnnotation, autoExpandAnnotation, editTextBoxAnnotation, finishEditingText, startEditingText, continueDrawing, finishLineDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing, finishMovingAnnotation, move, moveAnnotation, startMovingAnnotation, resize, resizeAnnotation, startResizingAnnotation, finishResizingAnnotation, selectAnnotation, updateAnySelectedAnnotations, updateStrokeColor, updateStrokeStyle, updateFill)
+module Goat.Update exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand

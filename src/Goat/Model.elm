@@ -1,4 +1,4 @@
-module Goat.Model exposing (Flags, StartPosition, EndPosition, ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine), Drawing(DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), Shape, TextArea, Image, AttributeDropdown(Fonts, Fills, StrokeColors, Strokes), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), Vertices(Rectangular, Elliptical, Linear), Annotation(Lines, Shapes, TextBox, Spotlight), Vertex(Start, End, StartPlusX, StartPlusY), OperatingSystem(MacOS, Windows), ResizingData, AnnotationState(ReadyToDraw, DrawingAnnotation, SelectedAnnotation, MovingAnnotation, ResizingAnnotation, EditingATextBox), SelectState(Selected, SelectedWithVertices, NotSelected), Model, AnnotationAttributes, init)
+module Goat.Model exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
@@ -134,6 +134,12 @@ type Vertex
 type OperatingSystem
     = MacOS
     | Windows
+
+
+type ResizeDirection
+    = NWSE
+    | NESW
+    | Move
 
 
 type alias ResizingData =
