@@ -167,8 +167,8 @@
         var url = DOMURL.createObjectURL(svg)
         drawingImg.onload = function() {
           ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.width, Math.round(image.height))
+          ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height))
           if (isInZendeskAppContext) {
-            ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height))
             client.get('ticket.comment').then(function(zaf) {
               var div = document.createElement('div')
               var comment = zaf['ticket.comment'].text
@@ -180,7 +180,6 @@
               })
             })
           } else {
-            ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height))
             plopImageIntoDom(canvas, image)
           }
           DOMURL.revokeObjectURL(url)
