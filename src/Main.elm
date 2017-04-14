@@ -1,9 +1,9 @@
-module Main exposing (..)
+module Main exposing (main)
 
-import Goat.Model exposing (AnnotationState(..), Flags, Model, init)
+import Goat.Model exposing (Flags, Model, init)
 import Goat.Ports as Ports
 import Goat.Subscriptions exposing (subscriptions)
-import Goat.Update exposing (Msg(..), update)
+import Goat.Update exposing (Msg, update)
 import Goat.View exposing (view)
 import Html
 import Rocket

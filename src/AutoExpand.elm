@@ -1,18 +1,27 @@
 module AutoExpand exposing (Config, State, initState, config, view)
 
-{-|
-Taken from https://github.com/ohanhi/autoexpand/blob/master/src/AutoExpand.elm
+{-| Taken from <https://github.com/ohanhi/autoexpand/blob/master/src/AutoExpand.elm>
 Testing this out without forking: experimenting with a more permissive API
 
 This library lets you use automatically expanding textareas in Elm.
 This means the textarea grows in height until it reaches the maximum number of
 rows allowed and then becomes a scrollable box.
+
+
 # View
+
 @docs view
+
+
 # Configuration
+
 @docs config, Config
+
+
 # State
+
 @docs State, initState
+
 -}
 
 import Html exposing (Html, div, p, br, textarea, text)
@@ -46,17 +55,17 @@ type Config msg
 
 {-| Create the `Config` for the auto expanding textarea.
 A typical configuration might look like this:
-    type Msg
-        = AutoExpandInput { textValue : String, state : AutoExpand.State }
-    config : AutoExpand.Config Msg
-    config =
-        AutoExpand.config
-            { onInput = AutoExpandInput
-            , padding = 10
-            , minRows = 1
-            , maxRows = 4
-            , attributes = []
-            }
+type Msg
+= AutoExpandInput { textValue : String, state : AutoExpand.State }
+config : AutoExpand.Config Msg
+config =
+AutoExpand.config
+{ onInput = AutoExpandInput
+, padding = 10
+, minRows = 1
+, maxRows = 4
+, attributes = []
+}
 -}
 config :
     { onInput : { textValue : String, state : State } -> msg
@@ -78,9 +87,9 @@ initState (Config config) =
 
 
 {-| Show the textarea on your page.
-    view : Model -> Html Msg
-    view model =
-        AutoExpand.view config model.autoExpandState model.textValue
+view : Model -> Html Msg
+view model =
+AutoExpand.view config model.autoExpandState model.textValue
 -}
 view : Config msg -> Float -> State -> String -> Html msg
 view (Config config) lineHeight (State rowCount) textValue =

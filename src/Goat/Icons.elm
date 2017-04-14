@@ -1,11 +1,11 @@
-module Goat.Icons exposing (..)
+module Goat.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle)
 
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
-import Goat.Model exposing (StrokeStyle(..))
+import Goat.Model exposing (StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick))
 import Html exposing (Html)
-import Svg exposing (circle, g, line, polygon, svg)
-import Svg.Attributes exposing (class, cx, cy, rx, ry, d, fill, fillOpacity, fillRule, height, path, points, r, stroke, viewBox, width, strokeLinecap, x, y)
+import Svg exposing (circle, polygon, svg)
+import Svg.Attributes exposing (class, cx, cy, rx, ry, d, fill, fillOpacity, fillRule, height, points, r, stroke, viewBox, width, strokeLinecap, x, y)
 
 
 viewUndoArrow : Html msg

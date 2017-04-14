@@ -1,7 +1,8 @@
-module Goat.Helpers exposing (..)
+module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, theGoats, removeItemIf, removeItem, isEmptyTextBox, selectLine, selectShape, selectSpotlight, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle)
 
 import Array.Hamt as Array exposing (Array)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), EndPosition, Image, LineMode(..), LineType(..), ShapeMode(..), Shape, ShapeType(..), StartPosition, StrokeStyle(..), controlUIWidth)
+import Goat.ControlOptions as ControlOptions
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), EndPosition, Image, LineMode(..), LineType(..), ShapeMode(..), Shape, ShapeType(..), StartPosition, StrokeStyle(..))
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import List.Extra
@@ -68,9 +69,9 @@ calcLinePos start end lineMode =
 equalXandY : StartPosition -> EndPosition -> EndPosition
 equalXandY a b =
     if b.y - a.y < 0 then
-        Position b.x (a.y - (Basics.max (b.x - a.x) (a.x - b.x)))
+        Position b.x (a.y - Basics.max (b.x - a.x) (a.x - b.x))
     else
-        Position b.x (a.y + (Basics.max (b.x - a.x) (a.x - b.x)))
+        Position b.x (a.y + Basics.max (b.x - a.x) (a.x - b.x))
 
 
 positionMapX : (Int -> Int) -> Position -> Position
@@ -130,7 +131,7 @@ toLineStyle strokeStyle =
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
 toDrawingPosition mouse =
-    { mouse | x = mouse.x - controlUIWidth, y = mouse.y - 10 }
+    { mouse | x = mouse.x - ControlOptions.controlUIWidth, y = mouse.y - 10 }
 
 
 annotationStateToCursor : AnnotationState -> String
@@ -239,7 +240,7 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
-        DrawSpotlight shapeType shapeMode ->
+        DrawSpotlight shapeType _ ->
             case drawing2 of
                 DrawSpotlight shapeType2 _ ->
                     shapeType == shapeType2
@@ -261,14 +262,6 @@ isSpotlightShape annotation =
 fontSizeToLineHeight : Int -> Float
 fontSizeToLineHeight fontSize =
     toFloat fontSize * 1.2
-
-
-svgTextHeight : Int -> String -> Int
-svgTextHeight fontSize text =
-    text
-        |> String.split "\n"
-        |> List.length
-        |> (*) fontSize
 
 
 linePath : StartPosition -> EndPosition -> String
@@ -357,3 +350,24 @@ getFirstSpotlightIndex annotations =
         |> Array.toList
         |> List.Extra.findIndex isSpotlightShape
         |> Maybe.withDefault 0
+
+
+shiftPosition : Int -> Int -> Mouse.Position -> Mouse.Position
+shiftPosition dx dy pos =
+    { pos | x = pos.x + dx, y = pos.y + dy }
+
+
+getPositions : Annotation -> ( StartPosition, EndPosition )
+getPositions annotation =
+    case annotation of
+        Lines lineType line ->
+            line.start => line.end
+
+        Shapes shapeType _ shape ->
+            shape.start => shape.end
+
+        TextBox textArea ->
+            textArea.start => textArea.end
+
+        Spotlight shapeType shape ->
+            shape.start => shape.end

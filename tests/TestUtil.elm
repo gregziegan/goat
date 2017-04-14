@@ -3,7 +3,7 @@ module TestUtil exposing (..)
 import Array.Hamt as Array
 import Fuzz exposing (Fuzzer)
 import Goat.Model exposing (Annotation, AnnotationState(..), EndPosition, Model, ResizingData, StartPosition, Vertex(..))
-import Goat.Update exposing (getPositions, shiftPosition)
+import Goat.Helpers exposing (getPositions, shiftPosition)
 import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
