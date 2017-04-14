@@ -1,15 +1,15 @@
 module Goat.Subscriptions exposing (subscriptions)
 
 import Goat.Helpers exposing (toDrawingPosition)
-import Goat.Model exposing (AnnotationState(..), Flags, Model, init)
+import Goat.Model exposing (AnnotationState(DrawingAnnotation, ResizingAnnotation, MovingAnnotation), Flags, Model)
 import Goat.Ports as Ports
-import Goat.Update exposing (Msg(..))
+import Goat.Update exposing (Msg(KeyboardMsg, ContinueDrawing, ResizeAnnotation, MoveAnnotation, SetImages))
 import Keyboard.Extra as Keyboard
 import Mouse
 
 
-imageUploadSubscriptions : Model -> Sub Msg
-imageUploadSubscriptions model =
+imageUploadSubscriptions : Sub Msg
+imageUploadSubscriptions =
     Sub.batch
         [ Ports.setImages SetImages
         , Ports.newImage (SetImages << List.singleton)
@@ -45,4 +45,4 @@ subscriptions model =
     if model.imageSelected then
         imageAnnotationSubscriptions model
     else
-        imageUploadSubscriptions model
+        imageUploadSubscriptions

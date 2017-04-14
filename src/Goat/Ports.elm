@@ -1,4 +1,4 @@
-port module Goat.Ports exposing (..)
+port module Goat.Ports exposing (exportToImage, listenForUpload, setImages, newImage)
 
 import Goat.Model exposing (Image)
 

@@ -1,14 +1,14 @@
-module Goat.Update exposing (..)
+module Goat.Update exposing (Msg(..), update, autoExpandConfig, addAnnotation, autoExpandAnnotation, editTextBoxAnnotation, finishEditingText, startEditingText, continueDrawing, finishLineDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing, finishMovingAnnotation, move, moveAnnotation, startMovingAnnotation, resize, resizeAnnotation, startResizingAnnotation, finishResizingAnnotation, selectAnnotation, updateAnySelectedAnnotations, updateStrokeColor, updateStrokeStyle, updateFill)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
-import Goat.Helpers exposing (..)
-import Goat.Model exposing (..)
+import Goat.Helpers exposing (calcLinePos, calcShapePos, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, removeItem, removeItemIf, selectLine, selectShape, selectSpotlight, theGoats, shiftPosition, getPositions)
+import Goat.Model exposing (StartPosition, EndPosition, ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine), Drawing(DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle, Shape, TextArea, Image, AttributeDropdown(Fonts, Fills, StrokeColors, Strokes), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), Vertices, Annotation(Lines, Shapes, TextBox, Spotlight), Vertex(Start, StartPlusX, StartPlusY), OperatingSystem(MacOS, Windows), ResizingData, AnnotationState(ReadyToDraw, DrawingAnnotation, SelectedAnnotation, MovingAnnotation, ResizingAnnotation, EditingATextBox), SelectState, Model)
 import Goat.Ports as Ports
 import Html.Attributes as Attr
-import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(..), isPressed)
+import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp), isPressed)
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
@@ -69,7 +69,7 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ edits, fill, fontSize, strokeColor, strokeStyle, images, keyboardState, drawing } as model) =
+update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, drawing } as model) =
     case msg of
         StartDrawing pos ->
             model
@@ -330,10 +330,10 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                                 Array.length model.edits.present
 
                             initialTextBox =
-                                TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations))
+                                TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations))
                         in
                             model
-                                |> addAnnotation (TextBox <| TextArea start (calcShapePos start pos DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (config numAnnotations)))
+                                |> addAnnotation (TextBox <| TextArea start (calcShapePos start pos DrawingShape) strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations)))
                                 |> startEditingText numAnnotations
                                 => [ "text-box-edit--"
                                         ++ toString numAnnotations
@@ -533,22 +533,6 @@ startMovingAnnotation index newPos model =
             model
 
 
-getPositions : Annotation -> ( StartPosition, EndPosition )
-getPositions annotation =
-    case annotation of
-        Lines lineType line ->
-            line.start => line.end
-
-        Shapes shapeType _ shape ->
-            shape.start => shape.end
-
-        TextBox textArea ->
-            textArea.start => textArea.end
-
-        Spotlight shapeType shape ->
-            shape.start => shape.end
-
-
 moveAnnotation : Position -> Model -> Model
 moveAnnotation newPos model =
     case model.annotationState of
@@ -684,11 +668,6 @@ move translate annotation =
 
         Spotlight shapeType shape ->
             Spotlight shapeType (shift translate shape)
-
-
-shiftPosition : Int -> Int -> Mouse.Position -> Mouse.Position
-shiftPosition dx dy pos =
-    { pos | x = pos.x + dx, y = pos.y + dy }
 
 
 closeDropdown : Model -> Model
@@ -1215,8 +1194,8 @@ returnToImageSelection model =
     { model | imageSelected = False, edits = UndoList.reset model.edits }
 
 
-config : Int -> AutoExpand.Config Msg
-config index =
+autoExpandConfig : Int -> AutoExpand.Config Msg
+autoExpandConfig index =
     AutoExpand.config
         { onInput = TextBoxInput index
         , padding = 2

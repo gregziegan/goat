@@ -1,23 +1,24 @@
-module Goat.View exposing (..)
+module Goat.View exposing (view, viewAnnotation)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
+import Goat.ControlOptions as ControlOptions
 import Goat.Helpers exposing (..)
 import Goat.Icons as Icons
 import Goat.Model exposing (..)
-import Goat.Update exposing (Msg(..))
-import Html exposing (Attribute, Html, button, div, p, text, ul, li)
-import Html.Attributes exposing (class, classList, disabled, height, id, readonly, src, start, style, type_, width, map)
-import Html.Events exposing (keyCode, on, onCheck, onClick, onInput, onMouseEnter, onMouseLeave, onWithOptions)
+import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Html exposing (Attribute, Html, button, div, li, p, text, ul, img, h2)
+import Html.Attributes exposing (class, classList, disabled, id, src, style)
+import Html.Events exposing (onClick, onWithOptions)
 import Json.Decode as Json
-import Keyboard.Extra as Keyboard exposing (Key(Shift), KeyChange, KeyChange(..), isPressed)
+import Keyboard.Extra exposing (Key(Shift), KeyChange, isPressed)
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
 import SingleTouch as ST
-import Svg exposing (circle, defs, foreignObject, marker, Svg, svg, rect)
+import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
 import Touch as T
 import UndoList exposing (UndoList)
@@ -40,20 +41,20 @@ viewImageSelector : Zipper Image -> Html Msg
 viewImageSelector images =
     images
         |> List.Zipper.toList
-        |> List.map (viewImageOption images)
+        |> List.map viewImageOption
         |> div [ class "image-selector" ]
 
 
-viewImageOption : Zipper Image -> Image -> Html Msg
-viewImageOption zipper image =
+viewImageOption : Image -> Html Msg
+viewImageOption image =
     button
         [ class "image-option"
-        , width <| round image.width
-        , height <| round image.height
+        , Html.Attributes.width <| round image.width
+        , Html.Attributes.height <| round image.height
         , onClick <| SelectImage image
         ]
-        [ Html.img [ src image.url, height <| round image.height, width <| round image.width ] []
-        , Html.div [ onClick <| SelectImage image, class "image-edit-pencil" ]
+        [ img [ src image.url, Html.Attributes.height <| round image.height, Html.Attributes.width <| round image.width ] []
+        , div [ onClick <| SelectImage image, class "image-edit-pencil" ]
             [ Icons.viewPencil
             ]
         ]
@@ -63,10 +64,10 @@ viewInfoScreen : Html Msg
 viewInfoScreen =
     div [ class "droparea" ]
         [ div [ class "info-text" ]
-            [ Html.h2 [] [ Html.text "Please drag and drop an image onto the page" ]
+            [ h2 [] [ text "Please drag and drop an image onto the page" ]
             , div [ class "goat-time" ]
-                [ p [] [ Html.text "Or, show me the goats!" ]
-                , button [ class "goat-button", onClick ShowMeTheGoats ] [ Html.text "🐐" ]
+                [ p [] [ text "Or, show me the goats!" ]
+                , button [ class "goat-button", onClick ShowMeTheGoats ] [ text "🐐" ]
                 ]
             ]
         ]
@@ -79,7 +80,7 @@ viewImageAnnotator model selectedImage =
         ]
         [ viewModals model
         , viewModalMask model.showingAnyMenu
-        , viewControls model (viewDropdownMenu model.currentDropdown model.drawing model)
+        , viewControls model (viewDropdownMenu model.currentDropdown model)
         , viewDrawingArea model selectedImage
         ]
 
@@ -89,16 +90,16 @@ viewControls { edits, keyboardState, drawing, fill, strokeColor, strokeStyle } t
     div
         [ class "controls" ]
         [ div [ class "columns" ]
-            [ button [ onClick ReturnToImageSelection, class "cancel-button" ] [ Html.text "Cancel" ]
-            , button [ onClick Save, class "save-button" ] [ Html.text "Save" ]
+            [ button [ onClick ReturnToImageSelection, class "cancel-button" ] [ text "Cancel" ]
+            , button [ onClick Save, class "save-button" ] [ text "Save" ]
             ]
         , viewHistoryControls edits
         , div [ class "columns" ]
-            (List.map (viewDrawingButton drawing) (drawingOptions (isPressed Shift keyboardState))
+            (List.map (viewDrawingButton drawing) (ControlOptions.drawings (isPressed Shift keyboardState))
                 ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
                    , viewFillDropdown toDropdownMenu fill
                    , viewLineStrokeDropdown toDropdownMenu strokeStyle
-                   , viewFontSizeDropdown drawing toDropdownMenu
+                   , viewFontSizeDropdown toDropdownMenu
                    ]
             )
         ]
@@ -111,7 +112,7 @@ viewModals model =
             viewAnnotationMenu position index
 
         Nothing ->
-            Html.text ""
+            text ""
 
 
 viewModalMask : Bool -> Html Msg
@@ -143,8 +144,8 @@ viewHistoryControls edits =
         ]
 
 
-viewFontSizeDropdown : Drawing -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewFontSizeDropdown drawing toDropdownMenu =
+viewFontSizeDropdown : (AttributeDropdown -> Html Msg) -> Html Msg
+viewFontSizeDropdown toDropdownMenu =
     div [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
@@ -159,21 +160,21 @@ viewFontSizeDropdown drawing toDropdownMenu =
 
 viewFontSizeOptions : Int -> Html Msg
 viewFontSizeOptions fontSize =
-    fontSizes
+    ControlOptions.fontSizes
         |> List.map (viewFontSizeOption fontSize)
         |> div [ class "dropdown-options" ]
 
 
 viewFillOptions : Maybe Color -> Html Msg
 viewFillOptions fill =
-    fillOptions
+    ControlOptions.fills
         |> List.map (viewFillOption fill)
         |> div [ class "dropdown-options" ]
 
 
 viewStrokeColorOptions : Color -> Html Msg
 viewStrokeColorOptions strokeColor =
-    strokeColorOptions
+    ControlOptions.strokeColors
         |> List.map (viewStrokeColorOption strokeColor)
         |> div [ class "dropdown-options" ]
 
@@ -211,7 +212,7 @@ viewFontSizeOption selectedFontSize fontSize =
             ]
         , onClick (SelectFontSize fontSize)
         ]
-        [ Html.text <| toString <| fontSize ]
+        [ text <| toString <| fontSize ]
 
 
 viewLineStrokeDropdown : (AttributeDropdown -> Html Msg) -> StrokeStyle -> Html Msg
@@ -259,16 +260,16 @@ viewStrokeColorDropdown toDropdownMenu strokeColor =
         ]
 
 
-viewDropdownMenu : Maybe AttributeDropdown -> Drawing -> Model -> AttributeDropdown -> Html Msg
-viewDropdownMenu maybeDropdown drawing model selectedOption =
-    Maybe.map (viewDropdownOptions drawing model selectedOption) maybeDropdown
-        |> Maybe.withDefault (Html.text "")
+viewDropdownMenu : Maybe AttributeDropdown -> Model -> AttributeDropdown -> Html Msg
+viewDropdownMenu maybeDropdown model selectedOption =
+    Maybe.map (viewDropdownOptions model selectedOption) maybeDropdown
+        |> Maybe.withDefault (text "")
 
 
-viewDropdownOptions : Drawing -> Model -> AttributeDropdown -> AttributeDropdown -> Html Msg
-viewDropdownOptions curEditMode model selectedOption editOption =
+viewDropdownOptions : Model -> AttributeDropdown -> AttributeDropdown -> Html Msg
+viewDropdownOptions model selectedOption editOption =
     if selectedOption /= editOption then
-        Html.text ""
+        text ""
     else
         case editOption of
             Fonts ->
@@ -323,7 +324,7 @@ viewShapeSvg drawing =
 
 viewLineStrokeOptions : StrokeStyle -> Html Msg
 viewLineStrokeOptions strokeStyle =
-    strokeStyleOptions
+    ControlOptions.strokeStyles
         |> List.map (viewStrokeStyleOption strokeStyle)
         |> div [ class "dropdown-options" ]
 
@@ -340,8 +341,8 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         [ Icons.viewStrokeStyle strokeStyle ]
 
 
-drawingStateEvents : Drawing -> AnnotationState -> List (Html.Attribute Msg)
-drawingStateEvents drawing annotationState =
+drawingStateEvents : AnnotationState -> List (Attribute Msg)
+drawingStateEvents annotationState =
     case annotationState of
         ReadyToDraw ->
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
@@ -356,7 +357,7 @@ drawingStateEvents drawing annotationState =
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
-        MovingAnnotation index start _ ->
+        MovingAnnotation _ _ _ ->
             [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
@@ -370,14 +371,14 @@ drawingStateEvents drawing annotationState =
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
-        SelectedAnnotation index ->
+        SelectedAnnotation _ ->
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
             ]
 
         EditingATextBox index ->
             [ Html.Events.onMouseDown <| FinishEditingText index
-            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (\_ -> FinishEditingText index)
+            , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
@@ -414,7 +415,7 @@ canvasAttributes image drawing annotationState =
         ]
     , Html.Attributes.contextmenu "annotation-menu"
     ]
-        ++ drawingStateEvents drawing annotationState
+        ++ drawingStateEvents annotationState
 
 
 viewNonSpotlightAnnotations : AnnotationState -> Array Annotation -> List (Svg Msg)
@@ -425,10 +426,11 @@ viewNonSpotlightAnnotations annotationState annotations =
         |> List.concat
 
 
-viewDefinitions : Float -> Float -> AnnotationState -> List (Svg Msg) -> List (Svg Msg)
-viewDefinitions width height annotationState cutOuts =
-    List.map viewArrowHeadDefinition strokeColorOptions
-        |> (::) (maskDefinition annotationState width height cutOuts)
+viewDefinitions : Float -> Float -> List (Svg Msg) -> List (Svg Msg)
+viewDefinitions width height cutOuts =
+    ControlOptions.strokeColors
+        |> List.map viewArrowHeadDefinition
+        |> (::) (maskDefinition width height cutOuts)
         |> (::) viewSvgFilters
         |> defs []
         |> List.singleton
@@ -446,8 +448,9 @@ getAnnotations image annotations spotlights nonSpotlights isDrawingSpotlight =
             nonSpotlights
         else
             List.take (firstSpotlightIndex) nonSpotlights
-                ++ [ viewMask image.width image.height ]
-                ++ List.drop firstSpotlightIndex nonSpotlights
+                ++ (viewMask image.width image.height
+                        :: List.drop firstSpotlightIndex nonSpotlights
+                   )
 
 
 viewDrawingAndAnnotations :
@@ -462,21 +465,21 @@ viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing
     case annotationState of
         DrawingAnnotation start curPos ->
             let
-                nonSpotlightDrawingAndAnnotations start =
+                nonSpotlightDrawingAndAnnotations =
                     definitions spotlights ++ toAnnotations False ++ [ toDrawing start curPos False ]
 
-                spotlightDrawingAndAnnotations start =
+                spotlightDrawingAndAnnotations =
                     definitions (spotlights ++ [ toDrawing start curPos True ]) ++ toAnnotations True ++ [ toDrawing start curPos False ]
             in
                 case drawing of
-                    DrawShape shapeType _ ->
-                        nonSpotlightDrawingAndAnnotations start
+                    DrawShape _ _ ->
+                        nonSpotlightDrawingAndAnnotations
 
                     DrawSpotlight _ _ ->
-                        spotlightDrawingAndAnnotations start
+                        spotlightDrawingAndAnnotations
 
                     _ ->
-                        nonSpotlightDrawingAndAnnotations start
+                        nonSpotlightDrawingAndAnnotations
 
         _ ->
             definitions spotlights ++ toAnnotations False
@@ -498,27 +501,25 @@ viewDrawingArea model image =
             viewNonSpotlightAnnotations model.annotationState annotations
 
         definitions =
-            viewDefinitions image.width image.height model.annotationState
+            viewDefinitions image.width image.height
 
         toAnnotations =
             getAnnotations image annotations spotlights nonSpotlights
     in
         div (canvasAttributes image model.drawing model.annotationState)
-            (viewImage image
-                :: [ svg
-                        [ Attr.id "drawing"
-                        , Attr.class "drawing"
-                        , Attr.width <| toString <| round image.width
-                        , Attr.height <| toString <| round image.height
-                        , Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg"
-                        ]
-                        (viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing model.drawing model.annotationState)
-                   ]
-            )
+            [ viewImage image
+            , svg
+                [ Attr.id "drawing"
+                , Attr.class "drawing"
+                , Attr.width <| toString <| round image.width
+                , Attr.height <| toString <| round image.height
+                , Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg"
+                ]
+                (viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing model.drawing model.annotationState)
+            ]
 
 
-{-|
-  TODO: fix these filters for lines. Lines/Arrows render very strangely with this filter.
+{-| TODO: fix these filters for lines. Lines/Arrows render very strangely with this filter.
 -}
 viewSvgFilters : Svg Msg
 viewSvgFilters =
@@ -654,7 +655,7 @@ viewAnnotation annotationState index annotation =
                             |> flip List.append (vertices Rectangular shape)
 
             TextBox textBox ->
-                viewTextBox annotationStateAttrs annotationState selectState index textBox
+                viewTextBox annotationStateAttrs selectState index textBox
 
             Spotlight shapeType shape ->
                 case shapeType of
@@ -674,7 +675,7 @@ annotationStateVertexEvents index annotationState vertex =
     , Attr.class "resizeCursor"
     ]
         ++ case annotationState of
-            MovingAnnotation int start ( dx, dy ) ->
+            MovingAnnotation _ _ ( dx, dy ) ->
                 [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
 
             ResizingAnnotation _ ->
@@ -686,8 +687,8 @@ annotationStateVertexEvents index annotationState vertex =
                 []
 
 
-maskDefinition : AnnotationState -> Float -> Float -> List (Svg Msg) -> Svg Msg
-maskDefinition annotationState width height shapes =
+maskDefinition : Float -> Float -> List (Svg Msg) -> Svg Msg
+maskDefinition width height shapes =
     rect
         ([ Attr.x "0"
          , Attr.y "0"
@@ -703,7 +704,7 @@ maskDefinition annotationState width height shapes =
 
 
 viewDrawing : Model -> StartPosition -> Position -> Bool -> Svg Msg
-viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, keyboardState } start curPos isInMask =
+viewDrawing { drawing, fill, strokeColor, strokeStyle, keyboardState } start curPos isInMask =
     let
         lineAttrs lineType lineMode =
             lineAttributes lineType <| Shape start (calcLinePos start curPos lineMode) strokeColor strokeStyle
@@ -713,7 +714,6 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, keyboardState }
 
         spotlightAttrs shapeType shapeMode =
             if isInMask then
-                -- maskAttributes shapeType (Shape start (calcShapePos start curPos shapeMode))
                 shapeAttributes shapeType (Shape start (calcShapePos start curPos shapeMode) strokeColor strokeStyle) (Just Color.black)
             else
                 shapeAttributes shapeType (Shape start (calcShapePos start curPos shapeMode) strokeColor strokeStyle) Nothing
@@ -751,11 +751,6 @@ viewDrawing { drawing, fill, strokeColor, strokeStyle, fontSize, keyboardState }
 
                     Ellipse ->
                         Svg.ellipse (spotlightAttrs shapeType shapeMode) []
-
-
-maskAttributes : ShapeType -> Shape -> List (Svg.Attribute Msg)
-maskAttributes shapeType shape =
-    shapeAttributes shapeType shape (Just Color.white)
 
 
 viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> List (Svg Msg)
@@ -884,13 +879,6 @@ viewVertex vertexEvents x y =
         []
 
 
-arrowVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
-arrowVertices toVertexEvents start end =
-    [ viewVertex (toVertexEvents Start) start.x start.y
-    , viewVertex (toVertexEvents End) end.x end.y
-    ]
-
-
 ellipseVertices : (Vertex -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
 ellipseVertices toVertexEvents start end =
     let
@@ -907,7 +895,7 @@ ellipseVertices toVertexEvents start end =
 
 
 viewTextArea : Int -> TextArea -> Svg Msg
-viewTextArea index { start, end, text, fill, fontSize, angle, autoexpand } =
+viewTextArea index ({ start, end, fill, fontSize, autoexpand } as textArea) =
     foreignObject
         []
         [ div
@@ -921,16 +909,16 @@ viewTextArea index { start, end, text, fill, fontSize, angle, autoexpand } =
                 ]
             , Html.Events.onWithOptions "mousedown" stopPropagation (Json.succeed PreventTextMouseDown)
             ]
-            [ AutoExpand.view (Goat.Update.config index) (fontSizeToLineHeight fontSize) autoexpand text
+            [ AutoExpand.view (autoExpandConfig index) (fontSizeToLineHeight fontSize) autoexpand textArea.text
             ]
         ]
 
 
-viewTextBox : List (Svg.Attribute Msg) -> AnnotationState -> SelectState -> Int -> TextArea -> List (Svg Msg)
-viewTextBox attrs annotationState selectState index ({ start, end, text, fill, fontSize, angle, autoexpand } as textBox) =
+viewTextBox : List (Svg.Attribute Msg) -> SelectState -> Int -> TextArea -> List (Svg Msg)
+viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) =
     case selectState of
         Selected ->
-            (viewTextArea index textBox)
+            viewTextArea index textBox
                 |> List.singleton
 
         NotSelected ->
@@ -975,7 +963,8 @@ simpleLineAttrs : Shape -> List (Svg.Attribute Msg)
 simpleLineAttrs { start, end } =
     [ Attr.fill "none"
     , Attr.d <| linePath start end
-      --  , Attr.filter "url(#dropShadow)"
+
+    --  , Attr.filter "url(#dropShadow)"
     ]
 
 
@@ -996,7 +985,7 @@ lineAttributes lineType shape =
 
 viewImage : Image -> Html Msg
 viewImage { width, height, url } =
-    Html.img
+    img
         [ class "image-to-annotate"
         , Html.Attributes.width (round width)
         , Html.Attributes.height (round height)
@@ -1037,7 +1026,7 @@ viewDisabledAnnotationMenuItem buttonText =
             [ class "annotation-menu__button"
             , disabled True
             ]
-            [ Html.text buttonText ]
+            [ text buttonText ]
         ]
 
 
@@ -1048,5 +1037,5 @@ viewAnnotationMenuItem msg buttonText =
             [ class "annotation-menu__button"
             , onClick msg
             ]
-            [ Html.text buttonText ]
+            [ text buttonText ]
         ]

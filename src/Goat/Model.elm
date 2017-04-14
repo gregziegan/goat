@@ -1,4 +1,4 @@
-module Goat.Model exposing (..)
+module Goat.Model exposing (Flags, StartPosition, EndPosition, ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine), Drawing(DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), Shape, TextArea, Image, AttributeDropdown(Fonts, Fills, StrokeColors, Strokes), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), Vertices(Rectangular, Elliptical, Linear), Annotation(Lines, Shapes, TextBox, Spotlight), Vertex(Start, End, StartPlusX, StartPlusY), OperatingSystem(MacOS, Windows), ResizingData, AnnotationState(ReadyToDraw, DrawingAnnotation, SelectedAnnotation, MovingAnnotation, ResizingAnnotation, EditingATextBox), SelectState(Selected, SelectedWithVertices, NotSelected), Model, init)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
@@ -109,20 +109,19 @@ type Annotation
     | Spotlight ShapeType Shape
 
 
-{-|
-  Vertices are classified by their relationship to the `start` and `end`
-  mouse positions that created the annotation.
+{-| Vertices are classified by their relationship to the `start` and `end`
+mouse positions that created the annotation.
 
-  e.g: (assume a top-left to bottom-right draw)
+e.g: (assume a top-left to bottom-right draw)
 
-  Start            StartPlusX
-        +----------+
-        |          |
-        |          |
-        |          |
-        |          |
-        +----------+
-  StartPlusY       End
+Start StartPlusX
++----------+
+| |
+| |
+| |
+| |
++----------+
+StartPlusY End
 
 -}
 type Vertex
@@ -146,46 +145,8 @@ type alias ResizingData =
     }
 
 
-{-|
-
-The finite state machine for annotating.
-
-                 --------------------------------------------------------+
-                 |                                                       |
-                 +                                                       v
-
-       +------------------+         +------------------+         +------------------+
-       |                  |         |                  |         |                  | <--------+
-       |                  |         |                  | <-------+                  |          |
-+--->  |    ReadyToDraw   +-------> |    Drawing       |         |     Selected     |          |
-|      |                  |         |    Annotation    |         |     Annotation   |          |
-|      |                  | <-------+                  +----+    |                  | <----+   |
-|      |                  |         |                  |    |  +-+                  |      |   |
-|      +------------------+         +------------------+    |  | +------------------+      |   |
-|                     ^                                     |  |              |            |   |
-|                     |                                     |  |              |            |   |
-|              +-----------------------------------------------+              |            |   |
-|              |                             |              |                 |            |   |
-|              v                             v              |                 v            |   |
-|                                                           |                              |   |
-|      +------------------+         +------------------+    |    +------------------+      |   |
-|      |                  |         |                  |    |    |                  |      |   |
-|      |                  |         |                  |    |    |                  |      |   |
-|      |   Moving         |         |    Resizing      |    +--> |    Editing       |      |   |
-|      |   Annotation     |         |    Annotation    |         |    A Textbox     |      |   |
-|      |                  |         |                  |         |                  |      |   |
-|      |                  |         |                  |         |                  |      |   |
-|      +----+-------------+         +--------------+---+         +------------------+      |   |
-|           |                                      |                         |             |   |
-|           |                                      |                         |             |   |
-|           |                                      |                         |             |   |
-+----------------------------------------------------------------------------+             |   |
-            |                                      |                                       |   |
-            |                                      |                                       |   |
-            |                                      +---------------------------------------+   |
-            |                                                                                  |
-            +----------------------------------------------------------------------------------+
-
+{-| The finite state machine for annotating.
+See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
 -}
 type AnnotationState
     = ReadyToDraw
@@ -196,17 +157,24 @@ type AnnotationState
     | EditingATextBox Int
 
 
-{-|
-   Annotations are viewed differently based on the kind of selection.
-   1. Selected corresponds to annotations that are not in a state for resizing/moving.
-     This is currently only relevant to Textboxes when they are being edited.
-   2. SelectedWithVertices shows vertices on any annotation that allows for resizing/moving
-   3. NotSelected shows the unadorned annotation
+{-| Annotations are viewed differently based on the kind of selection.
+
+1.  Selected corresponds to annotations that are not in a state for resizing/moving.
+    This is currently only relevant to Textboxes when they are being edited.
+2.  SelectedWithVertices shows vertices on any annotation that allows for resizing/moving
+3.  NotSelected shows the unadorned annotation
+
 -}
 type SelectState
     = Selected
     | SelectedWithVertices
     | NotSelected
+
+
+type alias AnnotationMenu =
+    { index : Maybe Int
+    , position : Position
+    }
 
 
 type alias Model =
@@ -222,89 +190,10 @@ type alias Model =
     , currentDropdown : Maybe AttributeDropdown
     , drawing : Drawing
     , operatingSystem : OperatingSystem
-    , annotationMenu : Maybe { index : Maybe Int, position : Position }
+    , annotationMenu : Maybe AnnotationMenu
     , showingAnyMenu : Bool
     , clipboard : Maybe Annotation
     }
-
-
-strokeColorOptions : List Color
-strokeColorOptions =
-    [ Color.rgb 255 0 0
-    , Color.rgb 255 0 212
-    , Color.rgb 73 0 255
-    , Color.rgb 0 202 255
-    , Color.rgb 16 255 0
-    , Color.rgb 255 226 0
-    , Color.rgb 255 129 0
-    , Color.black
-    , Color.white
-    ]
-
-
-fillOptions : List (Maybe Color)
-fillOptions =
-    [ Nothing
-    , Just (Color.rgb 255 0 0)
-    , Just (Color.rgb 255 0 212)
-    , Just (Color.rgb 73 0 255)
-    , Just (Color.rgb 0 202 255)
-    , Just (Color.rgb 16 255 0)
-    , Just (Color.rgb 255 226 0)
-    , Just (Color.rgb 255 129 0)
-    , Just Color.black
-    , Just Color.white
-    ]
-
-
-strokeStyleOptions : List StrokeStyle
-strokeStyleOptions =
-    [ SolidThin
-    , SolidMedium
-    , SolidThick
-    , SolidVeryThick
-    , DashedThin
-    , DashedMedium
-    , DashedThick
-    , DashedVeryThick
-    ]
-
-
-drawingOptions : Bool -> List Drawing
-drawingOptions shiftPressed =
-    if shiftPressed then
-        [ DrawLine Arrow DrawingDiscreteLine
-        , DrawLine StraightLine DrawingDiscreteLine
-        , DrawShape Rect DrawingEqualizedShape
-        , DrawShape RoundedRect DrawingEqualizedShape
-        , DrawShape Ellipse DrawingEqualizedShape
-        , DrawTextBox
-        , DrawSpotlight Rect DrawingEqualizedShape
-        , DrawSpotlight RoundedRect DrawingEqualizedShape
-        , DrawSpotlight Ellipse DrawingEqualizedShape
-        ]
-    else
-        [ DrawLine Arrow DrawingLine
-        , DrawLine StraightLine DrawingLine
-        , DrawShape Rect DrawingShape
-        , DrawShape RoundedRect DrawingShape
-        , DrawShape Ellipse DrawingShape
-        , DrawTextBox
-        , DrawSpotlight Rect DrawingShape
-        , DrawSpotlight RoundedRect DrawingShape
-        , DrawSpotlight Ellipse DrawingShape
-        ]
-
-
-fontSizes : List Int
-fontSizes =
-    [ 14
-    , 16
-    , 20
-    , 26
-    , 32
-    , 40
-    ]
 
 
 init : Flags -> Model
@@ -329,13 +218,3 @@ init flags =
     , showingAnyMenu = False
     , clipboard = Nothing
     }
-
-
-{-|
-  The sidebar is a hard-coded width. This offset is used to shift the incoming mouse position.
-  TODO: investigate whether this can be skipped by using position: relative, or some
-  other CSS rule.
--}
-controlUIWidth : number
-controlUIWidth =
-    83

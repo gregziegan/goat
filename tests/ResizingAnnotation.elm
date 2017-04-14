@@ -3,7 +3,7 @@ module ResizingAnnotation exposing (all)
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineMode(..), LineType(..), ResizingData, AnnotationState(SelectedAnnotation), Shape, ShapeMode(..), ShapeType(..), Vertex(..))
-import Goat.Update exposing (addAnnotation, finishMovingAnnotation, finishResizingAnnotation, getPositions, moveAnnotation, resize, resizeAnnotation, startMovingAnnotation, startResizingAnnotation)
+import Goat.Update exposing (addAnnotation, finishMovingAnnotation, finishResizingAnnotation, moveAnnotation, resize, resizeAnnotation, startMovingAnnotation, startResizingAnnotation)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
 
