@@ -1,13 +1,13 @@
-module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, theGoats, removeItemIf, removeItem, isEmptyTextBox, selectLine, selectShape, selectSpotlight, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle)
+module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, theGoats, removeItemIf, removeItem, isEmptyTextBox, selectLine, selectShape, selectSpotlight, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), EndPosition, Image, LineMode(..), LineType(..), ShapeMode(..), Shape, ShapeType(..), StartPosition, StrokeStyle(..))
+import Goat.Model exposing (Model, Annotation(..), AnnotationAttributes, AnnotationState(..), Drawing(..), Drawing(DrawLine), EndPosition, Image, LineMode(..), LineType(..), Shape, ShapeMode(..), ShapeType(..), StartPosition, StrokeStyle(..))
 import Html exposing (Attribute)
 import Html.Events exposing (on)
-import List.Extra
 import Json.Decode as Json
 import Keyboard.Extra as Keyboard exposing (Key(Shift), isPressed)
+import List.Extra
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
 import SingleTouch as ST
@@ -143,13 +143,13 @@ annotationStateToCursor annotationState =
         DrawingAnnotation _ _ ->
             "crosshair"
 
-        MovingAnnotation _ _ _ ->
+        MovingAnnotation _ _ _ _ ->
             "move"
 
-        ResizingAnnotation _ ->
+        ResizingAnnotation _ _ ->
             "nesw-resize"
 
-        EditingATextBox _ ->
+        EditingATextBox _ _ ->
             "default"
 
         _ ->
@@ -371,3 +371,24 @@ getPositions annotation =
 
         Spotlight shapeType shape ->
             shape.start => shape.end
+
+
+getAnnotationAttributes : Annotation -> AnnotationAttributes -> AnnotationAttributes
+getAnnotationAttributes annotation existingAttrs =
+    case annotation of
+        Lines _ shape ->
+            AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
+
+        Shapes _ fill shape ->
+            AnnotationAttributes shape.strokeColor fill shape.strokeStyle existingAttrs.fontSize
+
+        TextBox textArea ->
+            AnnotationAttributes textArea.fill existingAttrs.fill existingAttrs.strokeStyle textArea.fontSize
+
+        Spotlight _ shape ->
+            AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
+
+
+currentAnnotationAttributes : Model -> AnnotationAttributes
+currentAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
+    AnnotationAttributes strokeColor fill strokeStyle fontSize

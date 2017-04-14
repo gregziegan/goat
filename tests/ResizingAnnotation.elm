@@ -4,6 +4,7 @@ import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineMode(..), LineType(..), ResizingData, AnnotationState(SelectedAnnotation), Shape, ShapeMode(..), ShapeType(..), Vertex(..))
 import Goat.Update exposing (addAnnotation, finishMovingAnnotation, finishResizingAnnotation, moveAnnotation, resize, resizeAnnotation, startMovingAnnotation, startResizingAnnotation)
+import Goat.Helpers exposing (currentAnnotationAttributes)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
 
@@ -36,7 +37,7 @@ startResizingTests =
                     |> addAnnotation (Lines Arrow aShape)
                     |> startResizingAnnotation 0 Start start
                     |> .annotationState
-                    |> Expect.equal (ResizingAnnotation resizingData)
+                    |> Expect.equal (ResizingAnnotation resizingData (currentAnnotationAttributes model))
         , test "should not change the annotationState to ResizingAnnotation if annotation doesn't exist" <|
             \() ->
                 model
@@ -56,7 +57,7 @@ resizeAnnotationTests =
                     |> startResizingAnnotation 0 Start start
                     |> resizeAnnotation end
                     |> .annotationState
-                    |> Expect.equal (ResizingAnnotation { resizingData | curPos = end })
+                    |> Expect.equal (ResizingAnnotation { resizingData | curPos = end } (currentAnnotationAttributes model))
         , test "should resize annotation by updating its start and end with resize" <|
             \() ->
                 model
@@ -80,7 +81,7 @@ finishResizingAnnotationTests =
                     |> resizeAnnotation end
                     |> finishResizingAnnotation
                     |> .annotationState
-                    |> Expect.equal (SelectedAnnotation 0)
+                    |> Expect.equal (SelectedAnnotation 0 (currentAnnotationAttributes model))
         , test "should resize annotation by updating its start and end with resize fn" <|
             \() ->
                 model

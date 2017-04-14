@@ -1,4 +1,4 @@
-module Goat.Model exposing (Flags, StartPosition, EndPosition, ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine), Drawing(DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), Shape, TextArea, Image, AttributeDropdown(Fonts, Fills, StrokeColors, Strokes), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), Vertices(Rectangular, Elliptical, Linear), Annotation(Lines, Shapes, TextBox, Spotlight), Vertex(Start, End, StartPlusX, StartPlusY), OperatingSystem(MacOS, Windows), ResizingData, AnnotationState(ReadyToDraw, DrawingAnnotation, SelectedAnnotation, MovingAnnotation, ResizingAnnotation, EditingATextBox), SelectState(Selected, SelectedWithVertices, NotSelected), Model, init)
+module Goat.Model exposing (Flags, StartPosition, EndPosition, ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine), Drawing(DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), Shape, TextArea, Image, AttributeDropdown(Fonts, Fills, StrokeColors, Strokes), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), Vertices(Rectangular, Elliptical, Linear), Annotation(Lines, Shapes, TextBox, Spotlight), Vertex(Start, End, StartPlusX, StartPlusY), OperatingSystem(MacOS, Windows), ResizingData, AnnotationState(ReadyToDraw, DrawingAnnotation, SelectedAnnotation, MovingAnnotation, ResizingAnnotation, EditingATextBox), SelectState(Selected, SelectedWithVertices, NotSelected), Model, AnnotationAttributes, init)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
@@ -145,16 +145,24 @@ type alias ResizingData =
     }
 
 
+type alias AnnotationAttributes =
+    { strokeColor : Color
+    , fill : Maybe Color
+    , strokeStyle : StrokeStyle
+    , fontSize : Int
+    }
+
+
 {-| The finite state machine for annotating.
 See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
 -}
 type AnnotationState
     = ReadyToDraw
     | DrawingAnnotation StartPosition Position
-    | SelectedAnnotation Int
-    | MovingAnnotation Int StartPosition ( Int, Int )
-    | ResizingAnnotation ResizingData
-    | EditingATextBox Int
+    | SelectedAnnotation Int AnnotationAttributes
+    | MovingAnnotation Int StartPosition ( Int, Int ) AnnotationAttributes
+    | ResizingAnnotation ResizingData AnnotationAttributes
+    | EditingATextBox Int AnnotationAttributes
 
 
 {-| Annotations are viewed differently based on the kind of selection.

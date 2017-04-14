@@ -4,7 +4,7 @@ import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineMode(..), LineType(..), Shape, ShapeMode(..), ShapeType(..))
 import Goat.Update exposing (addAnnotation, finishMovingAnnotation, move, moveAnnotation, startMovingAnnotation)
-import Goat.Helpers exposing (getPositions, shiftPosition)
+import Goat.Helpers exposing (getPositions, shiftPosition, currentAnnotationAttributes)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation, isAnnotationMovedByCorrectAmount)
 
@@ -28,7 +28,7 @@ startMovingTests =
                     |> addAnnotation (Lines Arrow aShape)
                     |> startMovingAnnotation 0 start
                     |> .annotationState
-                    |> Expect.equal (MovingAnnotation 0 start ( 0, 0 ))
+                    |> Expect.equal (MovingAnnotation 0 start ( 0, 0 ) (currentAnnotationAttributes model))
         , test "should not change the annotationState to MovingAnnotation if annotation doesn't exist" <|
             \() ->
                 model
@@ -67,7 +67,7 @@ moveAnnotationTests =
                     |> startMovingAnnotation 0 start
                     |> moveAnnotation end
                     |> .annotationState
-                    |> Expect.equal (MovingAnnotation 0 start ( end.x - start.x, end.y - start.y ))
+                    |> Expect.equal (MovingAnnotation 0 start ( end.x - start.x, end.y - start.y ) (currentAnnotationAttributes model))
         ]
 
 
@@ -81,7 +81,7 @@ finishMovingAnnotationTests =
                     |> startMovingAnnotation 0 start
                     |> finishMovingAnnotation
                     |> .annotationState
-                    |> Expect.equal (SelectedAnnotation 0)
+                    |> Expect.equal (SelectedAnnotation 0 (currentAnnotationAttributes model))
         , test "should move annotation by updating its start and end with move fn" <|
             \() ->
                 model

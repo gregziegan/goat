@@ -4,8 +4,8 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
-import Goat.Helpers exposing (calcLinePos, calcShapePos, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, removeItem, removeItemIf, selectLine, selectShape, selectSpotlight, theGoats, shiftPosition, getPositions)
-import Goat.Model exposing (StartPosition, EndPosition, ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine), Drawing(DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle, Shape, TextArea, Image, AttributeDropdown(Fonts, Fills, StrokeColors, Strokes), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), Vertices, Annotation(Lines, Shapes, TextBox, Spotlight), Vertex(Start, StartPlusX, StartPlusY), OperatingSystem(MacOS, Windows), ResizingData, AnnotationState(ReadyToDraw, DrawingAnnotation, SelectedAnnotation, MovingAnnotation, ResizingAnnotation, EditingATextBox), SelectState, Model)
+import Goat.Helpers exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, removeItem, removeItemIf, selectLine, selectShape, selectSpotlight, shiftPosition, theGoats)
+import Goat.Model exposing (..)
 import Goat.Ports as Ports
 import Html.Attributes as Attr
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp), isPressed)
@@ -293,7 +293,9 @@ skipChange model annotations =
 
 startDrawing : StartPosition -> Model -> Model
 startDrawing start model =
-    { model | annotationState = DrawingAnnotation start start }
+    { model
+        | annotationState = DrawingAnnotation start start
+    }
 
 
 continueDrawing : Position -> Model -> Model
@@ -362,11 +364,9 @@ resetToReadyToDraw model =
 finishMovingAnnotation : Model -> Model
 finishMovingAnnotation model =
     case model.annotationState of
-        MovingAnnotation index _ translate ->
-            { model
-                | annotationState = SelectedAnnotation index
-                , edits = UndoList.new (mapAtIndex index (move translate) model.edits.present) model.edits
-            }
+        MovingAnnotation index _ translate _ ->
+            { model | edits = UndoList.new (mapAtIndex index (move translate) model.edits.present) model.edits }
+                |> selectAnnotation index
 
         _ ->
             model
@@ -375,13 +375,12 @@ finishMovingAnnotation model =
 updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
 updateAnySelectedAnnotations fn model =
     case model.annotationState of
-        SelectedAnnotation index ->
+        SelectedAnnotation index _ ->
             { model
                 | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
-                , annotationState = SelectedAnnotation index
             }
 
-        EditingATextBox index ->
+        EditingATextBox index _ ->
             { model
                 | edits = UndoList.mapPresent (mapAtIndex index fn) model.edits
             }
@@ -402,7 +401,12 @@ autoExpandAnnotation state textValue annotation =
 
 selectAnnotation : Int -> Model -> Model
 selectAnnotation index model =
-    { model | annotationState = SelectedAnnotation index }
+    case Array.get index model.edits.present of
+        Just annotation ->
+            { model | annotationState = SelectedAnnotation index (getAnnotationAttributes annotation (currentAnnotationAttributes model)) }
+
+        Nothing ->
+            model
 
 
 addAnnotation : Annotation -> Model -> Model
@@ -433,7 +437,12 @@ finishSpotlightDrawing start end shapeType shapeMode model =
 
 startEditingText : Int -> Model -> Model
 startEditingText index model =
-    { model | annotationState = EditingATextBox index }
+    case Array.get index model.edits.present of
+        Just annotation ->
+            { model | annotationState = EditingATextBox index (getAnnotationAttributes annotation (currentAnnotationAttributes model)) }
+
+        Nothing ->
+            model
 
 
 editTextBoxAnnotation : Int -> AutoExpand.State -> String -> Model -> Model
@@ -503,22 +512,48 @@ updateFontSize fontSize annotation =
 
 setFill : Maybe Color -> Model -> Model
 setFill fill model =
-    { model | fill = fill }
+    case model.annotationState of
+        SelectedAnnotation index annotationAttrs ->
+            { model | annotationState = SelectedAnnotation index { annotationAttrs | fill = fill } }
+
+        _ ->
+            { model | fill = fill }
 
 
 setFontSize : Int -> Model -> Model
 setFontSize fontSize model =
-    { model | fontSize = fontSize }
+    case model.annotationState of
+        SelectedAnnotation index annotationAttrs ->
+            { model | annotationState = SelectedAnnotation index { annotationAttrs | fontSize = fontSize } }
+
+        EditingATextBox index annotationAttrs ->
+            { model | annotationState = EditingATextBox index { annotationAttrs | fontSize = fontSize } }
+
+        _ ->
+            { model | fontSize = fontSize }
 
 
 setStrokeStyle : StrokeStyle -> Model -> Model
 setStrokeStyle strokeStyle model =
-    { model | strokeStyle = strokeStyle }
+    case model.annotationState of
+        SelectedAnnotation index annotationAttrs ->
+            { model | annotationState = SelectedAnnotation index { annotationAttrs | strokeStyle = strokeStyle } }
+
+        _ ->
+            { model | strokeStyle = strokeStyle }
 
 
 setStrokeColor : Color -> Model -> Model
 setStrokeColor strokeColor model =
-    { model | strokeColor = strokeColor }
+    case model.annotationState of
+        SelectedAnnotation index annotationAttrs ->
+            { model | annotationState = SelectedAnnotation index { annotationAttrs | strokeColor = strokeColor } }
+
+        EditingATextBox index annotationAttrs ->
+            { model | annotationState = EditingATextBox index { annotationAttrs | strokeColor = strokeColor } }
+
+        _ ->
+            { model | strokeColor = strokeColor }
 
 
 startMovingAnnotation : Int -> Position -> Model -> Model
@@ -526,7 +561,7 @@ startMovingAnnotation index newPos model =
     case Array.get index model.edits.present of
         Just annotation ->
             { model
-                | annotationState = MovingAnnotation index newPos ( 0, 0 )
+                | annotationState = MovingAnnotation index newPos ( 0, 0 ) (getAnnotationAttributes annotation (currentAnnotationAttributes model))
             }
 
         Nothing ->
@@ -536,8 +571,8 @@ startMovingAnnotation index newPos model =
 moveAnnotation : Position -> Model -> Model
 moveAnnotation newPos model =
     case model.annotationState of
-        MovingAnnotation index start ( dx, dy ) ->
-            { model | annotationState = MovingAnnotation index start ( newPos.x - start.x, newPos.y - start.y ) }
+        MovingAnnotation index start ( dx, dy ) annotationAttrs ->
+            { model | annotationState = MovingAnnotation index start ( newPos.x - start.x, newPos.y - start.y ) annotationAttrs }
 
         _ ->
             model
@@ -547,7 +582,7 @@ startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
 startResizingAnnotation index vertex start model =
     case Array.get index model.edits.present of
         Just annotation ->
-            { model | annotationState = ResizingAnnotation (ResizingData index start start vertex (getPositions annotation)) }
+            { model | annotationState = ResizingAnnotation (ResizingData index start start vertex (getPositions annotation)) (getAnnotationAttributes annotation (currentAnnotationAttributes model)) }
 
         Nothing ->
             model
@@ -556,10 +591,10 @@ startResizingAnnotation index vertex start model =
 resizeAnnotation : Position -> Model -> Model
 resizeAnnotation curPos model =
     case model.annotationState of
-        ResizingAnnotation resizingData ->
+        ResizingAnnotation resizingData annotationAttrs ->
             { model
                 | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize { resizingData | curPos = curPos })) model.edits
-                , annotationState = ResizingAnnotation { resizingData | curPos = curPos }
+                , annotationState = ResizingAnnotation { resizingData | curPos = curPos } annotationAttrs
             }
 
         _ ->
@@ -569,8 +604,8 @@ resizeAnnotation curPos model =
 finishResizingAnnotation : Model -> Model
 finishResizingAnnotation model =
     case model.annotationState of
-        ResizingAnnotation { index } ->
-            { model | annotationState = SelectedAnnotation index }
+        ResizingAnnotation { index } _ ->
+            selectAnnotation index model
 
         _ ->
             model
@@ -878,9 +913,9 @@ pasteAnnotation model =
         Just annotation ->
             { model
                 | edits = UndoList.new (Array.push (shiftForPaste annotation) model.edits.present) model.edits
-                , annotationState = SelectedAnnotation (Array.length model.edits.present)
                 , clipboard = Just (shiftForPaste annotation)
             }
+                |> selectAnnotation (Array.length model.edits.present)
 
         Nothing ->
             model
@@ -947,21 +982,21 @@ alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
                         alterDrawing controlKey keyChange model
                             => []
 
-                    SelectedAnnotation index ->
+                    SelectedAnnotation index _ ->
                         alterDrawing controlKey keyChange model
                             |> handleSelectedAnnotationKeyboard index controlKey keyChange
                             |> handlePaste controlKey keyChange
                             => []
 
-                    MovingAnnotation _ _ _ ->
+                    MovingAnnotation _ _ _ _ ->
                         alterDrawing controlKey keyChange model
                             => []
 
-                    ResizingAnnotation _ ->
+                    ResizingAnnotation _ _ ->
                         alterDrawing controlKey keyChange model
                             => []
 
-                    EditingATextBox index ->
+                    EditingATextBox index _ ->
                         alterTextBoxDrawing keyChange index model
 
             Nothing ->
@@ -991,7 +1026,7 @@ alterTextBoxDrawing keyChange index model =
 deleteSelectedDrawing : Model -> Model
 deleteSelectedDrawing model =
     case model.annotationState of
-        SelectedAnnotation index ->
+        SelectedAnnotation index _ ->
             { model
                 | edits = UndoList.new (removeItem index model.edits.present) model.edits
                 , annotationState = ReadyToDraw
@@ -1123,7 +1158,8 @@ toggleAnnotationMenu selectedIndex position model =
                 , annotationState =
                     case selectedIndex of
                         Just index ->
-                            SelectedAnnotation index
+                            selectAnnotation index model
+                                |> .annotationState
 
                         Nothing ->
                             model.annotationState

@@ -4,12 +4,12 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
-import Goat.ControlOptions as ControlOptions
+import Goat.ControlOptions as ControlOptions exposing (fontSizes)
 import Goat.Helpers exposing (..)
 import Goat.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Html exposing (Attribute, Html, button, div, li, p, text, ul, img, h2)
+import Html exposing (Attribute, Html, button, div, h2, img, li, p, text, ul)
 import Html.Attributes exposing (class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
 import Json.Decode as Json
@@ -73,20 +73,43 @@ viewInfoScreen =
         ]
 
 
+annotationStateAttributes : Model -> AnnotationAttributes
+annotationStateAttributes model =
+    case model.annotationState of
+        SelectedAnnotation _ annotationAttrs ->
+            annotationAttrs
+
+        MovingAnnotation _ _ _ annotationAttrs ->
+            annotationAttrs
+
+        ResizingAnnotation _ annotationAttrs ->
+            annotationAttrs
+
+        EditingATextBox _ annotationAttrs ->
+            annotationAttrs
+
+        _ ->
+            currentAnnotationAttributes model
+
+
 viewImageAnnotator : Model -> Image -> Html Msg
 viewImageAnnotator model selectedImage =
-    div
-        [ class "annotation-app"
-        ]
-        [ viewModals model
-        , viewModalMask model.showingAnyMenu
-        , viewControls model (viewDropdownMenu model.currentDropdown model)
-        , viewDrawingArea model selectedImage
-        ]
+    let
+        annotationAttrs =
+            (annotationStateAttributes model)
+    in
+        div
+            [ class "annotation-app"
+            ]
+            [ viewModals model
+            , viewModalMask model.showingAnyMenu
+            , viewControls model annotationAttrs (viewDropdownMenu model.currentDropdown annotationAttrs model)
+            , viewDrawingArea model annotationAttrs selectedImage
+            ]
 
 
-viewControls : Model -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewControls { edits, keyboardState, drawing, fill, strokeColor, strokeStyle } toDropdownMenu =
+viewControls : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
+viewControls ({ edits, keyboardState, drawing, annotationState } as model) { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
     div
         [ class "controls" ]
         [ div [ class "columns" ]
@@ -260,29 +283,29 @@ viewStrokeColorDropdown toDropdownMenu strokeColor =
         ]
 
 
-viewDropdownMenu : Maybe AttributeDropdown -> Model -> AttributeDropdown -> Html Msg
-viewDropdownMenu maybeDropdown model selectedOption =
-    Maybe.map (viewDropdownOptions model selectedOption) maybeDropdown
+viewDropdownMenu : Maybe AttributeDropdown -> AnnotationAttributes -> Model -> AttributeDropdown -> Html Msg
+viewDropdownMenu maybeDropdown annotationAttrs model selectedOption =
+    Maybe.map (viewDropdownOptions model annotationAttrs selectedOption) maybeDropdown
         |> Maybe.withDefault (text "")
 
 
-viewDropdownOptions : Model -> AttributeDropdown -> AttributeDropdown -> Html Msg
-viewDropdownOptions model selectedOption editOption =
+viewDropdownOptions : Model -> AnnotationAttributes -> AttributeDropdown -> AttributeDropdown -> Html Msg
+viewDropdownOptions model { fill, strokeColor, strokeStyle, fontSize } selectedOption editOption =
     if selectedOption /= editOption then
         text ""
     else
         case editOption of
             Fonts ->
-                viewFontSizeOptions model.fontSize
+                viewFontSizeOptions fontSize
 
             Fills ->
-                viewFillOptions model.fill
+                viewFillOptions fill
 
             StrokeColors ->
-                viewStrokeColorOptions model.strokeColor
+                viewStrokeColorOptions strokeColor
 
             Strokes ->
-                viewLineStrokeOptions model.strokeStyle
+                viewLineStrokeOptions strokeStyle
 
 
 viewShapeSvg : Drawing -> Html Msg
@@ -357,26 +380,26 @@ drawingStateEvents annotationState =
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
-        MovingAnnotation _ _ _ ->
+        MovingAnnotation _ _ _ _ ->
             [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
-        ResizingAnnotation _ ->
+        ResizingAnnotation _ _ ->
             [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
-        SelectedAnnotation _ ->
+        SelectedAnnotation _ _ ->
             [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
             ]
 
-        EditingATextBox index ->
+        EditingATextBox index _ ->
             [ Html.Events.onMouseDown <| FinishEditingText index
             , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
@@ -485,14 +508,14 @@ viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing
             definitions spotlights ++ toAnnotations False
 
 
-viewDrawingArea : Model -> Image -> Html Msg
-viewDrawingArea model image =
+viewDrawingArea : Model -> AnnotationAttributes -> Image -> Html Msg
+viewDrawingArea model annotationAttrs image =
     let
         annotations =
             model.edits.present
 
         toDrawing =
-            viewDrawing model
+            viewDrawing model annotationAttrs
 
         spotlights =
             viewSpotlights model.annotationState annotations
@@ -563,14 +586,14 @@ annotationStateEvents annIndex annotationState =
         DrawingAnnotation _ _ ->
             [ Attr.class "crosshairCursor" ]
 
-        SelectedAnnotation _ ->
+        SelectedAnnotation _ _ ->
             [ Attr.class "moveCursor"
             , Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartMovingAnnotation annIndex << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation annIndex << toDrawingPosition << toPosition)
             , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleSelectedAnnotationMenu annIndex) Mouse.position)
             ]
 
-        MovingAnnotation index _ ( dx, dy ) ->
+        MovingAnnotation index _ ( dx, dy ) _ ->
             [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
             , Attr.class "moveCursor"
@@ -580,36 +603,36 @@ annotationStateEvents annIndex annotationState =
                    else
                     []
 
-        ResizingAnnotation _ ->
+        ResizingAnnotation _ _ ->
             [ Attr.class "resizeCursor"
             ]
 
-        EditingATextBox index ->
+        EditingATextBox index _ ->
             [ Attr.class "crosshairCursor" ]
 
 
 getSelectState : Int -> AnnotationState -> SelectState
 getSelectState annIndex annotationState =
     case annotationState of
-        SelectedAnnotation index ->
+        SelectedAnnotation index _ ->
             if index == annIndex then
                 SelectedWithVertices
             else
                 NotSelected
 
-        MovingAnnotation index _ _ ->
+        MovingAnnotation index _ _ _ ->
             if index == annIndex then
                 SelectedWithVertices
             else
                 NotSelected
 
-        ResizingAnnotation { index } ->
+        ResizingAnnotation { index } _ ->
             if index == annIndex then
                 SelectedWithVertices
             else
                 NotSelected
 
-        EditingATextBox index ->
+        EditingATextBox index _ ->
             if index == annIndex then
                 Selected
             else
@@ -675,10 +698,10 @@ annotationStateVertexEvents index annotationState vertex =
     , Attr.class "resizeCursor"
     ]
         ++ case annotationState of
-            MovingAnnotation _ _ ( dx, dy ) ->
+            MovingAnnotation _ _ ( dx, dy ) _ ->
                 [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
 
-            ResizingAnnotation _ ->
+            ResizingAnnotation _ _ ->
                 [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
                 , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
                 ]
@@ -703,8 +726,8 @@ maskDefinition width height shapes =
         |> Svg.mask [ Attr.id "Mask" ]
 
 
-viewDrawing : Model -> StartPosition -> Position -> Bool -> Svg Msg
-viewDrawing { drawing, fill, strokeColor, strokeStyle, keyboardState } start curPos isInMask =
+viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
+viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
     let
         lineAttrs lineType lineMode =
             lineAttributes lineType <| Shape start (calcLinePos start curPos lineMode) strokeColor strokeStyle

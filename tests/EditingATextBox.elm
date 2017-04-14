@@ -5,6 +5,7 @@ import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, autoExpand, end, model, start)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineMode(..), LineType(..), Shape, ShapeMode(..), ShapeType(..))
 import Goat.Update exposing (addAnnotation, autoExpandAnnotation, editTextBoxAnnotation, finishEditingText, startEditingText)
+import Goat.Helpers exposing (currentAnnotationAttributes)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
 
@@ -26,7 +27,7 @@ startEditingTextTests =
                     |> addAnnotation (TextBox aTextArea)
                     |> startEditingText 0
                     |> .annotationState
-                    |> Expect.equal (EditingATextBox 0)
+                    |> Expect.equal (EditingATextBox 0 (currentAnnotationAttributes model))
         ]
 
 
