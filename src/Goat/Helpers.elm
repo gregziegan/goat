@@ -105,28 +105,28 @@ toLineStyle : StrokeStyle -> ( String, String )
 toLineStyle strokeStyle =
     case strokeStyle of
         SolidThin ->
-            "4" => ""
+            "2" => ""
 
         SolidMedium ->
-            "6" => ""
+            "4" => ""
 
         SolidThick ->
-            "8" => ""
+            "6" => ""
 
         SolidVeryThick ->
-            "10" => ""
+            "8" => ""
 
         DashedThin ->
-            "4" => "10, 5"
+            "2" => "10, 5"
 
         DashedMedium ->
-            "6" => "10, 5"
+            "4" => "10, 5"
 
         DashedThick ->
-            "8" => "10, 5"
+            "6" => "10, 5"
 
         DashedVeryThick ->
-            "10" => "10, 5"
+            "8" => "10, 5"
 
 
 toDrawingPosition : Mouse.Position -> Mouse.Position
