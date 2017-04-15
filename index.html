@@ -29,22 +29,25 @@
      }
     </script>
     <script>
-      var isMac = navigator.userAgent.indexOf('Mac OS X') != -1
-      var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac });
-      var savedImage
-      app.ports.exportToImage.subscribe(function(image) {
-        savedImage = image;
-        window.requestAnimationFrame(exportImage)
-      })
 
-      app.ports.listenForUpload.subscribe(function(className) {
+      var isMac = navigator.userAgent.indexOf('Mac OS X') != -1;
+      var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac });
+      var savedImage;
+      app.ports.exportToImage.subscribe(function (image) {
+        savedImage = image;
+        window.requestAnimationFrame(exportImage);
+      });
+
+      app.ports.listenForUpload.subscribe(function (className) {
         var target = document.querySelector('.' + className);
-        target.addEventListener("dragover", function(e) { e.preventDefault(); });
-        target.addEventListener("drop", function(e) {
-        	  e.preventDefault()
-        	  loadImage(e.dataTransfer.files[0])
+        target.addEventListener("dragover", function (e) {
+          e.preventDefault();
+        });
+        target.addEventListener("drop", function (e) {
+          e.preventDefault();
+          loadImage(e.dataTransfer.files[0]);
         }, true);
-      })
+      });
 
       var client = window.ZAFClient ? ZAFClient.init() : null;
       var isInZendeskAppContext = !!client;
@@ -53,16 +56,16 @@
 
       function loadImage(src) {
         if (!src.type.match(/image.*/)) {
-          return
+          return;
         }
         var reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function (e) {
           var contentType = 'image/png';
           var blob = b64toBlob(e.target.result.replace('data:image/png;base64,', ''), contentType);
           var editImageBlobUrl = DOMURL.createObjectURL(blob);
-          var newImg = new Image()
-          newImg.crossOrigin = 'anonymous'
-          newImg.onload = function() {
+          var newImg = new Image();
+          newImg.crossOrigin = 'anonymous';
+          newImg.onload = function () {
             app.ports.newImage.send({
               id: '0',
               url: editImageBlobUrl,
@@ -70,26 +73,26 @@
               height: this.naturalHeight,
               originalWidth: this.naturalWidth,
               originalHeight: this.naturalHeight
-            })
-          }
-          newImg.src = editImageBlobUrl
-        }
-        reader.readAsDataURL(src)
+            });
+          };
+          newImg.src = editImageBlobUrl;
+        };
+        reader.readAsDataURL(src);
       }
 
       function getImages(html) {
-        var div = document.createElement('div')
-        div.innerHTML = html
-        var images = div.querySelectorAll('img')
-        return Array.prototype.map.call(images, toImageObject)
+        var div = document.createElement('div');
+        div.innerHTML = html;
+        var images = div.querySelectorAll('img');
+        return Array.prototype.map.call(images, toImageObject);
       }
 
       function toImageObject(image) {
-        var id = image.getAttribute('data-imageuploadid')
+        var id = image.getAttribute('data-imageuploadid');
         var originalWidth = parseFloat(image.getAttribute('data-original-width'));
         var originalHeight = parseFloat(image.getAttribute('data-original-height'));
-        var width = parseFloat(image.style.width.replace('px', ''))
-        var height = width / (originalWidth / originalHeight)
+        var width = parseFloat(image.style.width.replace('px', ''));
+        var height = width / (originalWidth / originalHeight);
         return {
           id: id,
           url: image.src,
@@ -97,149 +100,146 @@
           originalHeight: originalHeight,
           width: width,
           height: height
-        }
+        };
       }
 
       function toLocalImage(imageObject) {
-        return new Promise(function(resolve) {
-            const img = new Image()
-            img.crossOrigin = 'anonymous'
-            img.onload = function() {
-              resolve({img, imageObject, status: 'ok'})
-            }
+        return new Promise(function (resolve) {
+          var img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = function () {
+            resolve({ img: img, imageObject: imageObject, status: 'ok' });
+          };
 
-            img.src = imageObject.url
-        })
+          img.src = imageObject.url;
+        });
       }
 
       function getImageBlob(img, imageObject) {
-        return new Promise(function(resolve) {
-          var canvas = document.createElement("canvas")
-          canvas.width = img.width
-          canvas.height = img.height
+        return new Promise(function (resolve) {
+          var canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
 
-          var ctx = canvas.getContext("2d")
-          ctx.drawImage(img, 0, 0)
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
 
-          var newImageObject = imageObject
-          canvas.toBlob(function(blob) {
-            newImageObject.url = DOMURL.createObjectURL(blob)
-            resolve(newImageObject)
-          })
-        })
+          var newImageObject = imageObject;
+          canvas.toBlob(function (blob) {
+            newImageObject.url = DOMURL.createObjectURL(blob);
+            resolve(newImageObject);
+          });
+        });
       }
 
-      function b64toBlob(b64Data, contentType='', sliceSize=512) {
-        var byteCharacters = atob(b64Data)
-        var byteArrays = []
+      function b64toBlob(b64Data) {
+        var contentType = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+        var sliceSize = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 512;
+
+        var byteCharacters = atob(b64Data);
+        var byteArrays = [];
         for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-          var slice = byteCharacters.slice(offset, offset + sliceSize)
-          var byteNumbers = new Array(slice.length)
+          var slice = byteCharacters.slice(offset, offset + sliceSize);
+          var byteNumbers = new Array(slice.length);
           for (var i = 0; i < slice.length; i++) {
-            byteNumbers[i] = slice.charCodeAt(i)
+            byteNumbers[i] = slice.charCodeAt(i);
           }
-          var byteArray = new Uint8Array(byteNumbers)
-          byteArrays.push(byteArray)
+          var byteArray = new Uint8Array(byteNumbers);
+          byteArrays.push(byteArray);
         }
-        return new Blob(byteArrays, {type: contentType})
+        return new Blob(byteArrays, { type: contentType });
       }
 
       function autoScale(canvas) {
         // adapted from https://www.html5rocks.com/en/tutorials/canvas/hidpi/
-        var context = canvas.getContext('2d')
-        var devicePixelRatio = window.devicePixelRatio || 1
-        var backingStoreRatio = context.webkitBackingStorePixelRatio ||
-                              context.mozBackingStorePixelRatio ||
-                              context.msBackingStorePixelRatio ||
-                              context.oBackingStorePixelRatio ||
-                              context.backingStorePixelRatio || 1
+        var context = canvas.getContext('2d');
+        var devicePixelRatio = window.devicePixelRatio || 1;
+        var backingStoreRatio = context.webkitBackingStorePixelRatio || context.mozBackingStorePixelRatio || context.msBackingStorePixelRatio || context.oBackingStorePixelRatio || context.backingStorePixelRatio || 1;
 
-        var ratio = devicePixelRatio / backingStoreRatio
+        var ratio = devicePixelRatio / backingStoreRatio;
 
         if (devicePixelRatio !== backingStoreRatio) {
-            var oldWidth = canvas.width
-            var oldHeight = canvas.height
+          var oldWidth = canvas.width;
+          var oldHeight = canvas.height;
 
-            canvas.width = oldWidth * ratio
-            canvas.height = oldHeight * ratio
+          canvas.width = oldWidth * ratio;
+          canvas.height = oldHeight * ratio;
 
-            canvas.style.width = oldWidth + 'px'
-            canvas.style.height = oldHeight + 'px'
+          canvas.style.width = oldWidth + 'px';
+          canvas.style.height = oldHeight + 'px';
 
-            context.scale(ratio, ratio)
+          context.scale(ratio, ratio);
         }
       }
 
       function exportImage() {
-        var image = savedImage
-        var canvas = document.createElement('canvas')
-        canvas.crossOrigin='anonymous'
-        canvas.width = image.width
-        canvas.height = image.height
-        autoScale(canvas)
+        var image = savedImage;
+        var canvas = document.createElement('canvas');
+        canvas.crossOrigin = 'anonymous';
+        canvas.width = image.width;
+        canvas.height = image.height;
+        autoScale(canvas);
 
-        var ctx = canvas.getContext('2d')
-        var data = document.getElementById('drawing').outerHTML
-        var drawingImg = new Image()
-        drawingImg.crossOrigin = 'anonymous'
-        var svg = new Blob([data], {type: 'image/svg+xml'})
-        var url = DOMURL.createObjectURL(svg)
-        drawingImg.onload = function() {
-          ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.width, Math.round(image.height))
-          ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height))
+        var ctx = canvas.getContext('2d');
+        var data = document.getElementById('drawing').outerHTML;
+        var drawingImg = new Image();
+        drawingImg.crossOrigin = 'anonymous';
+        var svg = new Blob([data], { type: 'image/svg+xml' });
+        var url = DOMURL.createObjectURL(svg);
+        drawingImg.onload = function () {
+          ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.width, Math.round(image.height));
+          ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height));
           if (isInZendeskAppContext) {
-            client.get('ticket.comment').then(function(zaf) {
-              var div = document.createElement('div')
-              var comment = zaf['ticket.comment'].text
-              div.innerHTML = comment
-              div.querySelector('img[data-imageuploadid="' + image.id + '"]').outerHTML = ''
-              client.set('ticket.comment.text', div.innerHTML).then(function() {
-                client.invoke('ticket.editor.inlineImage', canvas.toDataURL())
-                client.invoke('app.close')
-              })
-            })
+            client.get('ticket.comment').then(function (zaf) {
+              var div = document.createElement('div');
+              var comment = zaf['ticket.comment'].text;
+              div.innerHTML = comment;
+              div.querySelector('img[data-imageuploadid="' + image.id + '"]').outerHTML = '';
+              client.set('ticket.comment.text', div.innerHTML).then(function () {
+                client.invoke('ticket.editor.inlineImage', canvas.toDataURL());
+                client.invoke('app.close');
+              });
+            });
           } else {
-            plopImageIntoDom(canvas, image)
+            plopImageIntoDom(canvas, image);
           }
-          DOMURL.revokeObjectURL(url)
-        }
-        drawingImg.src = url
+          DOMURL.revokeObjectURL(url);
+        };
+        drawingImg.src = url;
       }
 
       function plopImageIntoDom(canvas, image) {
-        canvas.toBlob(function(blob) {
-          var exportImage = new Image()
-          exportImage.crossOrigin = 'anonymous'
-          exportImage.id = 'export-image'
-          exportImage.src = DOMURL.createObjectURL(blob)
-          exportImage.width = image.width
-          exportImage.height = image.height
-          document.body.replaceChild(exportImage, document.getElementById('export-image'))
-        })
+        canvas.toBlob(function (blob) {
+          var exportImage = new Image();
+          exportImage.crossOrigin = 'anonymous';
+          exportImage.id = 'export-image';
+          exportImage.src = DOMURL.createObjectURL(blob);
+          exportImage.width = image.width;
+          exportImage.height = image.height;
+          document.body.replaceChild(exportImage, document.getElementById('export-image'));
+        });
       }
 
       if (isInZendeskAppContext) {
-        client.invoke('resize', { height: 320, width: 800 })
-        client.on('pane.activated', readInImages)
+        var readInImages = function readInImages(event) {
+          client.get('ticket.comment').then(function (zaf) {
+            var div = document.createElement('div');
+            var comment = zaf['ticket.comment'].text;
+            div.innerHTML = comment;
+            var images = div.querySelectorAll('img');
+            var imageObjects = Array.prototype.map.call(images, toImageObject);
+            Promise.all(Array.prototype.map.call(imageObjects, toLocalImage)).then(function (allLocalImageData) {
+              return Promise.all(Array.prototype.map.call(allLocalImageData, function (localData) {
+                return getImageBlob(localData.img, localData.imageObject);
+              }));
+            }).then(function (localImages) {
+              app.ports.setImages.send(localImages);
+            });
+          });
+        };
 
-        function readInImages(event) {
-          client.get('ticket.comment').then(function(zaf) {
-            var div = document.createElement('div')
-            var comment = zaf['ticket.comment'].text
-            div.innerHTML = comment
-            var images = div.querySelectorAll('img')
-            var imageObjects = Array.prototype.map.call(images, toImageObject)
-            Promise.all(Array.prototype.map.call(imageObjects, toLocalImage))
-              .then(function(allLocalImageData) {
-                return Promise.all(Array.prototype.map.call(allLocalImageData, function(localData) {
-                  return getImageBlob(localData.img, localData.imageObject)
-                }))
-              })
-              .then(function(localImages) {
-                app.ports.setImages.send(localImages)
-              })
-          })
-        }
+        client.invoke('resize', { height: 320, width: 800 });
+        client.on('pane.activated', readInImages);
       }
     </script>
   </body>
