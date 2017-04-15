@@ -153,6 +153,7 @@ viewDrawingButton selectedDrawing drawing =
         [ classList
             [ "drawing-button" => True
             , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
+            , "drawing-button--spotlight" => isSpotlightDrawing drawing
             ]
         , onClick <| ChangeDrawing drawing
         ]
