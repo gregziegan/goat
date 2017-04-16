@@ -1,7 +1,7 @@
 module Goat.ControlOptions exposing (strokeColors, fills, strokeStyles, drawings, fontSizes, controlUIWidth)
 
 import Color exposing (Color)
-import Goat.Model exposing (Drawing(DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine))
+import Goat.Model exposing (Drawing(DrawBlur, DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine))
 
 
 strokeColors : List Color
@@ -58,6 +58,7 @@ drawings shiftPressed =
         , DrawSpotlight Rect DrawingEqualizedShape
         , DrawSpotlight RoundedRect DrawingEqualizedShape
         , DrawSpotlight Ellipse DrawingEqualizedShape
+        , DrawBlur DrawingEqualizedShape
         ]
     else
         [ DrawLine Arrow DrawingLine
@@ -69,6 +70,7 @@ drawings shiftPressed =
         , DrawSpotlight Rect DrawingShape
         , DrawSpotlight RoundedRect DrawingShape
         , DrawSpotlight Ellipse DrawingShape
+        , DrawBlur DrawingShape
         ]
 
 

@@ -4,7 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
-import Goat.Helpers exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, removeItem, removeItemIf, selectLine, selectShape, selectSpotlight, shiftPosition, theGoats)
+import Goat.Helpers exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, selectLine, selectShape, selectSpotlight, shiftPosition, theGoats)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
 import Html.Attributes as Attr
@@ -347,6 +347,10 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                         finishSpotlightDrawing start pos shapeType shapeMode model
                             => []
 
+                    DrawBlur _ ->
+                        finishBlurDrawing start pos model
+                            => []
+
         _ ->
             model => []
 
@@ -423,6 +427,12 @@ finishLineDrawing start end lineType lineMode model =
         |> addAnnotation (Lines lineType (Shape start (calcLinePos start end lineMode) model.strokeColor model.strokeStyle))
 
 
+finishBlurDrawing : StartPosition -> EndPosition -> Model -> Model
+finishBlurDrawing start end model =
+    model
+        |> addAnnotation (Blur start end)
+
+
 finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> ShapeMode -> Model -> Model
 finishShapeDrawing start end shapeType shapeMode model =
     model
@@ -467,6 +477,9 @@ updateStrokeColor strokeColor annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | strokeColor = strokeColor }
 
+        Blur _ _ ->
+            annotation
+
 
 updateFill : Maybe Color -> Annotation -> Annotation
 updateFill fill annotation =
@@ -481,6 +494,9 @@ updateFill fill annotation =
             annotation
 
         Spotlight shapeType shape ->
+            annotation
+
+        Blur _ _ ->
             annotation
 
 
@@ -498,6 +514,9 @@ updateStrokeStyle strokeStyle annotation =
 
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | strokeStyle = strokeStyle }
+
+        Blur _ _ ->
+            annotation
 
 
 updateFontSize : Int -> Annotation -> Annotation
@@ -677,6 +696,9 @@ resize resizingData annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType (resizeVertices resizingData shape)
 
+        Blur start end ->
+            Blur (resizeVertices resizingData { start = start, end = end }).start (resizeVertices resizingData { start = start, end = end }).end
+
 
 shift :
     ( Int, Int )
@@ -703,6 +725,9 @@ move translate annotation =
 
         Spotlight shapeType shape ->
             Spotlight shapeType (shift translate shape)
+
+        Blur start end ->
+            Blur (shiftPosition (Tuple.first translate) (Tuple.second translate) start) (shiftPosition (Tuple.first translate) (Tuple.second translate) end)
 
 
 closeDropdown : Model -> Model
@@ -762,6 +787,14 @@ transitionOnShift drawing =
 
                 DrawingEqualizedShape ->
                     DrawSpotlight shapeType DrawingShape
+
+        DrawBlur shapeMode ->
+            case shapeMode of
+                DrawingShape ->
+                    DrawBlur DrawingEqualizedShape
+
+                DrawingEqualizedShape ->
+                    DrawBlur DrawingShape
 
 
 cancelDrawing : Model -> Model
@@ -905,6 +938,9 @@ shiftForPaste annotation =
 
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
+
+        Blur start end ->
+            Blur (positionMap ((+) 10) start) (positionMap ((+) 10) end)
 
 
 pasteAnnotation : Model -> Model

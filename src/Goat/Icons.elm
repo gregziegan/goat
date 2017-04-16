@@ -1,4 +1,4 @@
-module Goat.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle)
+module Goat.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle, viewBlur)
 
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
@@ -218,3 +218,35 @@ viewStrokeStyle strokeStyle =
         DashedVeryThick ->
             svg [ width "14", height "2", viewBox "0 0 14 2" ]
                 [ Svg.path [ d "M0 4h6V0H0v4zm9 0h6V0H9v4z", fillRule "nonzero", fill "currentColor" ] [] ]
+
+
+viewBlur : Html msg
+viewBlur =
+    svg [ viewBox "0 0 20 20", width "20", height "20" ]
+        [ g [ fillRule "evenodd" ]
+            [ path [ d "M2 4h4v4H2z", fillOpacity ".195" ]
+                []
+            , path [ d "M6 4h4v4H6z", fillOpacity ".434" ]
+                []
+            , path [ d "M10 4h4v4h-4z", fillOpacity ".791" ]
+                []
+            , path [ d "M14 4h4v4h-4z", fillOpacity ".553" ]
+                []
+            , path [ d "M2 8h4v4H2z", fillOpacity ".964" ]
+                []
+            , path [ d "M6 8h4v4H6z", fillOpacity ".646" ]
+                []
+            , path [ d "M10 8h4v4h-4z", fillOpacity ".924" ]
+                []
+            , path [ d "M14 8h4v4h-4z", fillOpacity ".267" ]
+                []
+            , path [ d "M2 12h4v4H2z", fillOpacity ".375" ]
+                []
+            , path [ d "M6 12h4v4H6z", fillOpacity ".722" ]
+                []
+            , path [ d "M10 12h4v4h-4z", fillOpacity ".396" ]
+                []
+            , path [ d "M14 12h4v4h-4z", fillOpacity ".623" ]
+                []
+            ]
+        ]

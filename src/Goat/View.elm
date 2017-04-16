@@ -20,6 +20,7 @@ import Rocket exposing ((=>))
 import SingleTouch as ST
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
+import Svg.Lazy
 import Touch as T
 import UndoList exposing (UndoList)
 
@@ -345,6 +346,9 @@ viewShapeSvg drawing =
                 Ellipse ->
                     Icons.viewSpotlightEllipse
 
+        DrawBlur _ ->
+            Icons.viewBlur
+
 
 viewLineStrokeOptions : StrokeStyle -> Html Msg
 viewLineStrokeOptions strokeStyle =
@@ -428,6 +432,14 @@ viewSpotlights annotationState annotations =
         |> List.concat
 
 
+viewBlurs : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewBlurs annotationState annotations =
+    annotations
+        |> Array.toIndexedList
+        |> List.filterMap (uncurry (viewBlur annotationState))
+        |> List.concat
+
+
 canvasAttributes : Image -> Drawing -> AnnotationState -> List (Svg.Attribute Msg)
 canvasAttributes image drawing annotationState =
     [ id "canvas"
@@ -450,12 +462,13 @@ viewNonSpotlightAnnotations annotationState annotations =
         |> List.concat
 
 
-viewDefinitions : Float -> Float -> List (Svg Msg) -> List (Svg Msg)
-viewDefinitions width height cutOuts =
+viewDefinitions : Float -> Float -> List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg)
+viewDefinitions width height spotlightCutOuts blurCutOuts =
     ControlOptions.strokeColors
         |> List.map viewArrowHeadDefinition
-        |> (::) (maskDefinition width height cutOuts)
-        |> (::) viewSvgFilters
+        |> (::) (maskDefinition width height spotlightCutOuts)
+        |> (::) (pixelateMaskDefinition blurCutOuts)
+        |> flip List.append viewSvgFilters
         |> defs []
         |> List.singleton
 
@@ -471,29 +484,31 @@ getAnnotations image annotations spotlights nonSpotlights isDrawingSpotlight =
         else if List.isEmpty spotlights then
             nonSpotlights
         else
-            List.take (firstSpotlightIndex) nonSpotlights
+            List.take firstSpotlightIndex nonSpotlights
                 ++ (viewMask image.width image.height
                         :: List.drop firstSpotlightIndex nonSpotlights
                    )
 
 
 viewDrawingAndAnnotations :
-    (List (Svg Msg) -> List (Svg Msg))
+    Image
+    -> (List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg))
+    -> List (Svg Msg)
     -> List (Svg Msg)
     -> (Bool -> List (Svg Msg))
     -> (StartPosition -> Position -> Bool -> Svg Msg)
     -> Drawing
     -> AnnotationState
     -> List (Svg Msg)
-viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing annotationState =
+viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDrawing drawing annotationState =
     case annotationState of
         DrawingAnnotation start curPos ->
             let
                 nonSpotlightDrawingAndAnnotations =
-                    definitions spotlights ++ toAnnotations False ++ [ toDrawing start curPos False ]
+                    definitions spotlights blurs ++ (Svg.Lazy.lazy viewBlurredImage image :: viewImage image :: toAnnotations False) ++ [ toDrawing start curPos False ]
 
                 spotlightDrawingAndAnnotations =
-                    definitions (spotlights ++ [ toDrawing start curPos True ]) ++ toAnnotations True ++ [ toDrawing start curPos False ]
+                    definitions (spotlights ++ [ toDrawing start curPos True ]) blurs ++ (Svg.Lazy.lazy viewBlurredImage image :: Svg.Lazy.lazy viewImage image :: toAnnotations True) ++ [ toDrawing start curPos False ]
             in
                 case drawing of
                     DrawShape _ _ ->
@@ -506,7 +521,7 @@ viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing drawing
                         nonSpotlightDrawingAndAnnotations
 
         _ ->
-            definitions spotlights ++ toAnnotations False
+            definitions spotlights blurs ++ (Svg.Lazy.lazy viewBlurredImage image :: viewImage image :: toAnnotations False)
 
 
 viewDrawingArea : Model -> AnnotationAttributes -> Image -> Html Msg
@@ -521,6 +536,20 @@ viewDrawingArea model annotationAttrs image =
         spotlights =
             viewSpotlights model.annotationState annotations
 
+        blurs =
+            viewBlurs model.annotationState <|
+                case model.annotationState of
+                    DrawingAnnotation start curPos ->
+                        case model.drawing of
+                            DrawBlur _ ->
+                                Array.push (Blur start curPos) annotations
+
+                            _ ->
+                                annotations
+
+                    _ ->
+                        annotations
+
         nonSpotlights =
             viewNonSpotlightAnnotations model.annotationState annotations
 
@@ -530,24 +559,31 @@ viewDrawingArea model annotationAttrs image =
         toAnnotations =
             getAnnotations image annotations spotlights nonSpotlights
     in
-        div (canvasAttributes image model.drawing model.annotationState)
-            [ viewImage image
-            , svg
+        div
+            (canvasAttributes image model.drawing model.annotationState)
+            [ svg
                 [ Attr.id "drawing"
                 , Attr.class "drawing"
                 , Attr.width <| toString <| round image.width
                 , Attr.height <| toString <| round image.height
                 , Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg"
                 ]
-                (viewDrawingAndAnnotations definitions spotlights toAnnotations toDrawing model.drawing model.annotationState)
+                (viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDrawing model.drawing model.annotationState)
             ]
 
 
 {-| TODO: fix these filters for lines. Lines/Arrows render very strangely with this filter.
 -}
-viewSvgFilters : Svg Msg
+viewSvgFilters : List (Svg Msg)
 viewSvgFilters =
-    Svg.filter [ Attr.id "dropShadow", Attr.x "-20%", Attr.y "-20%", Attr.width "200%", Attr.height "200%" ]
+    [ Svg.filter [ id "pixelate", Attr.x "0", Attr.y "0" ]
+        [ Svg.feFlood [ Attr.height "2", Attr.width "2", Attr.x "4", Attr.y "4" ] []
+        , Svg.feComposite [ Attr.height "10", Attr.width "10" ] []
+        , Svg.feTile [ Attr.result "a" ] []
+        , Svg.feComposite [ Attr.in_ "SourceGraphic", Attr.in2 "a", Attr.operator "in" ] []
+        , Svg.feMorphology [ Attr.operator "dilate", Attr.radius "5" ] []
+        ]
+    , Svg.filter [ Attr.id "dropShadow", Attr.x "-20%", Attr.y "-20%", Attr.width "200%", Attr.height "200%" ]
         [ Svg.feGaussianBlur [ Attr.in_ "SourceAlpha", Attr.stdDeviation "2.2" ] []
         , Svg.feOffset [ Attr.dx "2", Attr.dy "2", Attr.result "offsetblur" ] []
         , Svg.feComponentTransfer []
@@ -558,6 +594,7 @@ viewSvgFilters =
             , Svg.feMergeNode [ Attr.in_ "SourceGraphic" ] []
             ]
         ]
+    ]
 
 
 viewArrowHeadDefinition : Color -> Svg Msg
@@ -691,6 +728,20 @@ viewAnnotation annotationState index annotation =
                         viewShape annotationStateAttrs shapeType Nothing shape
                             |> flip List.append (vertices Rectangular shape)
 
+            Blur start end ->
+                [ Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ annotationStateAttrs) [] ]
+                    |> flip List.append (vertices Rectangular { start = start, end = end })
+
+
+viewBlur : AnnotationState -> Int -> Annotation -> Maybe (List (Svg Msg))
+viewBlur annotationState index annotation =
+    case annotation of
+        Blur start end ->
+            Just [ Svg.rect (rectAttrs start end ++ [ Attr.fill "black", Attr.style "all" ] ++ (annotationStateEvents index annotationState)) [] ]
+
+        _ ->
+            Nothing
+
 
 annotationStateVertexEvents : Int -> AnnotationState -> Vertex -> ResizeDirection -> List (Svg.Attribute Msg)
 annotationStateVertexEvents index annotationState vertex direction =
@@ -725,6 +776,21 @@ maskDefinition width height shapes =
         []
         :: shapes
         |> Svg.mask [ Attr.id "Mask" ]
+
+
+pixelateMaskDefinition : List (Svg Msg) -> Svg Msg
+pixelateMaskDefinition shapes =
+    rect
+        ([ Attr.x "0"
+         , Attr.y "0"
+         , Attr.width "100%"
+         , Attr.height "100%"
+         , Attr.fill "white"
+         ]
+        )
+        []
+        :: shapes
+        |> Svg.mask [ Attr.id "pixelateMask" ]
 
 
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
@@ -776,6 +842,9 @@ viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSiz
                     Ellipse ->
                         Svg.ellipse (spotlightAttrs shapeType shapeMode) []
 
+            DrawBlur _ ->
+                Svg.text ""
+
 
 viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> List (Svg Msg)
 viewShape attrs shapeType fill shape =
@@ -822,8 +891,8 @@ strokeAttrs strokeStyle strokeColor =
         ]
 
 
-rectAttrs : Shape -> List (Svg.Attribute Msg)
-rectAttrs { start, end } =
+rectAttrs : StartPosition -> EndPosition -> List (Svg.Attribute Msg)
+rectAttrs start end =
     [ Attr.width <| toString <| abs <| end.x - start.x
     , Attr.height <| toString <| abs <| end.y - start.y
     , Attr.x <| toString <| Basics.min start.x end.x
@@ -862,10 +931,10 @@ shapeAttributes shapeType shape fill =
         ++ strokeAttrs shape.strokeStyle shape.strokeColor
         ++ case shapeType of
             Rect ->
-                rectAttrs shape
+                rectAttrs shape.start shape.end
 
             RoundedRect ->
-                rectAttrs shape ++ [ Attr.rx "15", Attr.ry "15" ]
+                rectAttrs shape.start shape.end ++ [ Attr.rx "15", Attr.ry "15" ]
 
             Ellipse ->
                 ellipseAttributes shape
@@ -1018,13 +1087,29 @@ lineAttributes lineType shape =
             simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
 
 
-viewImage : Image -> Html Msg
+viewBlurredImage : Image -> Svg Msg
+viewBlurredImage { width, height, url } =
+    Svg.image
+        [ Attr.width (toString (round width))
+        , Attr.height (toString (round height))
+        , Attr.xlinkHref url
+        , Attr.filter "url(#pixelate)"
+        ]
+        []
+
+
+
+-- Svg.text ""
+
+
+viewImage : Image -> Svg Msg
 viewImage { width, height, url } =
-    img
-        [ class "image-to-annotate"
-        , Html.Attributes.width (round width)
-        , Html.Attributes.height (round height)
-        , src url
+    Svg.image
+        [ Attr.class "image-to-annotate"
+        , Attr.width (toString (round width))
+        , Attr.height (toString (round height))
+        , Attr.xlinkHref url
+        , Attr.mask "url(#pixelateMask)"
         ]
         []
 

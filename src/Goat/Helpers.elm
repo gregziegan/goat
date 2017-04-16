@@ -248,6 +248,14 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
+        DrawBlur _ ->
+            case drawing2 of
+                DrawBlur _ ->
+                    True
+
+                _ ->
+                    False
+
 
 isSpotlightShape : Annotation -> Bool
 isSpotlightShape annotation =
@@ -372,6 +380,9 @@ getPositions annotation =
         Spotlight shapeType shape ->
             shape.start => shape.end
 
+        Blur start end ->
+            start => end
+
 
 getAnnotationAttributes : Annotation -> AnnotationAttributes -> AnnotationAttributes
 getAnnotationAttributes annotation existingAttrs =
@@ -387,6 +398,9 @@ getAnnotationAttributes annotation existingAttrs =
 
         Spotlight _ shape ->
             AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
+
+        Blur _ _ ->
+            existingAttrs
 
 
 currentAnnotationAttributes : Model -> AnnotationAttributes
