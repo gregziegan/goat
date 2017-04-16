@@ -638,12 +638,7 @@ resize resizingData annotation =
             Lines lineType (resizeVertices resizingData shape)
 
         Shapes shapeType fill shape ->
-            case shapeType of
-                Ellipse ->
-                    Shapes shapeType fill (resizeVertices resizingData shape)
-
-                _ ->
-                    Shapes shapeType fill (resizeVertices resizingData shape)
+            Shapes shapeType fill (resizeVertices resizingData shape)
 
         TextBox textArea ->
             TextBox (resizeVertices resizingData textArea)
