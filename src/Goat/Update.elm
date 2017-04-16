@@ -650,32 +650,6 @@ resizeVertices { curPos, vertex, originalCoords } annotation =
                 { annotation | start = curPos, end = Position end.x start.y }
 
 
-resizeEllipseVertices : ResizingData -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeEllipseVertices { curPos, vertex, originalCoords } annotation =
-    let
-        ( start, end ) =
-            originalCoords
-
-        dX =
-            start.x - curPos.x
-
-        dY =
-            end.y - curPos.y
-    in
-        case vertex of
-            Start ->
-                { annotation | start = Position (curPos.x + ((end.x - curPos.x) // 2)) (end.y - (dY // 2)) }
-
-            Goat.Model.End ->
-                { annotation | end = curPos }
-
-            StartPlusX ->
-                { annotation | start = Position (curPos.x + ((end.x - curPos.x) // 2) - ((end.x - start.x) // 2)) (end.y - (dY // 2)), end = Position start.x end.y }
-
-            StartPlusY ->
-                { annotation | start = Position (curPos.x + ((end.x - curPos.x) // 2)) (start.y - ((start.y - curPos.y) // 2)), end = Position end.x start.y }
-
-
 resize : ResizingData -> Annotation -> Annotation
 resize resizingData annotation =
     case annotation of
@@ -683,12 +657,7 @@ resize resizingData annotation =
             Lines lineType (resizeVertices resizingData shape)
 
         Shapes shapeType fill shape ->
-            case shapeType of
-                Ellipse ->
-                    Shapes shapeType fill (resizeEllipseVertices resizingData shape)
-
-                _ ->
-                    Shapes shapeType fill (resizeVertices resizingData shape)
+            Shapes shapeType fill (resizeVertices resizingData shape)
 
         TextBox textArea ->
             TextBox (resizeVertices resizingData textArea)
