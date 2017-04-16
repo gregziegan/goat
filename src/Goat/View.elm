@@ -834,10 +834,10 @@ rectAttrs { start, end } =
 
 ellipseAttributes : Shape -> List (Svg.Attribute Msg)
 ellipseAttributes { start, end } =
-    [ Attr.rx <| toString <| abs <| end.x - start.x
-    , Attr.ry <| toString <| abs <| end.y - start.y
-    , Attr.cx <| toString start.x
-    , Attr.cy <| toString start.y
+    [ Attr.rx <| toString <| abs <| (end.x - start.x) // 2
+    , Attr.ry <| toString <| abs <| (end.y - start.y) // 2
+    , Attr.cx <| toString <| start.x + ((end.x - start.x) // 2)
+    , Attr.cy <| toString <| start.y + ((end.y - start.y) // 2)
     , Attr.filter "url(#dropShadow)"
     ]
 
@@ -916,17 +916,7 @@ viewVertex vertexEvents x y =
 
 ellipseVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
 ellipseVertices toVertexEvents start end =
-    let
-        dX =
-            end.x - start.x
-
-        dY =
-            end.y - start.y
-
-        rectStart =
-            Position (start.x - dX) (end.y - 2 * dY)
-    in
-        shapeVertices toVertexEvents rectStart end
+    shapeVertices toVertexEvents start end
 
 
 viewTextArea : Int -> TextArea -> Svg Msg
@@ -998,8 +988,7 @@ simpleLineAttrs : Shape -> List (Svg.Attribute Msg)
 simpleLineAttrs { start, end } =
     [ Attr.fill "none"
     , Attr.d <| linePath start end
-
-    --  , Attr.filter "url(#dropShadow)"
+      --  , Attr.filter "url(#dropShadow)"
     ]
 
 
