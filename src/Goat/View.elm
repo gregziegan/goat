@@ -916,17 +916,7 @@ viewVertex vertexEvents x y =
 
 ellipseVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
 ellipseVertices toVertexEvents start end =
-    let
-        dX =
-            end.x - start.x
-
-        dY =
-            end.y - start.y
-
-        rectStart =
-            Position (start.x - dX) (end.y - 2 * dY)
-    in
-        shapeVertices toVertexEvents rectStart end
+    shapeVertices toVertexEvents start end
 
 
 viewTextArea : Int -> TextArea -> Svg Msg
