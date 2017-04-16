@@ -48,10 +48,10 @@ strokeSelectors strokeWidth dashArray strokeColor =
 
 ellipseSelector : Shape -> List Selector
 ellipseSelector shape =
-    [ attribute "rx" <| toString <| abs end.x - start.x
-    , attribute "ry" <| toString <| abs end.y - start.y
-    , attribute "cx" <| toString start.x
-    , attribute "cy" <| toString start.y
+    [ attribute "rx" <| toString <| abs <| (end.x - start.x) // 2
+    , attribute "ry" <| toString <| abs <| (end.y - start.y) // 2
+    , attribute "cx" <| toString <| start.x + ((end.x - start.x) // 2)
+    , attribute "cy" <| toString <| start.y + ((end.y - start.y) // 2)
     , attribute "filter" "url(#dropShadow)"
     ]
         ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
