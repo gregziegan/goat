@@ -36,6 +36,7 @@ type Drawing
     | DrawShape ShapeType ShapeMode
     | DrawTextBox
     | DrawSpotlight ShapeType ShapeMode
+    | DrawBlur ShapeMode
 
 
 type StrokeStyle
@@ -107,6 +108,7 @@ type Annotation
     | Shapes ShapeType (Maybe Color) Shape
     | TextBox TextArea
     | Spotlight ShapeType Shape
+    | Blur StartPosition EndPosition
 
 
 {-| Vertices are classified by their relationship to the `start` and `end`

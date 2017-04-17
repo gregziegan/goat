@@ -1,4 +1,4 @@
-module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, theGoats, removeItemIf, removeItem, isEmptyTextBox, selectLine, selectShape, selectSpotlight, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, directionToCursor)
+module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, selectLine, selectShape, selectSpotlight, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, directionToCursor)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
@@ -181,13 +181,6 @@ calcDistance a b =
     sqrt <| toFloat <| (b.x - a.x) ^ 2 + (b.y - a.y) ^ 2
 
 
-theGoats : List Image
-theGoats =
-    [ Image "0" "images/goat.jpg" 235 276 639 751
-    , Image "1" "images/goat2.jpg" 235 276 639 751
-    ]
-
-
 toPosition : ST.SingleTouch -> Position
 toPosition st =
     Position (round st.touch.clientX) (round st.touch.clientY)
@@ -244,6 +237,14 @@ drawingsAreEqual drawing drawing2 =
             case drawing2 of
                 DrawSpotlight shapeType2 _ ->
                     shapeType == shapeType2
+
+                _ ->
+                    False
+
+        DrawBlur _ ->
+            case drawing2 of
+                DrawBlur _ ->
+                    True
 
                 _ ->
                     False
@@ -372,6 +373,9 @@ getPositions annotation =
         Spotlight shapeType shape ->
             shape.start => shape.end
 
+        Blur start end ->
+            start => end
+
 
 getAnnotationAttributes : Annotation -> AnnotationAttributes -> AnnotationAttributes
 getAnnotationAttributes annotation existingAttrs =
@@ -387,6 +391,9 @@ getAnnotationAttributes annotation existingAttrs =
 
         Spotlight _ shape ->
             AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
+
+        Blur _ _ ->
+            existingAttrs
 
 
 currentAnnotationAttributes : Model -> AnnotationAttributes
