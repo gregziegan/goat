@@ -10,7 +10,7 @@ import Goat.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Html exposing (Attribute, Html, button, div, h2, img, li, p, text, ul)
-import Html.Attributes exposing (class, classList, disabled, id, src, style)
+import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra exposing (Key(Shift), KeyChange, isPressed)
@@ -505,10 +505,10 @@ viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDra
         DrawingAnnotation start curPos ->
             let
                 nonSpotlightDrawingAndAnnotations =
-                    definitions spotlights blurs ++ (Svg.Lazy.lazy viewBlurredImage image :: viewImage image :: toAnnotations False) ++ [ toDrawing start curPos False ]
+                    definitions spotlights blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: toAnnotations False) ++ [ toDrawing start curPos False ]
 
                 spotlightDrawingAndAnnotations =
-                    definitions (spotlights ++ [ toDrawing start curPos True ]) blurs ++ (Svg.Lazy.lazy viewBlurredImage image :: Svg.Lazy.lazy viewImage image :: toAnnotations True) ++ [ toDrawing start curPos False ]
+                    definitions (spotlights ++ [ toDrawing start curPos True ]) blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: Svg.Lazy.lazy viewImage image :: toAnnotations True) ++ [ toDrawing start curPos False ]
             in
                 case drawing of
                     DrawShape _ _ ->
@@ -521,7 +521,7 @@ viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDra
                         nonSpotlightDrawingAndAnnotations
 
         _ ->
-            definitions spotlights blurs ++ (Svg.Lazy.lazy viewBlurredImage image :: viewImage image :: toAnnotations False)
+            definitions spotlights blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: toAnnotations False)
 
 
 viewDrawingArea : Model -> AnnotationAttributes -> Image -> Html Msg
@@ -1057,7 +1057,8 @@ simpleLineAttrs : Shape -> List (Svg.Attribute Msg)
 simpleLineAttrs { start, end } =
     [ Attr.fill "none"
     , Attr.d <| linePath start end
-      --  , Attr.filter "url(#dropShadow)"
+
+    --  , Attr.filter "url(#dropShadow)"
     ]
 
 
@@ -1076,19 +1077,15 @@ lineAttributes lineType shape =
             simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
 
 
-viewBlurredImage : Image -> Svg Msg
-viewBlurredImage { width, height, url } =
+viewPixelatedImage : Image -> Svg Msg
+viewPixelatedImage { width, height, url } =
     Svg.image
         [ Attr.width (toString (round width))
         , Attr.height (toString (round height))
-        , Attr.xlinkHref url
+        , attribute "href" url
         , Attr.filter "url(#pixelate)"
         ]
         []
-
-
-
--- Svg.text ""
 
 
 viewImage : Image -> Svg Msg
@@ -1097,7 +1094,7 @@ viewImage { width, height, url } =
         [ Attr.class "image-to-annotate"
         , Attr.width (toString (round width))
         , Attr.height (toString (round height))
-        , Attr.xlinkHref url
+        , attribute "href" url
         , Attr.mask "url(#pixelateMask)"
         ]
         []

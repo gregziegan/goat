@@ -8,7 +8,7 @@
     <div id="export-image"></div>
     <script src="elm.js"></script>
     <script src="dist/goat-app_v1-0-0-rc.min.js"></script>
-    <!-- <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script> -->
+    <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
     <script>
      // polyfills
      if (!HTMLCanvasElement.prototype.toBlob) {
@@ -29,7 +29,6 @@
      }
     </script>
     <script>
-
       var isMac = navigator.userAgent.indexOf('Mac OS X') != -1;
       var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac });
       var savedImage;
@@ -49,10 +48,20 @@
         }, true);
       });
 
+      app.ports.requestImages.subscribe(function () {
+        if (isInZendeskAppContext) {
+          readInImagesFromZendesk();
+        } else {
+          var goats = [
+            { id: '0', url: 'images/goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
+            { id: '0', url: 'images/goat2.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751}
+          ];
+          readInImages(goats);
+        }
+      });
+
       var client = window.ZAFClient ? ZAFClient.init() : null;
       var isInZendeskAppContext = !!client;
-
-      var DOMURL = window.URL || window.webkitURL || window;
 
       function loadImage(src) {
         if (!src.type.match(/image.*/)) {
@@ -60,31 +69,23 @@
         }
         var reader = new FileReader();
         reader.onload = function (e) {
+          var imageUrl = e.target.result;
           var contentType = 'image/png';
-          var blob = b64toBlob(e.target.result.replace('data:image/png;base64,', ''), contentType);
-          var editImageBlobUrl = DOMURL.createObjectURL(blob);
           var newImg = new Image();
           newImg.crossOrigin = 'anonymous';
           newImg.onload = function () {
             app.ports.newImage.send({
               id: '0',
-              url: editImageBlobUrl,
+              url: imageUrl,
               width: this.naturalWidth,
               height: this.naturalHeight,
               originalWidth: this.naturalWidth,
               originalHeight: this.naturalHeight
             });
           };
-          newImg.src = editImageBlobUrl;
+          newImg.src = imageUrl;
         };
         reader.readAsDataURL(src);
-      }
-
-      function getImages(html) {
-        var div = document.createElement('div');
-        div.innerHTML = html;
-        var images = div.querySelectorAll('img');
-        return Array.prototype.map.call(images, toImageObject);
       }
 
       function toImageObject(image) {
@@ -115,7 +116,7 @@
         });
       }
 
-      function getImageBlob(img, imageObject) {
+      function getImageUrl(img, imageObject) {
         return new Promise(function (resolve) {
           var canvas = document.createElement("canvas");
           canvas.width = img.width;
@@ -125,70 +126,22 @@
           ctx.drawImage(img, 0, 0);
 
           var newImageObject = imageObject;
-          canvas.toBlob(function (blob) {
-            newImageObject.url = DOMURL.createObjectURL(blob);
-            resolve(newImageObject);
-          });
+          newImageObject.url = canvas.toDataURL("image/png");
+          resolve(newImageObject);
         });
-      }
-
-      function b64toBlob(b64Data) {
-        var contentType = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
-        var sliceSize = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 512;
-
-        var byteCharacters = atob(b64Data);
-        var byteArrays = [];
-        for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-          var slice = byteCharacters.slice(offset, offset + sliceSize);
-          var byteNumbers = new Array(slice.length);
-          for (var i = 0; i < slice.length; i++) {
-            byteNumbers[i] = slice.charCodeAt(i);
-          }
-          var byteArray = new Uint8Array(byteNumbers);
-          byteArrays.push(byteArray);
-        }
-        return new Blob(byteArrays, { type: contentType });
-      }
-
-      function autoScale(canvas) {
-        // adapted from https://www.html5rocks.com/en/tutorials/canvas/hidpi/
-        var context = canvas.getContext('2d');
-        var devicePixelRatio = window.devicePixelRatio || 1;
-        var backingStoreRatio = context.webkitBackingStorePixelRatio || context.mozBackingStorePixelRatio || context.msBackingStorePixelRatio || context.oBackingStorePixelRatio || context.backingStorePixelRatio || 1;
-
-        var ratio = devicePixelRatio / backingStoreRatio;
-
-        if (devicePixelRatio !== backingStoreRatio) {
-          var oldWidth = canvas.width;
-          var oldHeight = canvas.height;
-
-          canvas.width = oldWidth * ratio;
-          canvas.height = oldHeight * ratio;
-
-          canvas.style.width = oldWidth + 'px';
-          canvas.style.height = oldHeight + 'px';
-
-          context.scale(ratio, ratio);
-        }
       }
 
       function exportImage() {
         var image = savedImage;
-        var canvas = document.createElement('canvas');
-        canvas.crossOrigin = 'anonymous';
-        canvas.width = image.width;
-        canvas.height = image.height;
-        autoScale(canvas);
+        var svg = document.getElementById( "drawing" );
+        var svgData = new XMLSerializer().serializeToString( svg );
 
-        var ctx = canvas.getContext('2d');
-        var data = document.getElementById('drawing').outerHTML;
-        var drawingImg = new Image();
-        drawingImg.crossOrigin = 'anonymous';
-        var svg = new Blob([data], { type: 'image/svg+xml' });
-        var url = DOMURL.createObjectURL(svg);
-        drawingImg.onload = function () {
-          ctx.drawImage(document.querySelector('.image-to-annotate'), 0, 0, image.width, Math.round(image.height));
-          ctx.drawImage(drawingImg, 0, 0, image.width, Math.round(image.height));
+        var canvas = document.createElement( "canvas" );
+        var ctx = canvas.getContext( "2d" );
+
+        var img = document.createElement( "img" );
+        img.onload = function() {
+          ctx.drawImage( img, 0, 0 );
           if (isInZendeskAppContext) {
             client.get('ticket.comment').then(function (zaf) {
               var div = document.createElement('div');
@@ -196,50 +149,42 @@
               div.innerHTML = comment;
               div.querySelector('img[data-imageuploadid="' + image.id + '"]').outerHTML = '';
               client.set('ticket.comment.text', div.innerHTML).then(function () {
-                client.invoke('ticket.editor.inlineImage', canvas.toDataURL());
+                client.invoke('ticket.editor.inlineImage', canvas.toDataURL('image/png'));
                 client.invoke('app.close');
               });
             });
           } else {
-            plopImageIntoDom(canvas, image);
+            img.id = 'export-image';
+            document.body.replaceChild(img, document.getElementById('export-image'));
           }
-          DOMURL.revokeObjectURL(url);
-        };
-        drawingImg.src = url;
+        }
+        img.setAttribute( "src", "data:image/svg+xml;base64," + btoa( svgData ) );
       }
 
-      function plopImageIntoDom(canvas, image) {
-        canvas.toBlob(function (blob) {
-          var exportImage = new Image();
-          exportImage.crossOrigin = 'anonymous';
-          exportImage.id = 'export-image';
-          exportImage.src = DOMURL.createObjectURL(blob);
-          exportImage.width = image.width;
-          exportImage.height = image.height;
-          document.body.replaceChild(exportImage, document.getElementById('export-image'));
+      function readInImagesFromZendesk() {
+        client.get('ticket.comment').then(function (zaf) {
+          var div = document.createElement('div');
+          var comment = zaf['ticket.comment'].text;
+          div.innerHTML = comment;
+          var images = div.querySelectorAll('img');
+          var imageObjects = Array.prototype.map.call(images, toImageObject);
+          readInImages(imageObjects);
+        });
+      }
+
+      function readInImages(imageObjects) {
+        Promise.all(Array.prototype.map.call(imageObjects, toLocalImage)).then(function (allLocalImageData) {
+          return Promise.all(Array.prototype.map.call(allLocalImageData, function (localData) {
+            return getImageUrl(localData.img, localData.imageObject);
+          }));
+        }).then(function (localImages) {
+          app.ports.setImages.send(localImages);
         });
       }
 
       if (isInZendeskAppContext) {
-        var readInImages = function readInImages(event) {
-          client.get('ticket.comment').then(function (zaf) {
-            var div = document.createElement('div');
-            var comment = zaf['ticket.comment'].text;
-            div.innerHTML = comment;
-            var images = div.querySelectorAll('img');
-            var imageObjects = Array.prototype.map.call(images, toImageObject);
-            Promise.all(Array.prototype.map.call(imageObjects, toLocalImage)).then(function (allLocalImageData) {
-              return Promise.all(Array.prototype.map.call(allLocalImageData, function (localData) {
-                return getImageBlob(localData.img, localData.imageObject);
-              }));
-            }).then(function (localImages) {
-              app.ports.setImages.send(localImages);
-            });
-          });
-        };
-
         client.invoke('resize', { height: 320, width: 800 });
-        client.on('pane.activated', readInImages);
+        client.on('pane.activated', readInImagesFromZendesk);
       }
     </script>
   </body>

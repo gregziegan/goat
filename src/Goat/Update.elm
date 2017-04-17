@@ -4,7 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
-import Goat.Helpers exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, selectLine, selectShape, selectSpotlight, shiftPosition, theGoats)
+import Goat.Helpers exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, selectLine, selectShape, selectSpotlight, shiftPosition)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
 import Html.Attributes as Attr
@@ -274,10 +274,8 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                    ]
 
         ShowMeTheGoats ->
-            { model
-                | images = List.Zipper.fromList theGoats
-            }
-                => []
+            model
+                => [ Ports.requestImages () ]
 
 
 {-| Do not add this annotations array change change to undo history
