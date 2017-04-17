@@ -2,7 +2,7 @@ module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcS
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
-import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), ResizeDirection(..), Drawing(..), EndPosition, Image, LineMode(..), LineType(..), Model, Shape, ShapeMode(..), ShapeType(..), StartPosition, StrokeStyle(..))
+import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), ResizeDirection(..), Drawing(..), EndPosition, LineMode(..), LineType(..), Model, Shape, ShapeMode(..), ShapeType(..), StartPosition, StrokeStyle(..))
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import Json.Decode as Json

@@ -4,6 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
+import Goat.Flags exposing (Image)
 import Goat.Helpers exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, selectLine, selectShape, selectSpotlight, shiftPosition)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
@@ -57,6 +58,7 @@ type Msg
     | Redo
     | Save
       -- Image Selection updates
+    | Reset
     | SelectImage Image
     | SetImages (List Image)
     | ReturnToImageSelection
@@ -113,7 +115,14 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                 => []
 
         SetImages images ->
-            { model | images = List.Zipper.fromList images }
+            { model | images = List.Zipper.fromList images, imageSelected = False }
+                => []
+
+        Reset ->
+            { model
+                | images = List.Zipper.fromList []
+                , imageSelected = False
+            }
                 => []
 
         ReturnToImageSelection ->
@@ -1222,10 +1231,15 @@ selectImage image model =
                         |> List.Zipper.first
                         |> List.Zipper.find ((==) image.url << .url)
                 , imageSelected = True
+                , edits = UndoList.reset model.edits
             }
 
         Nothing ->
-            model
+            { model
+                | images = List.Zipper.fromList [ image ]
+                , imageSelected = True
+                , edits = UndoList.reset model.edits
+            }
 
 
 returnToImageSelection : Model -> Model

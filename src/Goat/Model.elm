@@ -6,11 +6,15 @@ import Color exposing (Color)
 import Keyboard.Extra as Keyboard
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
+import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
+import Goat.Flags exposing (Flags, Image)
+import Goat.Ports as Ports
 
 
-type alias Flags =
-    { isMac : Bool }
+type Context
+    = Zendesk
+    | Web
 
 
 type alias StartPosition =
@@ -66,16 +70,6 @@ type alias TextArea =
     , text : String
     , angle : Float
     , autoexpand : AutoExpand.State
-    }
-
-
-type alias Image =
-    { id : String
-    , url : String
-    , width : Float
-    , height : Float
-    , originalWidth : Float
-    , originalHeight : Float
     }
 
 
@@ -209,11 +203,12 @@ type alias Model =
     , annotationMenu : Maybe AnnotationMenu
     , showingAnyMenu : Bool
     , clipboard : Maybe Annotation
+    , context : Context
     }
 
 
-init : Flags -> Model
-init flags =
+init : Flags -> ( Model, List (Cmd msg) )
+init { isMac, inZendesk } =
     { edits = UndoList.fresh Array.empty
     , fill = Nothing
     , strokeColor = Color.rgb 255 0 0
@@ -226,11 +221,17 @@ init flags =
     , drawing = DrawLine Arrow DrawingLine
     , annotationState = ReadyToDraw
     , operatingSystem =
-        if flags.isMac then
+        if isMac then
             MacOS
         else
             Windows
     , annotationMenu = Nothing
     , showingAnyMenu = False
     , clipboard = Nothing
+    , context =
+        if inZendesk then
+            Zendesk
+        else
+            Web
     }
+        => [ Ports.listenForUpload () ]

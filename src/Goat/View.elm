@@ -5,11 +5,12 @@ import AutoExpand
 import Color exposing (Color)
 import Color.Convert
 import Goat.ControlOptions as ControlOptions exposing (fontSizes)
+import Goat.Flags exposing (Image)
 import Goat.Helpers exposing (..)
 import Goat.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Html exposing (Attribute, Html, button, div, h2, img, li, p, text, ul)
+import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
 import Json.Decode as Json
@@ -29,13 +30,18 @@ view : Model -> Html Msg
 view model =
     case model.images of
         Nothing ->
-            viewInfoScreen
+            case model.context of
+                Zendesk ->
+                    viewLoadingScreen
+
+                Web ->
+                    viewInfoScreen
 
         Just images ->
             if model.imageSelected then
                 viewImageAnnotator model <| List.Zipper.current images
             else
-                viewImageSelector images
+                div [] [ h3 [] [ text "Please select an image to annotate:" ], viewImageSelector images ]
 
 
 viewImageSelector : Zipper Image -> Html Msg
@@ -57,6 +63,22 @@ viewImageOption image =
         [ img [ src image.url, Html.Attributes.height <| round image.height, Html.Attributes.width <| round image.width ] []
         , div [ onClick <| SelectImage image, class "image-edit-pencil" ]
             [ Icons.viewPencil
+            ]
+        ]
+
+
+viewLoadingScreen : Html Msg
+viewLoadingScreen =
+    div
+        [ class "loader" ]
+        [ svg
+            [ Attr.width "40px", Attr.height "40px", Attr.viewBox "0 0 50 50" ]
+            [ Svg.path
+                [ Attr.fill "currentColor", Attr.d "M25.251,6.461c-10.318,0-18.683,8.365-18.683,18.683h4.068c0-8.071,6.543-14.615,14.615-14.615V6.461z" ]
+                []
+            , Svg.animateTransform
+                [ Attr.attributeType "xml", Attr.attributeName "transform", Attr.type_ "rotate", Attr.from "0 25 25", Attr.to "360 25 25", Attr.dur "0.6s", Attr.repeatCount "indefinite" ]
+                []
             ]
         ]
 

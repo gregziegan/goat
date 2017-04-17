@@ -1,6 +1,6 @@
-port module Goat.Ports exposing (exportToImage, listenForUpload, setImages, newImage, requestImages)
+port module Goat.Ports exposing (exportToImage, listenForUpload, setImages, newImage, reset, requestImages)
 
-import Goat.Model exposing (Image)
+import Goat.Flags exposing (Image)
 
 
 -- Talk to Javascript
@@ -9,7 +9,7 @@ import Goat.Model exposing (Image)
 port exportToImage : Image -> Cmd msg
 
 
-port listenForUpload : String -> Cmd msg
+port listenForUpload : () -> Cmd msg
 
 
 port requestImages : () -> Cmd msg
@@ -23,3 +23,6 @@ port setImages : (List Image -> msg) -> Sub msg
 
 
 port newImage : (Image -> msg) -> Sub msg
+
+
+port reset : (() -> msg) -> Sub msg

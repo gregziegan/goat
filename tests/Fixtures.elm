@@ -3,6 +3,7 @@ module Fixtures exposing (..)
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color
+import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Update exposing (..)
 import Keyboard.Extra as Keyboard
@@ -39,6 +40,7 @@ model =
     , annotationMenu = Nothing
     , showingAnyMenu = False
     , clipboard = Nothing
+    , context = Web
     }
 
 

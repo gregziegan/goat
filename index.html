@@ -29,16 +29,23 @@
      }
     </script>
     <script>
+      // flags
       var isMac = navigator.userAgent.indexOf('Mac OS X') != -1;
-      var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac });
+      var client = window.ZAFClient ? ZAFClient.init() : null;
+      var isInZendeskAppContext = !!client;
+
+
+      var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac, inZendesk : isInZendeskAppContext });
       var savedImage;
+
+      // ports
       app.ports.exportToImage.subscribe(function (image) {
         savedImage = image;
         window.requestAnimationFrame(exportImage);
       });
 
-      app.ports.listenForUpload.subscribe(function (className) {
-        var target = document.querySelector('.' + className);
+      app.ports.listenForUpload.subscribe(function () {
+        var target = document.querySelector('.droparea');
         target.addEventListener("dragover", function (e) {
           e.preventDefault();
         });
@@ -56,13 +63,22 @@
             { id: '0', url: 'images/goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
             { id: '0', url: 'images/goat2.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751}
           ];
-          readInImages(goats);
+          readInImages(goats).then(function (localImages) {
+            app.ports.setImages.send(localImages);
+          });
         }
       });
 
-      var client = window.ZAFClient ? ZAFClient.init() : null;
-      var isInZendeskAppContext = !!client;
+      // zendesk listeners
+      if (isInZendeskAppContext) {
+        client.invoke('resize', { height: 320, width: 800 });
+        client.on('pane.activated', readInImagesFromZendesk);
+        client.on('pane.deactivated', function() {
+          app.ports.reset.send(null);
+        })
+      }
 
+      // helper functions
       function loadImage(src) {
         if (!src.type.match(/image.*/)) {
           return;
@@ -147,10 +163,17 @@
               var div = document.createElement('div');
               var comment = zaf['ticket.comment'].text;
               div.innerHTML = comment;
-              div.querySelector('img[data-imageuploadid="' + image.id + '"]').outerHTML = '';
+              var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
+              var imageToReplace = div.querySelector('img[data-imageuploadid="' + image.id + '"]');
+              if (selectionBox && imageToReplace) {
+                selectionBox.outerHTML = '';
+              } else {
+                imageToReplace.outerHTML = '';
+              }
               client.set('ticket.comment.text', div.innerHTML).then(function () {
                 client.invoke('ticket.editor.inlineImage', canvas.toDataURL('image/png'));
                 client.invoke('app.close');
+                app.ports.reset.send(null);
               });
             });
           } else {
@@ -166,25 +189,28 @@
           var div = document.createElement('div');
           var comment = zaf['ticket.comment'].text;
           div.innerHTML = comment;
-          var images = div.querySelectorAll('img');
-          var imageObjects = Array.prototype.map.call(images, toImageObject);
-          readInImages(imageObjects);
+          var selectedImage = div.querySelector('span.zd-editor--rich-text-comment--resize-box img')
+          if (selectedImage) {
+            readInImages([toImageObject(selectedImage)])
+              .then(function (localImages) {
+                app.ports.newImage.send(localImages[0]);
+              });
+          } else {
+            var images = div.querySelectorAll('img');
+            var imageObjects = Array.prototype.map.call(images, toImageObject);
+            readInImages(imageObjects).then(function (localImages) {
+              app.ports.setImages.send(localImages);
+            });
+          }
         });
       }
 
       function readInImages(imageObjects) {
-        Promise.all(Array.prototype.map.call(imageObjects, toLocalImage)).then(function (allLocalImageData) {
+        return Promise.all(Array.prototype.map.call(imageObjects, toLocalImage)).then(function (allLocalImageData) {
           return Promise.all(Array.prototype.map.call(allLocalImageData, function (localData) {
             return getImageUrl(localData.img, localData.imageObject);
           }));
-        }).then(function (localImages) {
-          app.ports.setImages.send(localImages);
-        });
-      }
-
-      if (isInZendeskAppContext) {
-        client.invoke('resize', { height: 320, width: 800 });
-        client.on('pane.activated', readInImagesFromZendesk);
+        })
       }
     </script>
   </body>

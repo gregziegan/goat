@@ -135,7 +135,6 @@ button:active, button:focus, button:hover {
   font-size: 8px;
 }
 
-
 .flip {
   transform: scaleX(-1);
 }
@@ -168,7 +167,7 @@ button:active, button:focus, button:hover {
 
 .image-option {
   padding: 10px;
-  border: none;
+  border: 1px solid rgb(230, 230, 230);
   background-color: white;
   margin: 3px;
   cursor: pointer;
@@ -176,7 +175,7 @@ button:active, button:focus, button:hover {
 }
 
 .image-option > img {
-  width: 120px;
+  width: 200px;
   height: auto;
 }
 
@@ -189,10 +188,6 @@ button:active, button:focus, button:hover {
   position: absolute;
   top: 10px;
   left: 10px;
-}
-
-.image-option:first-of-type {
-  border-right: none;
 }
 
 .drawing {
@@ -342,4 +337,16 @@ button:active, button:focus, button:hover {
 
 .hidden {
   visibility: hidden;
+}
+
+.loade {
+  margin: 0 0 2em;
+  height: 100px;
+  width: 20%;
+  text-align: center;
+  padding: 1em;
+  margin: 0 auto 1em;
+  display: inline-block;
+  vertical-align: top;
+  color: green;
 }
