@@ -152,6 +152,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
             model
                 |> changeDrawing drawing
                 |> closeDropdown
+                |> resetToReadyToDraw
                 => []
 
         SelectFill fill ->
