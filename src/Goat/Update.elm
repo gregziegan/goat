@@ -860,38 +860,41 @@ cutSelectedAnnotation index model =
             model
 
 
-handleSelectedAnnotationKeyboard : Int -> Key -> KeyChange -> Model -> Model
-handleSelectedAnnotationKeyboard index controlKey keyChange model =
+handleCopyKey : Int -> OperatingSystem -> Model -> Model
+handleCopyKey index osToIgnore model =
+    if model.operatingSystem == osToIgnore then
+        model
+    else if isPressed CharC model.keyboardState then
+        copySelectedAnnotation index model
+    else
+        model
+
+
+handleSelectedAnnotationKeyboard : Int -> Bool -> KeyChange -> Model -> Model
+handleSelectedAnnotationKeyboard index ctrlPressed keyChange model =
     case keyChange of
         KeyDown key ->
             case key of
                 CharC ->
-                    if isPressed controlKey model.keyboardState then
+                    if ctrlPressed then
                         copySelectedAnnotation index model
                     else
                         model
 
                 CharX ->
-                    if isPressed controlKey model.keyboardState then
+                    if ctrlPressed then
                         cutSelectedAnnotation index model
                     else
                         model
 
                 Control ->
-                    if model.operatingSystem == MacOS then
-                        model
-                    else if isPressed CharC model.keyboardState then
-                        copySelectedAnnotation index model
-                    else
-                        model
+                    handleCopyKey index MacOS model
 
                 Super ->
-                    if model.operatingSystem == Windows then
-                        model
-                    else if isPressed CharC model.keyboardState then
-                        copySelectedAnnotation index model
-                    else
-                        model
+                    handleCopyKey index Windows model
+
+                ContextMenu ->
+                    handleCopyKey index Windows model
 
                 _ ->
                     model
@@ -933,13 +936,13 @@ pasteAnnotation model =
             model
 
 
-handlePaste : Key -> KeyChange -> Model -> Model
-handlePaste controlKey keyChange model =
+handlePaste : Bool -> KeyChange -> Model -> Model
+handlePaste ctrlPressed keyChange model =
     case keyChange of
         KeyDown key ->
             case key of
                 CharV ->
-                    if isPressed controlKey model.keyboardState then
+                    if ctrlPressed then
                         pasteAnnotation model
                             |> releaseKey CharV
                     else
@@ -973,39 +976,42 @@ handlePaste controlKey keyChange model =
 alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
 alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
     let
-        controlKey =
+        controlKeys =
             case model.operatingSystem of
                 MacOS ->
-                    Super
+                    [ Super, ContextMenu ]
 
                 Windows ->
-                    Control
+                    [ Control ]
+
+        ctrlPressed =
+            List.any (\key -> isPressed key model.keyboardState) controlKeys
     in
         case maybeKeyChange of
             Just keyChange ->
                 case model.annotationState of
                     ReadyToDraw ->
-                        alterDrawing controlKey keyChange model
+                        alterDrawing ctrlPressed keyChange model
                             |> handleKeyboardShortcuts keyChange
-                            |> handlePaste controlKey keyChange
+                            |> handlePaste ctrlPressed keyChange
                             => []
 
                     DrawingAnnotation _ _ ->
-                        alterDrawing controlKey keyChange model
+                        alterDrawing ctrlPressed keyChange model
                             => []
 
                     SelectedAnnotation index _ ->
-                        alterDrawing controlKey keyChange model
-                            |> handleSelectedAnnotationKeyboard index controlKey keyChange
-                            |> handlePaste controlKey keyChange
+                        alterDrawing ctrlPressed keyChange model
+                            |> handleSelectedAnnotationKeyboard index ctrlPressed keyChange
+                            |> handlePaste ctrlPressed keyChange
                             => []
 
                     MovingAnnotation _ _ _ _ ->
-                        alterDrawing controlKey keyChange model
+                        alterDrawing ctrlPressed keyChange model
                             => []
 
                     ResizingAnnotation _ _ ->
-                        alterDrawing controlKey keyChange model
+                        alterDrawing ctrlPressed keyChange model
                             => []
 
                     EditingATextBox index _ ->
@@ -1068,8 +1074,8 @@ redoEdit model =
     { model | edits = UndoList.redo model.edits }
 
 
-alterDrawing : Key -> KeyChange -> Model -> Model
-alterDrawing controlKey keyChange ({ keyboardState } as model) =
+alterDrawing : Bool -> KeyChange -> Model -> Model
+alterDrawing ctrlPressed keyChange ({ keyboardState } as model) =
     case keyChange of
         KeyDown key ->
             case key of
@@ -1086,10 +1092,10 @@ alterDrawing controlKey keyChange ({ keyboardState } as model) =
                     deleteSelectedDrawing model
 
                 CharZ ->
-                    if isPressed Shift keyboardState && isPressed controlKey keyboardState then
+                    if isPressed Shift keyboardState && ctrlPressed then
                         redoEdit model
                             |> releaseKey CharZ
-                    else if isPressed controlKey keyboardState then
+                    else if ctrlPressed then
                         undoEdit model
                             |> releaseKey CharZ
                     else
