@@ -541,7 +541,7 @@ setFill : Maybe Color -> Model -> Model
 setFill fill model =
     case model.annotationState of
         SelectedAnnotation index annotationAttrs ->
-            { model | annotationState = SelectedAnnotation index { annotationAttrs | fill = fill } }
+            { model | annotationState = SelectedAnnotation index { annotationAttrs | fill = fill }, fill = fill }
 
         _ ->
             { model | fill = fill }
@@ -551,10 +551,10 @@ setFontSize : Int -> Model -> Model
 setFontSize fontSize model =
     case model.annotationState of
         SelectedAnnotation index annotationAttrs ->
-            { model | annotationState = SelectedAnnotation index { annotationAttrs | fontSize = fontSize } }
+            { model | annotationState = SelectedAnnotation index { annotationAttrs | fontSize = fontSize }, fontSize = fontSize }
 
         EditingATextBox index annotationAttrs ->
-            { model | annotationState = EditingATextBox index { annotationAttrs | fontSize = fontSize } }
+            { model | annotationState = EditingATextBox index { annotationAttrs | fontSize = fontSize }, fontSize = fontSize }
 
         _ ->
             { model | fontSize = fontSize }
@@ -564,7 +564,7 @@ setStrokeStyle : StrokeStyle -> Model -> Model
 setStrokeStyle strokeStyle model =
     case model.annotationState of
         SelectedAnnotation index annotationAttrs ->
-            { model | annotationState = SelectedAnnotation index { annotationAttrs | strokeStyle = strokeStyle } }
+            { model | annotationState = SelectedAnnotation index { annotationAttrs | strokeStyle = strokeStyle }, strokeStyle = strokeStyle }
 
         _ ->
             { model | strokeStyle = strokeStyle }
@@ -574,10 +574,10 @@ setStrokeColor : Color -> Model -> Model
 setStrokeColor strokeColor model =
     case model.annotationState of
         SelectedAnnotation index annotationAttrs ->
-            { model | annotationState = SelectedAnnotation index { annotationAttrs | strokeColor = strokeColor } }
+            { model | annotationState = SelectedAnnotation index { annotationAttrs | strokeColor = strokeColor }, strokeColor = strokeColor }
 
         EditingATextBox index annotationAttrs ->
-            { model | annotationState = EditingATextBox index { annotationAttrs | strokeColor = strokeColor } }
+            { model | annotationState = EditingATextBox index { annotationAttrs | strokeColor = strokeColor }, strokeColor = strokeColor }
 
         _ ->
             { model | strokeColor = strokeColor }
