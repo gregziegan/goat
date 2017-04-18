@@ -339,7 +339,7 @@ button:active, button:focus, button:hover {
   visibility: hidden;
 }
 
-.loade {
+.loader {
   margin: 0 0 2em;
   height: 100px;
   width: 20%;

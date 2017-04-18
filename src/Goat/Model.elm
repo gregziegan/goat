@@ -234,4 +234,7 @@ init { isMac, inZendesk } =
         else
             Web
     }
-        => [ Ports.listenForUpload () ]
+        => if inZendesk then
+            []
+           else
+            [ Ports.listenForUpload () ]
