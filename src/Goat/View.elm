@@ -624,13 +624,15 @@ viewArrowHeadDefinition color =
     marker
         [ Attr.id <| "arrow-head--" ++ Color.Convert.colorToHex color
         , Attr.orient "auto"
-        , Attr.markerWidth "2"
-        , Attr.markerHeight "4"
-        , Attr.refX "0.1"
-        , Attr.refY "2"
+        , Attr.markerWidth "6"
+        , Attr.markerHeight "6"
+        , Attr.refX "65"
+        , Attr.refY "39"
         , Attr.class "pointerCursor"
+        , Attr.viewBox "0 0 82 77"
+        , Attr.filter "url(#dropShadow)"
         ]
-        [ Svg.path [ Attr.d "M0,0 V4 L2,2 Z", Attr.fill <| Color.Convert.colorToHex color ] []
+        [ Svg.path [ Attr.d "M20.5,38.5L2.5,-2.5L79.5,38.5L2.5,79.5", Attr.fill <| Color.Convert.colorToHex color ] []
         ]
 
 
@@ -1086,7 +1088,10 @@ simpleLineAttrs { start, end } =
 
 arrowAttributes : Shape -> List (Svg.Attribute Msg)
 arrowAttributes shape =
-    [ Attr.markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex shape.strokeColor ++ ")" ]
+    [ Attr.markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex shape.strokeColor ++ ")"
+
+    -- , Attr.filter "url(#dropShadow)"
+    ]
 
 
 lineAttributes : LineType -> Shape -> List (Svg.Attribute Msg)
