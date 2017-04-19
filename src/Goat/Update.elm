@@ -644,7 +644,7 @@ resizeVertices discretize { curPos, vertex, originalCoords } annotation =
         ( start, end ) =
             originalCoords
     in
-        case Debug.log "vert" vertex of
+        case vertex of
             Start ->
                 { annotation | start = discretize annotation.end curPos }
 
