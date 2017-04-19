@@ -83,7 +83,6 @@ type ShapeType
 
 type Vertices
     = Rectangular
-    | Elliptical
     | Linear
 
 

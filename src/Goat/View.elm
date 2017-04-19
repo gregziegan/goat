@@ -730,27 +730,15 @@ viewAnnotation annotationState index annotation =
                     |> flip List.append (vertices Linear shape)
 
             Shapes shapeType fill shape ->
-                case shapeType of
-                    Ellipse ->
-                        viewShape annotationStateAttrs shapeType fill shape
-                            |> flip List.append (vertices Elliptical shape)
-
-                    _ ->
-                        viewShape annotationStateAttrs shapeType fill shape
-                            |> flip List.append (vertices Rectangular shape)
+                viewShape annotationStateAttrs shapeType fill shape
+                    |> flip List.append (vertices Rectangular shape)
 
             TextBox textBox ->
                 viewTextBox annotationStateAttrs selectState index textBox
 
             Spotlight shapeType shape ->
-                case shapeType of
-                    Ellipse ->
-                        viewShape annotationStateAttrs shapeType Nothing shape
-                            |> flip List.append (vertices Elliptical shape)
-
-                    _ ->
-                        viewShape annotationStateAttrs shapeType Nothing shape
-                            |> flip List.append (vertices Rectangular shape)
+                viewShape annotationStateAttrs shapeType Nothing shape
+                    |> flip List.append (vertices Rectangular shape)
 
             Blur start end ->
                 [ Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ annotationStateAttrs) [] ]
@@ -894,9 +882,6 @@ viewVertices vertices start end toVertexEvents selectState =
                 Rectangular ->
                     shapeVertices
 
-                Elliptical ->
-                    ellipseVertices
-
                 Linear ->
                     lineVertices
     in
@@ -1008,11 +993,6 @@ viewVertex vertexEvents x y =
             ++ vertexEvents
         )
         []
-
-
-ellipseVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
-ellipseVertices toVertexEvents start end =
-    shapeVertices toVertexEvents start end
 
 
 viewTextArea : Int -> TextArea -> Svg Msg
