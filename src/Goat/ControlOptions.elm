@@ -1,7 +1,7 @@
 module Goat.ControlOptions exposing (strokeColors, fills, strokeStyles, drawings, fontSizes, controlUIWidth)
 
 import Color exposing (Color)
-import Goat.Model exposing (Drawing(DrawBlur, DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse), ShapeMode(DrawingShape, DrawingEqualizedShape), LineMode(DrawingLine, DrawingDiscreteLine))
+import Goat.Model exposing (Drawing(DrawBlur, DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse))
 
 
 strokeColors : List Color
@@ -46,32 +46,19 @@ strokeStyles =
     ]
 
 
-drawings : Bool -> List Drawing
-drawings shiftPressed =
-    if shiftPressed then
-        [ DrawLine Arrow DrawingDiscreteLine
-        , DrawLine StraightLine DrawingDiscreteLine
-        , DrawShape Rect DrawingEqualizedShape
-        , DrawShape RoundedRect DrawingEqualizedShape
-        , DrawShape Ellipse DrawingEqualizedShape
-        , DrawTextBox
-        , DrawSpotlight Rect DrawingEqualizedShape
-        , DrawSpotlight RoundedRect DrawingEqualizedShape
-        , DrawSpotlight Ellipse DrawingEqualizedShape
-        , DrawBlur DrawingEqualizedShape
-        ]
-    else
-        [ DrawLine Arrow DrawingLine
-        , DrawLine StraightLine DrawingLine
-        , DrawShape Rect DrawingShape
-        , DrawShape RoundedRect DrawingShape
-        , DrawShape Ellipse DrawingShape
-        , DrawTextBox
-        , DrawSpotlight Rect DrawingShape
-        , DrawSpotlight RoundedRect DrawingShape
-        , DrawSpotlight Ellipse DrawingShape
-        , DrawBlur DrawingShape
-        ]
+drawings : List Drawing
+drawings =
+    [ DrawLine Arrow
+    , DrawLine StraightLine
+    , DrawShape Rect
+    , DrawShape RoundedRect
+    , DrawShape Ellipse
+    , DrawTextBox
+    , DrawSpotlight Rect
+    , DrawSpotlight RoundedRect
+    , DrawSpotlight Ellipse
+    , DrawBlur
+    ]
 
 
 fontSizes : List Int

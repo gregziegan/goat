@@ -1,8 +1,8 @@
-module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, selectLine, selectShape, selectSpotlight, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, directionToCursor)
+module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, directionToCursor)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
-import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), ResizeDirection(..), Drawing(..), EndPosition, LineMode(..), LineType(..), Model, Shape, ShapeMode(..), ShapeType(..), StartPosition, StrokeStyle(..))
+import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), ResizeDirection(..), Drawing(..), EndPosition, LineType(..), Model, Shape, ShapeType(..), StartPosition, StrokeStyle(..))
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import Json.Decode as Json
@@ -34,7 +34,7 @@ isDrawingTooSmall isSpotlight start end =
 isSpotlightDrawing : Drawing -> Bool
 isSpotlightDrawing drawing =
     case drawing of
-        DrawSpotlight _ _ ->
+        DrawSpotlight _ ->
             True
 
         _ ->
@@ -46,24 +46,20 @@ toPx number =
     toString number ++ "px"
 
 
-calcShapePos : StartPosition -> EndPosition -> ShapeMode -> EndPosition
-calcShapePos start end shapeMode =
-    case shapeMode of
-        DrawingShape ->
-            end
-
-        DrawingEqualizedShape ->
-            equalXandY start end
+calcShapePos : StartPosition -> EndPosition -> Bool -> EndPosition
+calcShapePos start end shiftPressed =
+    if shiftPressed then
+        equalXandY start end
+    else
+        end
 
 
-calcLinePos : StartPosition -> EndPosition -> LineMode -> EndPosition
-calcLinePos start end lineMode =
-    case lineMode of
-        DrawingLine ->
-            end
-
-        DrawingDiscreteLine ->
-            stepMouse start end
+calcLinePos : StartPosition -> EndPosition -> Bool -> EndPosition
+calcLinePos start end shiftPressed =
+    if shiftPressed then
+        stepMouse start end
+    else
+        end
 
 
 equalXandY : StartPosition -> EndPosition -> EndPosition
@@ -209,17 +205,17 @@ mapAtIndex index fn xs =
 drawingsAreEqual : Drawing -> Drawing -> Bool
 drawingsAreEqual drawing drawing2 =
     case drawing of
-        DrawLine lineType _ ->
+        DrawLine lineType ->
             case drawing2 of
-                DrawLine lineType2 _ ->
+                DrawLine lineType2 ->
                     lineType == lineType2
 
                 _ ->
                     False
 
-        DrawShape shapeType _ ->
+        DrawShape shapeType ->
             case drawing2 of
-                DrawShape shapeType2 _ ->
+                DrawShape shapeType2 ->
                     shapeType == shapeType2
 
                 _ ->
@@ -233,17 +229,17 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
-        DrawSpotlight shapeType _ ->
+        DrawSpotlight shapeType ->
             case drawing2 of
-                DrawSpotlight shapeType2 _ ->
+                DrawSpotlight shapeType2 ->
                     shapeType == shapeType2
 
                 _ ->
                     False
 
-        DrawBlur _ ->
+        DrawBlur ->
             case drawing2 of
-                DrawBlur _ ->
+                DrawBlur ->
                     True
 
                 _ ->
@@ -278,33 +274,6 @@ spotlightToMaskCutout ( index, annotation ) =
 
         _ ->
             Nothing
-
-
-selectLine : LineType -> Keyboard.State -> Drawing
-selectLine lineType keyboardState =
-    DrawLine lineType <|
-        if isPressed Shift keyboardState then
-            DrawingDiscreteLine
-        else
-            DrawingLine
-
-
-selectShape : ShapeType -> Keyboard.State -> Drawing
-selectShape shapeType keyboardState =
-    DrawShape shapeType <|
-        if isPressed Shift keyboardState then
-            DrawingEqualizedShape
-        else
-            DrawingShape
-
-
-selectSpotlight : ShapeType -> Keyboard.State -> Drawing
-selectSpotlight shapeType keyboardState =
-    DrawSpotlight shapeType <|
-        if isPressed Shift keyboardState then
-            DrawingEqualizedShape
-        else
-            DrawingShape
 
 
 defaultPrevented : Html.Events.Options
