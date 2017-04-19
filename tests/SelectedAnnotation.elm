@@ -7,10 +7,8 @@ import Goat.Model
     exposing
         ( Annotation(..)
         , Drawing(..)
-        , LineMode(..)
         , LineType(..)
         , Shape
-        , ShapeMode(..)
         , ShapeType(..)
         , StrokeStyle(..)
         )

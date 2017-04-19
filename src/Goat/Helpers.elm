@@ -46,16 +46,16 @@ toPx number =
     toString number ++ "px"
 
 
-calcShapePos : StartPosition -> EndPosition -> Bool -> EndPosition
-calcShapePos start end shiftPressed =
+calcShapePos : Bool -> StartPosition -> EndPosition -> EndPosition
+calcShapePos shiftPressed start end =
     if shiftPressed then
         equalXandY start end
     else
         end
 
 
-calcLinePos : StartPosition -> EndPosition -> Bool -> EndPosition
-calcLinePos start end shiftPressed =
+calcLinePos : Bool -> StartPosition -> EndPosition -> EndPosition
+calcLinePos shiftPressed start end =
     if shiftPressed then
         stepMouse start end
     else

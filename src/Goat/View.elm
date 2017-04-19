@@ -820,20 +820,20 @@ pixelateMaskDefinition shapes =
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
 viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
     let
-        step =
+        discretize =
             isPressed Shift keyboardState
 
         lineAttrs lineType =
-            lineAttributes lineType <| Shape start (calcLinePos start curPos step) strokeColor strokeStyle
+            lineAttributes lineType <| Shape start (calcLinePos discretize start curPos) strokeColor strokeStyle
 
         shapeAttrs shapeType =
-            shapeAttributes shapeType (Shape start (calcShapePos start curPos step) strokeColor strokeStyle) fill
+            shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) fill
 
         spotlightAttrs shapeType =
             if isInMask then
-                shapeAttributes shapeType (Shape start (calcShapePos start curPos step) strokeColor strokeStyle) (Just Color.black)
+                shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) (Just Color.black)
             else
-                shapeAttributes shapeType (Shape start (calcShapePos start curPos step) strokeColor strokeStyle) Nothing
+                shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) Nothing
     in
         case drawing of
             DrawLine lineType ->

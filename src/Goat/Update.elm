@@ -343,7 +343,7 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                                 TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations))
                         in
                             model
-                                |> addAnnotation (TextBox <| TextArea start (calcShapePos start pos (isPressed Shift model.keyboardState)) strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations)))
+                                |> addAnnotation (TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations)))
                                 |> startEditingText numAnnotations
                                 => [ "text-box-edit--"
                                         ++ toString numAnnotations
@@ -432,7 +432,7 @@ addAnnotation annotation model =
 finishLineDrawing : StartPosition -> EndPosition -> LineType -> Model -> Model
 finishLineDrawing start end lineType model =
     model
-        |> addAnnotation (Lines lineType (Shape start (calcLinePos start end (isPressed Shift model.keyboardState)) model.strokeColor model.strokeStyle))
+        |> addAnnotation (Lines lineType (Shape start (calcLinePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
 
 
 finishBlurDrawing : StartPosition -> EndPosition -> Model -> Model
@@ -444,13 +444,13 @@ finishBlurDrawing start end model =
 finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
 finishShapeDrawing start end shapeType model =
     model
-        |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos start end (isPressed Shift model.keyboardState)) model.strokeColor model.strokeStyle))
+        |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
 
 
 finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
 finishSpotlightDrawing start end shapeType model =
     model
-        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos start end (isPressed Shift model.keyboardState)) model.strokeColor model.strokeStyle))
+        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
 
 
 startEditingText : Int -> Model -> Model
@@ -620,7 +620,7 @@ resizeAnnotation curPos model =
     case model.annotationState of
         ResizingAnnotation resizingData annotationAttrs ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize { resizingData | curPos = curPos })) model.edits
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize (isPressed Shift model.keyboardState) { resizingData | curPos = curPos })) model.edits
                 , annotationState = ResizingAnnotation { resizingData | curPos = curPos } annotationAttrs
             }
 
@@ -638,43 +638,43 @@ finishResizingAnnotation model =
             model
 
 
-resizeVertices : ResizingData -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeVertices { curPos, vertex, originalCoords } annotation =
+resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingData -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
+resizeVertices discretize { curPos, vertex, originalCoords } annotation =
     let
         ( start, end ) =
             originalCoords
     in
-        case vertex of
+        case Debug.log "vert" vertex of
             Start ->
-                { annotation | start = curPos }
+                { annotation | start = discretize annotation.end curPos }
 
             Goat.Model.End ->
-                { annotation | end = curPos }
+                { annotation | end = discretize annotation.start curPos }
 
             StartPlusX ->
-                { annotation | start = curPos, end = Position start.x end.y }
+                { annotation | start = discretize annotation.end curPos, end = Position start.x end.y }
 
             StartPlusY ->
-                { annotation | start = curPos, end = Position end.x start.y }
+                { annotation | start = discretize annotation.end curPos, end = Position end.x start.y }
 
 
-resize : ResizingData -> Annotation -> Annotation
-resize resizingData annotation =
+resize : Bool -> ResizingData -> Annotation -> Annotation
+resize discretize resizingData annotation =
     case annotation of
         Lines lineType shape ->
-            Lines lineType (resizeVertices resizingData shape)
+            Lines lineType (resizeVertices (calcLinePos discretize) resizingData shape)
 
         Shapes shapeType fill shape ->
-            Shapes shapeType fill (resizeVertices resizingData shape)
+            Shapes shapeType fill (resizeVertices (calcShapePos discretize) resizingData shape)
 
         TextBox textArea ->
-            TextBox (resizeVertices resizingData textArea)
+            TextBox (resizeVertices (calcShapePos False) resizingData textArea)
 
         Spotlight shapeType shape ->
-            Spotlight shapeType (resizeVertices resizingData shape)
+            Spotlight shapeType (resizeVertices (calcShapePos discretize) resizingData shape)
 
         Blur start end ->
-            Blur (resizeVertices resizingData { start = start, end = end }).start (resizeVertices resizingData { start = start, end = end }).end
+            Blur (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).end
 
 
 shift :

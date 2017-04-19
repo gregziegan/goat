@@ -2,7 +2,7 @@ module ResizingAnnotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineMode(..), LineType(..), ResizingData, AnnotationState(SelectedAnnotation), Shape, ShapeMode(..), ShapeType(..), Vertex(..))
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), ResizingData, AnnotationState(SelectedAnnotation), Shape, ShapeType(..), Vertex(..))
 import Goat.Update exposing (addAnnotation, finishMovingAnnotation, finishResizingAnnotation, moveAnnotation, resize, resizeAnnotation, startMovingAnnotation, startResizingAnnotation)
 import Goat.Helpers exposing (currentAnnotationAttributes)
 import Test exposing (..)
@@ -65,7 +65,7 @@ resizeAnnotationTests =
                     |> startResizingAnnotation 0 Start start
                     |> resizeAnnotation end
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (resize { resizingData | curPos = end } (Lines Arrow aShape)))
+                    |> Maybe.map (Expect.equal (resize False { resizingData | curPos = end } (Lines Arrow aShape)))
                     |> Maybe.withDefault (Expect.fail "resized annotation is missing!")
         ]
 
@@ -90,6 +90,6 @@ finishResizingAnnotationTests =
                     |> resizeAnnotation end
                     |> finishResizingAnnotation
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (resize { resizingData | curPos = end } (Lines Arrow aShape)))
+                    |> Maybe.map (Expect.equal (resize False { resizingData | curPos = end } (Lines Arrow aShape)))
                     |> Maybe.withDefault (Expect.fail "resized annotation is missing!")
         ]
