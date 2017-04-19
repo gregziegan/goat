@@ -10,10 +10,8 @@ import Goat.Model
         ( Annotation(..)
         , AnnotationState(..)
         , Drawing(..)
-        , LineMode(..)
         , LineType(..)
         , Shape
-        , ShapeMode(..)
         , ShapeType(..)
         , TextArea
         )

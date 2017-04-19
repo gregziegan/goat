@@ -141,7 +141,7 @@ viewControls ({ edits, keyboardState, drawing, annotationState } as model) { str
             ]
         , viewHistoryControls edits
         , div [ class "columns" ]
-            (List.map (viewDrawingButton drawing) (ControlOptions.drawings (isPressed Shift keyboardState))
+            (List.map (viewDrawingButton drawing) ControlOptions.drawings
                 ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
                    , viewFillDropdown toDropdownMenu fill
                    , viewLineStrokeDropdown toDropdownMenu strokeStyle
@@ -335,7 +335,7 @@ viewDropdownOptions model { fill, strokeColor, strokeStyle, fontSize } selectedO
 viewShapeSvg : Drawing -> Html Msg
 viewShapeSvg drawing =
     case drawing of
-        DrawLine lineType _ ->
+        DrawLine lineType ->
             case lineType of
                 StraightLine ->
                     Icons.viewLine
@@ -343,7 +343,7 @@ viewShapeSvg drawing =
                 Arrow ->
                     Icons.viewArrow
 
-        DrawShape shapeType _ ->
+        DrawShape shapeType ->
             case shapeType of
                 Rect ->
                     Icons.viewRectangle
@@ -357,7 +357,7 @@ viewShapeSvg drawing =
         DrawTextBox ->
             Icons.viewText
 
-        DrawSpotlight shapeType _ ->
+        DrawSpotlight shapeType ->
             case shapeType of
                 Rect ->
                     Icons.viewSpotlightRect
@@ -368,7 +368,7 @@ viewShapeSvg drawing =
                 Ellipse ->
                     Icons.viewSpotlightEllipse
 
-        DrawBlur _ ->
+        DrawBlur ->
             Icons.viewBlur
 
 
@@ -533,10 +533,10 @@ viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDra
                     definitions (spotlights ++ [ toDrawing start curPos True ]) blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: Svg.Lazy.lazy viewImage image :: toAnnotations True) ++ [ toDrawing start curPos False ]
             in
                 case drawing of
-                    DrawShape _ _ ->
+                    DrawShape _ ->
                         nonSpotlightDrawingAndAnnotations
 
-                    DrawSpotlight _ _ ->
+                    DrawSpotlight _ ->
                         spotlightDrawingAndAnnotations
 
                     _ ->
@@ -563,7 +563,7 @@ viewDrawingArea model annotationAttrs image =
                 case model.annotationState of
                     DrawingAnnotation start curPos ->
                         case model.drawing of
-                            DrawBlur _ ->
+                            DrawBlur ->
                                 Array.push (Blur start curPos) annotations
 
                             _ ->
@@ -820,53 +820,56 @@ pixelateMaskDefinition shapes =
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
 viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
     let
-        lineAttrs lineType lineMode =
-            lineAttributes lineType <| Shape start (calcLinePos start curPos lineMode) strokeColor strokeStyle
+        discretize =
+            isPressed Shift keyboardState
 
-        shapeAttrs shapeType shapeMode =
-            shapeAttributes shapeType (Shape start (calcShapePos start curPos shapeMode) strokeColor strokeStyle) fill
+        lineAttrs lineType =
+            lineAttributes lineType <| Shape start (calcLinePos discretize start curPos) strokeColor strokeStyle
 
-        spotlightAttrs shapeType shapeMode =
+        shapeAttrs shapeType =
+            shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) fill
+
+        spotlightAttrs shapeType =
             if isInMask then
-                shapeAttributes shapeType (Shape start (calcShapePos start curPos shapeMode) strokeColor strokeStyle) (Just Color.black)
+                shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) (Just Color.black)
             else
-                shapeAttributes shapeType (Shape start (calcShapePos start curPos shapeMode) strokeColor strokeStyle) Nothing
+                shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) Nothing
     in
         case drawing of
-            DrawLine lineType lineMode ->
+            DrawLine lineType ->
                 case lineType of
                     Arrow ->
-                        Svg.path (lineAttrs lineType lineMode) []
+                        Svg.path (lineAttrs lineType) []
 
                     StraightLine ->
-                        Svg.path (lineAttrs lineType lineMode) []
+                        Svg.path (lineAttrs lineType) []
 
-            DrawShape shapeType shapeMode ->
+            DrawShape shapeType ->
                 case shapeType of
                     Rect ->
-                        Svg.rect (shapeAttrs shapeType shapeMode) []
+                        Svg.rect (shapeAttrs shapeType) []
 
                     RoundedRect ->
-                        Svg.rect (shapeAttrs shapeType shapeMode) []
+                        Svg.rect (shapeAttrs shapeType) []
 
                     Ellipse ->
-                        Svg.ellipse (shapeAttrs shapeType shapeMode) []
+                        Svg.ellipse (shapeAttrs shapeType) []
 
             DrawTextBox ->
                 Svg.rect ((shapeAttributes Rect <| Shape start curPos (Color.rgb 230 230 230) SolidThin) Nothing ++ [ Attr.strokeWidth "1" ]) []
 
-            DrawSpotlight shapeType shapeMode ->
+            DrawSpotlight shapeType ->
                 case shapeType of
                     Rect ->
-                        Svg.rect (spotlightAttrs shapeType shapeMode) []
+                        Svg.rect (spotlightAttrs shapeType) []
 
                     RoundedRect ->
-                        Svg.rect (spotlightAttrs shapeType shapeMode) []
+                        Svg.rect (spotlightAttrs shapeType) []
 
                     Ellipse ->
-                        Svg.ellipse (spotlightAttrs shapeType shapeMode) []
+                        Svg.ellipse (spotlightAttrs shapeType) []
 
-            DrawBlur _ ->
+            DrawBlur ->
                 Svg.text ""
 
 

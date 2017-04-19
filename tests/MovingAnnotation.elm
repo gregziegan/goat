@@ -2,7 +2,7 @@ module MovingAnnotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineMode(..), LineType(..), Shape, ShapeMode(..), ShapeType(..))
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..))
 import Goat.Update exposing (addAnnotation, finishMovingAnnotation, move, moveAnnotation, startMovingAnnotation)
 import Goat.Helpers exposing (getPositions, shiftPosition, currentAnnotationAttributes)
 import Test exposing (..)

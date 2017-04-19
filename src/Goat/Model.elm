@@ -25,22 +25,12 @@ type alias EndPosition =
     Position
 
 
-type ShapeMode
-    = DrawingShape
-    | DrawingEqualizedShape
-
-
-type LineMode
-    = DrawingLine
-    | DrawingDiscreteLine
-
-
 type Drawing
-    = DrawLine LineType LineMode
-    | DrawShape ShapeType ShapeMode
+    = DrawLine LineType
+    | DrawShape ShapeType
     | DrawTextBox
-    | DrawSpotlight ShapeType ShapeMode
-    | DrawBlur ShapeMode
+    | DrawSpotlight ShapeType
+    | DrawBlur
 
 
 type StrokeStyle
@@ -218,7 +208,7 @@ init { isMac, inZendesk } =
     , images = List.Zipper.fromList []
     , imageSelected = False
     , currentDropdown = Nothing
-    , drawing = DrawLine Arrow DrawingLine
+    , drawing = DrawLine Arrow
     , annotationState = ReadyToDraw
     , operatingSystem =
         if isMac then
