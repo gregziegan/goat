@@ -1,4 +1,4 @@
-module Goat.View exposing (view, viewAnnotation)
+module Goat.View exposing (view, viewAnnotation, viewImage)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
@@ -1092,7 +1092,7 @@ viewPixelatedImage { width, height, url } =
     Svg.image
         [ Attr.width (toString (round width))
         , Attr.height (toString (round height))
-        , attribute "href" url
+        , Attr.xlinkHref url
         , Attr.filter "url(#pixelate)"
         ]
         []
@@ -1104,7 +1104,7 @@ viewImage { width, height, url } =
         [ Attr.class "image-to-annotate"
         , Attr.width (toString (round width))
         , Attr.height (toString (round height))
-        , attribute "href" url
+        , Attr.xlinkHref url
         , Attr.mask "url(#pixelateMask)"
         ]
         []

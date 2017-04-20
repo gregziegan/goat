@@ -8,6 +8,7 @@ import ResizingAnnotation
 import SelectedAnnotation
 import Test exposing (..)
 import View.Annotation
+import View.DrawingDefinitions
 
 
 all : Test
@@ -19,5 +20,6 @@ all =
         , ResizingAnnotation.all
         , EditingATextBox.all
         , View.Annotation.all
+        , View.DrawingDefinitions.all
         , Helpers.all
         ]
