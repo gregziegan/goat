@@ -10,6 +10,7 @@ import Goat.Helpers exposing (..)
 import Goat.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Goat.View.Definitions as Definitions
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
@@ -484,17 +485,6 @@ viewNonSpotlightAnnotations annotationState annotations =
         |> List.concat
 
 
-viewDefinitions : Float -> Float -> List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg)
-viewDefinitions width height spotlightCutOuts blurCutOuts =
-    ControlOptions.strokeColors
-        |> List.map viewArrowHeadDefinition
-        |> (::) (maskDefinition width height spotlightCutOuts)
-        |> (::) (pixelateMaskDefinition blurCutOuts)
-        |> flip List.append viewSvgFilters
-        |> defs []
-        |> List.singleton
-
-
 getAnnotations : Image -> Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Bool -> List (Svg Msg)
 getAnnotations image annotations spotlights nonSpotlights isDrawingSpotlight =
     let
@@ -576,7 +566,7 @@ viewDrawingArea model annotationAttrs image =
             viewNonSpotlightAnnotations model.annotationState annotations
 
         definitions =
-            viewDefinitions image.width image.height
+            Definitions.viewDefinitions image.width image.height
 
         toAnnotations =
             getAnnotations image annotations spotlights nonSpotlights
@@ -592,48 +582,6 @@ viewDrawingArea model annotationAttrs image =
                 ]
                 (viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDrawing model.drawing model.annotationState)
             ]
-
-
-{-| TODO: fix these filters for lines. Lines/Arrows render very strangely with this filter.
--}
-viewSvgFilters : List (Svg Msg)
-viewSvgFilters =
-    [ Svg.filter [ id "pixelate", Attr.x "0", Attr.y "0" ]
-        [ Svg.feFlood [ Attr.height "2", Attr.width "2", Attr.x "4", Attr.y "4" ] []
-        , Svg.feComposite [ Attr.height "10", Attr.width "10" ] []
-        , Svg.feTile [ Attr.result "a" ] []
-        , Svg.feComposite [ Attr.in_ "SourceGraphic", Attr.in2 "a", Attr.operator "in" ] []
-        , Svg.feMorphology [ Attr.operator "dilate", Attr.radius "5" ] []
-        ]
-    , Svg.filter [ Attr.id "dropShadow", Attr.x "-20%", Attr.y "-20%", Attr.width "200%", Attr.height "200%" ]
-        [ Svg.feGaussianBlur [ Attr.in_ "SourceAlpha", Attr.stdDeviation "2.2" ] []
-        , Svg.feOffset [ Attr.dx "2", Attr.dy "2", Attr.result "offsetblur" ] []
-        , Svg.feComponentTransfer []
-            [ Svg.feFuncA [ Attr.type_ "linear", Attr.slope "0.2" ] []
-            ]
-        , Svg.feMerge []
-            [ Svg.feMergeNode [] []
-            , Svg.feMergeNode [ Attr.in_ "SourceGraphic" ] []
-            ]
-        ]
-    ]
-
-
-viewArrowHeadDefinition : Color -> Svg Msg
-viewArrowHeadDefinition color =
-    marker
-        [ Attr.id <| "arrow-head--" ++ Color.Convert.colorToHex color
-        , Attr.orient "auto"
-        , Attr.markerWidth "6"
-        , Attr.markerHeight "6"
-        , Attr.refX "65"
-        , Attr.refY "39"
-        , Attr.class "pointerCursor"
-        , Attr.viewBox "0 0 82 77"
-        , Attr.filter "url(#dropShadow)"
-        ]
-        [ Svg.path [ Attr.d "M20.5,38.5L2.5,-2.5L79.5,38.5L2.5,79.5", Attr.fill <| Color.Convert.colorToHex color ] []
-        ]
 
 
 annotationStateEvents : Int -> AnnotationState -> List (Svg.Attribute Msg)
@@ -772,37 +720,6 @@ annotationStateVertexEvents index annotationState vertex direction =
 
             _ ->
                 []
-
-
-maskDefinition : Float -> Float -> List (Svg Msg) -> Svg Msg
-maskDefinition width height shapes =
-    rect
-        ([ Attr.x "0"
-         , Attr.y "0"
-         , Attr.width <| toString width
-         , Attr.height <| toString height
-         , Attr.opacity "0.5"
-         , Attr.fill "white"
-         ]
-        )
-        []
-        :: shapes
-        |> Svg.mask [ Attr.id "Mask" ]
-
-
-pixelateMaskDefinition : List (Svg Msg) -> Svg Msg
-pixelateMaskDefinition shapes =
-    rect
-        ([ Attr.x "0"
-         , Attr.y "0"
-         , Attr.width "100%"
-         , Attr.height "100%"
-         , Attr.fill "white"
-         ]
-        )
-        []
-        :: shapes
-        |> Svg.mask [ Attr.id "pixelateMask" ]
 
 
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
