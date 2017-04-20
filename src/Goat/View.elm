@@ -1,4 +1,4 @@
-module Goat.View exposing (view, viewAnnotation, viewImage)
+module Goat.View exposing (view, viewAnnotation, viewImage, viewPixelatedImage)
 
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
