@@ -51,7 +51,14 @@
         });
         target.addEventListener("drop", function (e) {
           e.preventDefault();
-          loadImage(e.dataTransfer.files[0]);
+          var file = e.dataTransfer.files[0]
+          if (!file.type.match(/image.*/)) {
+            return;
+          }
+          loadImage(file)
+            .then(function(loadedImage) {
+              app.ports.newImage.send(loadedImage);
+            })
         }, true);
       });
 
@@ -78,30 +85,63 @@
         })
       }
 
+      var DOMURL = window.URL || window.webkitURL || window;
+
       // helper functions
+      function blobImageTo64(src) {
+        return new Promise(function(resolve) {
+          var reader = new FileReader();
+          reader.onload = resolve
+          reader.readAsDataURL(src);
+        })
+      }
+
+      function createImage(img, imageUrl) {
+        return new Promise(function(resolve) {
+          img.crossOrigin = 'anonymous';
+          img.onload = function() {
+            resolve(this)
+          }
+          img.src = imageUrl;
+        });
+      }
+
       function loadImage(src) {
-        if (!src.type.match(/image.*/)) {
-          return;
-        }
-        var reader = new FileReader();
-        reader.onload = function (e) {
-          var imageUrl = e.target.result;
-          var contentType = 'image/png';
-          var newImg = new Image();
-          newImg.crossOrigin = 'anonymous';
-          newImg.onload = function () {
-            app.ports.newImage.send({
+        return blobImageTo64(src)
+          .then(function(e) {
+            var contentType = 'image/png';
+            var blob = b64toBlob(e.target.result.replace('data:image/png;base64,', ''), contentType);
+            var imageUrl = DOMURL.createObjectURL(blob);
+            var newImage = new Image();
+            return createImage(newImage, imageUrl)
+          }).then(function(img) {
+            return {
               id: '0',
-              url: imageUrl,
-              width: this.naturalWidth,
-              height: this.naturalHeight,
-              originalWidth: this.naturalWidth,
-              originalHeight: this.naturalHeight
-            });
-          };
-          newImg.src = imageUrl;
-        };
-        reader.readAsDataURL(src);
+              url: img.src,
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+              originalWidth: img.naturalWidth,
+              originalHeight: img.naturalHeight
+            }
+          });
+      }
+
+      function b64toBlob(b64Data) {
+        var contentType = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+        var sliceSize = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 512;
+
+        var byteCharacters = atob(b64Data);
+        var byteArrays = [];
+        for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+          var slice = byteCharacters.slice(offset, offset + sliceSize);
+          var byteNumbers = new Array(slice.length);
+          for (var i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+          var byteArray = new Uint8Array(byteNumbers);
+          byteArrays.push(byteArray);
+        }
+        return new Blob(byteArrays, { type: contentType });
       }
 
       function toImageObject(image) {
@@ -148,40 +188,81 @@
       }
 
       function exportImage() {
-        var image = savedImage;
         var svg = document.getElementById( "drawing" );
-        var svgData = new XMLSerializer().serializeToString( svg );
+        var svgCopy = svg.cloneNode(true)
+        encodeSvgBlobs(svgCopy)
+          .then(exportBlob)
+      }
 
-        var canvas = document.createElement( "canvas" );
-        var ctx = canvas.getContext( "2d" );
-
-        var img = document.createElement( "img" );
-        img.onload = function() {
-          ctx.drawImage( img, 0, 0 );
-          if (isInZendeskAppContext) {
-            client.get('ticket.comment').then(function (zaf) {
-              var div = document.createElement('div');
-              var comment = zaf['ticket.comment'].text;
-              div.innerHTML = comment;
-              var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
-              var imageToReplace = div.querySelector('img[data-imageuploadid="' + image.id + '"]');
-              if (selectionBox && imageToReplace) {
-                selectionBox.outerHTML = '';
-              } else {
-                imageToReplace.outerHTML = '';
-              }
-              client.set('ticket.comment.text', div.innerHTML).then(function () {
-                client.invoke('ticket.editor.inlineImage', canvas.toDataURL('image/png'));
-                client.invoke('app.close');
-                app.ports.reset.send(null);
-              });
-            });
-          } else {
-            img.id = 'export-image';
-            document.body.replaceChild(img, document.getElementById('export-image'));
+      function fetchBlob(url) {
+        return new Promise(function(resolve) {
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', url, true);
+          xhr.responseType = 'blob';
+          xhr.onload = function() {
+            resolve(this)
           }
-        }
-        img.setAttribute( "src", "data:image/svg+xml;base64," + btoa( svgData ) );
+          xhr.send();
+        });
+      }
+
+      function encodeSvgBlobs(svg) {
+        var imageBlobUrl = svg.querySelector('image').getAttribute('xlink:href');
+
+        return fetchBlob(imageBlobUrl)
+          .then(function(xhrResponse) {
+            if (xhrResponse.status == 200) {
+              return blobImageTo64(xhrResponse.response)
+                .then(function(e) {
+                  var b64Url = e.target.result;
+                  var images = svg.querySelectorAll('image')
+                  images[0].setAttribute('xlink:href', b64Url);
+                  images[1].setAttribute('xlink:href', b64Url);
+                  return svg
+                });
+            }
+          });
+      }
+
+      function exportBlob (svg) {
+        var image = savedImage;
+        var svgData = new XMLSerializer().serializeToString(svg);
+
+        var canvas = document.createElement("canvas");
+        var ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+        var newImage = document.createElement('img');
+        newImage.width = image.width;
+        newImage.height = image.height;
+
+        createImage(newImage, "data:image/svg+xml;base64," + btoa( svgData ))
+          .then(function() {
+            canvas.width = image.width
+            canvas.height = image.height
+            ctx.drawImage( newImage, 0, 0, image.width, image.height);
+            if (isInZendeskAppContext) {
+              client.get('ticket.comment').then(function (zaf) {
+                var div = document.createElement('div');
+                var comment = zaf['ticket.comment'].text;
+                div.innerHTML = comment;
+                var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
+                var imageToReplace = div.querySelector('img[data-imageuploadid="' + image.id + '"]');
+                if (selectionBox && imageToReplace) {
+                  selectionBox.outerHTML = '';
+                } else {
+                  imageToReplace.outerHTML = '';
+                }
+                client.set('ticket.comment.text', div.innerHTML).then(function () {
+                  client.invoke('ticket.editor.inlineImage', canvas.toDataURL('image/png'));
+                  client.invoke('app.close');
+                  app.ports.reset.send(null);
+                });
+              });
+            } else {
+              newImage.id = 'export-image';
+              document.body.replaceChild(newImage, document.getElementById('export-image'));
+            }
+          });
       }
 
       function readInImagesFromZendesk() {
@@ -191,16 +272,18 @@
           div.innerHTML = comment;
           var selectedImage = div.querySelector('span.zd-editor--rich-text-comment--resize-box img')
           if (selectedImage) {
-            readInImages([toImageObject(selectedImage)])
-              .then(function (localImages) {
-                app.ports.newImage.send(localImages[0]);
-              });
+            // readInImages([toImageObject(selectedImage)])
+            //   .then(function (localImages) {
+            //     app.ports.newImage.send(localImages[0]);
+            //   });
+            app.ports.setImages.send([selectedImage]);
           } else {
             var images = div.querySelectorAll('img');
             var imageObjects = Array.prototype.map.call(images, toImageObject);
-            readInImages(imageObjects).then(function (localImages) {
-              app.ports.setImages.send(localImages);
-            });
+            // readInImages(imageObjects).then(function (localImages) {
+            //   app.ports.setImages.send(localImages);
+            // });
+            app.ports.setImages.send(imageObjects);
           }
         });
       }
