@@ -2,7 +2,7 @@ module TestUtil exposing (..)
 
 import Array.Hamt as Array
 import Fuzz exposing (Fuzzer)
-import Goat.Model exposing (Annotation, AnnotationState(..), EndPosition, Model, ResizingData, StartPosition, Vertex(..))
+import Goat.Model exposing (Annotation(TextBox), AnnotationState(..), EndPosition, Model, ResizingData, StartPosition, Vertex(..))
 import Goat.Utils exposing (getPositions, shiftPosition)
 import Mouse exposing (Position)
 import Random.Pcg as Random
@@ -15,6 +15,16 @@ getFirstAnnotation model =
         |> .edits
         |> .present
         |> Array.get 0
+
+
+getAnnotationText : Annotation -> Maybe String
+getAnnotationText annotation =
+    case annotation of
+        TextBox { text } ->
+            Just text
+
+        _ ->
+            Nothing
 
 
 position : Fuzzer Position
