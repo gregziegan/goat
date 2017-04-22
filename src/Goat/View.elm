@@ -25,7 +25,7 @@ import Svg.Attributes as Attr
 
    Context: Web
      1. Wait for image upload or select default goats
-     2. Upload brings you to Image Selector (Should probably just bring you directly to annotator)
+     2. Upload brings you to the image annotator
 
    Image Annotator:
       Controls | DrawingArea

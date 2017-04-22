@@ -1,29 +1,16 @@
 module Goat.View.Definitions exposing (..)
 
 import Array.Hamt as Array exposing (Array)
-import AutoExpand
 import Color exposing (Color)
 import Color.Convert
 import Goat.ControlOptions as ControlOptions
-import Goat.Flags exposing (Image)
 import Goat.Helpers exposing (..)
-import Goat.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.View.Annotation as Annotation
-import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
-import Html.Events exposing (onClick, onWithOptions)
-import Json.Decode as Json
-import Keyboard.Extra exposing (Key(Shift), KeyChange, isPressed)
-import List.Zipper exposing (Zipper)
-import Mouse exposing (Position)
-import Rocket exposing ((=>))
-import SingleTouch as ST
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
-import Svg.Lazy
-import Touch as T
 
 
 viewNonSpotlightAnnotations : AnnotationState -> Array Annotation -> List (Svg Msg)

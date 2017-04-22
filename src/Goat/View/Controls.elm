@@ -4,7 +4,7 @@ import Array.Hamt exposing (Array)
 import Color exposing (Color)
 import Goat.ControlOptions as ControlOptions exposing (fontSizes)
 import Goat.Helpers exposing (..)
-import Goat.Icons as Icons
+import Goat.View.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
