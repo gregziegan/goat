@@ -1,7 +1,7 @@
-module View.Definitions exposing (all)
+module View.DrawingArea.Definitions exposing (all)
 
 import Fixtures exposing (goat)
-import Goat.View.Definitions exposing (viewDefinitions)
+import Goat.View.DrawingArea.Definitions exposing (viewDefinitions)
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)

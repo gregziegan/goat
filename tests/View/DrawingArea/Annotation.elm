@@ -1,11 +1,11 @@
-module View.Annotation exposing (all)
+module View.DrawingArea.Annotation exposing (all)
 
 import Color exposing (Color)
 import Color.Convert
 import Expect exposing (Expectation)
 import Fixtures exposing (end, goat, model, start, aShape, aTextArea, testColor)
 import Goat.Flags exposing (Image)
-import Goat.Helpers exposing (linePath, toLineStyle, fontSizeToLineHeight)
+import Goat.View.Utils exposing (linePath, toLineStyle, fontSizeToLineHeight)
 import Goat.Model
     exposing
         ( Annotation(..)
@@ -16,7 +16,8 @@ import Goat.Model
         , ShapeType(..)
         , TextArea
         )
-import Goat.View exposing (viewAnnotation, viewImage, viewPixelatedImage)
+import Goat.View.DrawingArea.Annotation exposing (viewAnnotation)
+import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)

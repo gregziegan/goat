@@ -3,9 +3,9 @@ module EditingATextBox exposing (all)
 import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, autoExpand, end, model, start)
-import Goat.Helpers exposing (currentAnnotationAttributes)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..), Annotation(TextBox))
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..))
 import Goat.Update exposing (addAnnotation, autoExpandAnnotation, editTextBoxAnnotation, finishEditingText, startEditingText)
+import Goat.Utils exposing (currentAnnotationAttributes)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
 
