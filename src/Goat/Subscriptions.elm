@@ -8,28 +8,27 @@ import Keyboard.Extra as Keyboard
 import Mouse
 
 
-imageAnnotationSubscriptions : Model -> Sub Msg
+imageAnnotationSubscriptions : Model -> List (Sub Msg)
 imageAnnotationSubscriptions model =
     if model.imageSelected then
-        Sub.batch <|
-            case model.annotationState of
-                DrawingAnnotation _ _ ->
-                    [ Mouse.moves (ContinueDrawing << toDrawingPosition)
-                    , Sub.map KeyboardMsg Keyboard.subscriptions
-                    ]
+        case model.annotationState of
+            DrawingAnnotation _ _ ->
+                [ Mouse.moves (ContinueDrawing << toDrawingPosition)
+                , Sub.map KeyboardMsg Keyboard.subscriptions
+                ]
 
-                ResizingAnnotation _ _ ->
-                    [ Mouse.moves (ResizeAnnotation << toDrawingPosition)
-                    , Sub.map KeyboardMsg Keyboard.subscriptions
-                    ]
+            ResizingAnnotation _ _ ->
+                [ Mouse.moves (ResizeAnnotation << toDrawingPosition)
+                , Sub.map KeyboardMsg Keyboard.subscriptions
+                ]
 
-                MovingAnnotation _ _ _ _ ->
-                    [ Mouse.moves (MoveAnnotation << toDrawingPosition) ]
+            MovingAnnotation _ _ _ _ ->
+                [ Mouse.moves (MoveAnnotation << toDrawingPosition) ]
 
-                _ ->
-                    [ Sub.map KeyboardMsg Keyboard.subscriptions ]
+            _ ->
+                [ Sub.map KeyboardMsg Keyboard.subscriptions ]
     else
-        Sub.none
+        []
 
 
 subscriptions : Model -> Sub Msg
@@ -38,8 +37,5 @@ subscriptions model =
         [ Ports.setImages SetImages
         , Ports.newImage SelectImage
         , Ports.reset (\_ -> Reset)
-        , if model.imageSelected then
-            imageAnnotationSubscriptions model
-          else
-            Sub.none
+        , Sub.batch (imageAnnotationSubscriptions model)
         ]
