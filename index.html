@@ -70,9 +70,9 @@
             { id: '0', url: 'images/goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
             { id: '0', url: 'images/goat2.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751}
           ];
-          readInImages(goats).then(function (localImages) {
-            app.ports.setImages.send(localImages);
-          });
+          // readInImages(goats).then(function (localImages) {
+            app.ports.setImages.send(goats);
+          // });
         }
       });
 
@@ -224,21 +224,43 @@
           });
       }
 
+      function autoScale(canvas) {
+        // adapted from https://www.html5rocks.com/en/tutorials/canvas/hidpi/
+        var context = canvas.getContext('2d')
+        var devicePixelRatio = window.devicePixelRatio || 1
+        var backingStoreRatio = context.webkitBackingStorePixelRatio ||
+                              context.mozBackingStorePixelRatio ||
+                              context.msBackingStorePixelRatio ||
+                              context.oBackingStorePixelRatio ||
+                              context.backingStorePixelRatio || 1
+        var ratio = devicePixelRatio / backingStoreRatio
+        if (devicePixelRatio !== backingStoreRatio) {
+            var oldWidth = canvas.width
+            var oldHeight = canvas.height
+            canvas.width = oldWidth * ratio
+            canvas.height = oldHeight * ratio
+            canvas.style.width = oldWidth + 'px'
+            canvas.style.height = oldHeight + 'px'
+            context.scale(ratio, ratio)
+        }
+      }
+
       function exportBlob (svg) {
         var image = savedImage;
         var svgData = new XMLSerializer().serializeToString(svg);
 
         var canvas = document.createElement("canvas");
+        canvas.width = image.width
+        canvas.height = image.height
+        autoScale(canvas);
+
         var ctx = canvas.getContext("2d");
-        ctx.imageSmoothingEnabled = false;
+
         var newImage = document.createElement('img');
         newImage.width = image.width;
         newImage.height = image.height;
-
         createImage(newImage, "data:image/svg+xml;base64," + btoa( svgData ))
           .then(function() {
-            canvas.width = image.width
-            canvas.height = image.height
             ctx.drawImage( newImage, 0, 0, image.width, image.height);
             if (isInZendeskAppContext) {
               client.get('ticket.comment').then(function (zaf) {
@@ -260,6 +282,7 @@
               });
             } else {
               newImage.id = 'export-image';
+              newImage.src = canvas.toDataURL('image/png');
               document.body.replaceChild(newImage, document.getElementById('export-image'));
             }
           });
