@@ -4,13 +4,13 @@ import Array.Hamt as Array exposing (Array)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.Utils exposing (toDrawingPosition, toPosition, getFirstSpotlightIndex)
+import Goat.Utils exposing (getFirstSpotlightIndex, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Annotation as Annotation
 import Goat.View.DrawingArea.Definitions as Definitions
 import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
-import Html.Events exposing (onClick, onWithOptions)
+import Html.Events exposing (onClick, onMouseEnter, onWithOptions)
 import Json.Decode as Json
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
@@ -95,6 +95,7 @@ canvasAttributes image drawing annotationState =
         , "height" => toString (round image.height) ++ "px"
         , "cursor" => annotationStateToCursor annotationState
         ]
+    , Html.Events.onMouseDown CloseDropdown
     , Html.Attributes.contextmenu "annotation-menu"
     ]
         ++ drawingStateEvents annotationState

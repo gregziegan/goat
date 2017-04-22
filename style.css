@@ -72,7 +72,7 @@ button:active, button:focus, button:hover {
 
 .dropdown-options {
   position: absolute;
-  margin-left: 40px;
+  margin-left: 35px;
   margin-top: 3px;
   border-radius: 1px;
   overflow: hidden;
@@ -94,6 +94,11 @@ button:active, button:focus, button:hover {
   height: 30px;
   width: 30px;
   margin-left: 1px;
+  color: #555;
+}
+
+.dropdown-button--spotlight {
+  padding: 0;
 }
 
 .dropdown-arrow {

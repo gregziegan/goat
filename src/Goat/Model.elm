@@ -64,7 +64,9 @@ type alias TextArea =
 
 
 type AttributeDropdown
-    = Fonts
+    = ShapesDropdown
+    | SpotlightsDropdown
+    | Fonts
     | Fills
     | StrokeColors
     | Strokes
@@ -180,6 +182,8 @@ type alias AnnotationMenu =
 type alias Model =
     { edits : UndoList (Array Annotation)
     , annotationState : AnnotationState
+    , shape : Drawing
+    , spotlight : Drawing
     , fill : Maybe Color
     , strokeColor : Color
     , strokeStyle : StrokeStyle
@@ -197,9 +201,28 @@ type alias Model =
     }
 
 
+shapes : List Drawing
+shapes =
+    [ DrawShape Rect
+    , DrawShape RoundedRect
+    , DrawShape Ellipse
+    , DrawLine StraightLine
+    ]
+
+
+spotlights : List Drawing
+spotlights =
+    [ DrawSpotlight Rect
+    , DrawSpotlight RoundedRect
+    , DrawSpotlight Ellipse
+    ]
+
+
 init : Flags -> ( Model, List (Cmd msg) )
 init { isMac, inZendesk } =
     { edits = UndoList.fresh Array.empty
+    , shape = DrawShape Rect
+    , spotlight = DrawSpotlight Rect
     , fill = Nothing
     , strokeColor = Color.rgb 255 0 0
     , strokeStyle = SolidMedium

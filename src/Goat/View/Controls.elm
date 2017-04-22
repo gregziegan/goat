@@ -15,7 +15,7 @@ import UndoList exposing (UndoList)
 
 
 viewControls : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewControls { edits, keyboardState, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
+viewControls { edits, shape, spotlight, keyboardState, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
     div
         [ class "controls" ]
         [ div [ class "columns" ]
@@ -24,13 +24,16 @@ viewControls { edits, keyboardState, drawing, annotationState, operatingSystem }
             ]
         , viewHistoryControls edits
         , div [ class "columns" ]
-            (List.map (viewDrawingButton operatingSystem drawing) ControlOptions.drawings
-                ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
-                   , viewFillDropdown toDropdownMenu fill operatingSystem
-                   , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
-                   , viewFontSizeDropdown toDropdownMenu operatingSystem
-                   ]
-            )
+            [ viewDrawingButton operatingSystem drawing (DrawLine Arrow)
+            , viewDrawingButton operatingSystem drawing DrawTextBox
+            , viewShapesDropdown toDropdownMenu drawing shape operatingSystem
+            , viewSpotlightsDropdown toDropdownMenu drawing spotlight operatingSystem
+            , viewDrawingButton operatingSystem drawing DrawPixelate
+            , viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
+            , viewFillDropdown toDropdownMenu fill operatingSystem
+            , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
+            , viewFontSizeDropdown toDropdownMenu operatingSystem
+            ]
         ]
 
 
@@ -39,6 +42,55 @@ viewHistoryControls edits =
     div [ class "history-controls" ]
         [ button [ onClick Undo, class "history-button", disabled <| not <| UndoList.hasPast edits, title "Undo" ] [ Icons.viewUndoArrow ]
         , button [ onClick Redo, class "history-button flip", disabled <| not <| UndoList.hasFuture edits, title "Redo" ] [ Icons.viewUndoArrow ]
+        ]
+
+
+viewShapesDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
+viewShapesDropdown toDropdownMenu selectedDrawing curShape os =
+    div [ class "dropdown-things" ]
+        [ button
+            [ onClick <| ToggleDropdown ShapesDropdown
+            , classList
+                [ "drawing-button" => True
+                , "drawing-button--selected" => List.member selectedDrawing shapes --List.isEmpty (List.filter (drawingsAreEqual drawing) shapes)
+                ]
+            , title <|
+                case os of
+                    MacOS ->
+                        "Font Sizes (N)"
+
+                    Windows ->
+                        "Fon̲t Sizes"
+            ]
+            [ viewShapeSvg curShape
+            , Icons.viewCornerArrow
+            ]
+        , toDropdownMenu ShapesDropdown
+        ]
+
+
+viewSpotlightsDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
+viewSpotlightsDropdown toDropdownMenu selectedDrawing curSpotlight os =
+    div [ class "dropdown-things" ]
+        [ button
+            [ onClick <| ToggleDropdown SpotlightsDropdown
+            , classList
+                [ "drawing-button" => True
+                , "drawing-button--selected" => List.member selectedDrawing spotlights
+                , "drawing-button--spotlight" => True
+                ]
+            , title <|
+                case os of
+                    MacOS ->
+                        "Font Sizes (N)"
+
+                    Windows ->
+                        "Fon̲t Sizes"
+            ]
+            [ viewShapeSvg curSpotlight
+            , Icons.viewCornerArrow
+            ]
+        , toDropdownMenu SpotlightsDropdown
         ]
 
 
@@ -205,18 +257,24 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         [ Icons.viewStrokeStyle strokeStyle ]
 
 
-viewDropdownMenu : Maybe AttributeDropdown -> AnnotationAttributes -> Model -> AttributeDropdown -> Html Msg
-viewDropdownMenu maybeDropdown annotationAttrs model selectedOption =
-    Maybe.map (viewDropdownOptions model annotationAttrs selectedOption) maybeDropdown
+viewDropdownMenu : Maybe AttributeDropdown -> Drawing -> AnnotationAttributes -> AttributeDropdown -> Html Msg
+viewDropdownMenu maybeDropdown drawing annotationAttrs selectedOption =
+    Maybe.map (viewDropdownOptions drawing annotationAttrs selectedOption) maybeDropdown
         |> Maybe.withDefault (text "")
 
 
-viewDropdownOptions : Model -> AnnotationAttributes -> AttributeDropdown -> AttributeDropdown -> Html Msg
-viewDropdownOptions model { fill, strokeColor, strokeStyle, fontSize } selectedOption editOption =
+viewDropdownOptions : Drawing -> AnnotationAttributes -> AttributeDropdown -> AttributeDropdown -> Html Msg
+viewDropdownOptions drawing { fill, strokeColor, strokeStyle, fontSize } selectedOption editOption =
     if selectedOption /= editOption then
         text ""
     else
         case editOption of
+            ShapesDropdown ->
+                viewShapesOptions drawing
+
+            SpotlightsDropdown ->
+                viewSpotlightsOptions drawing
+
             Fonts ->
                 viewFontSizeOptions fontSize
 
@@ -228,6 +286,33 @@ viewDropdownOptions model { fill, strokeColor, strokeStyle, fontSize } selectedO
 
             Strokes ->
                 viewStrokeStyleOptions strokeStyle
+
+
+viewShapesOptions : Drawing -> Html Msg
+viewShapesOptions drawing =
+    shapes
+        |> List.map (viewDrawingOption drawing)
+        |> div [ class "dropdown-options" ]
+
+
+viewDrawingOption : Drawing -> Drawing -> Html Msg
+viewDrawingOption selectedDrawing drawing =
+    button
+        [ classList
+            [ "dropdown-button" => True
+            , "dropdown-button--selected" => selectedDrawing == drawing
+            , "dropdown-button--spotlight" => List.member drawing spotlights
+            ]
+        , onClick (ChangeDrawing drawing)
+        ]
+        [ viewShapeSvg drawing ]
+
+
+viewSpotlightsOptions : Drawing -> Html Msg
+viewSpotlightsOptions drawing =
+    spotlights
+        |> List.map (viewDrawingOption drawing)
+        |> div [ class "dropdown-options" ]
 
 
 viewDrawingButton : OperatingSystem -> Drawing -> Drawing -> Html Msg

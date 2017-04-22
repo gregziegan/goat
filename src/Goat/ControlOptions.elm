@@ -1,4 +1,4 @@
-module Goat.ControlOptions exposing (strokeColors, fills, strokeStyles, drawings, fontSizes, controlUIWidth)
+module Goat.ControlOptions exposing (strokeColors, fills, strokeStyles, fontSizes, controlUIWidth)
 
 import Color exposing (Color)
 import Goat.Model exposing (Drawing(DrawPixelate, DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse))
@@ -43,21 +43,6 @@ strokeStyles =
     , DashedMedium
     , DashedThick
     , DashedVeryThick
-    ]
-
-
-drawings : List Drawing
-drawings =
-    [ DrawLine Arrow
-    , DrawLine StraightLine
-    , DrawShape Rect
-    , DrawShape RoundedRect
-    , DrawShape Ellipse
-    , DrawTextBox
-    , DrawSpotlight Rect
-    , DrawSpotlight RoundedRect
-    , DrawSpotlight Ellipse
-    , DrawPixelate
     ]
 
 
