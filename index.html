@@ -262,6 +262,7 @@
         createImage(newImage, "data:image/svg+xml;base64," + btoa( svgData ))
           .then(function() {
             ctx.drawImage( newImage, 0, 0, image.width, image.height);
+            var imageUrl = canvas.toDataURL('image/png');
             if (isInZendeskAppContext) {
               client.get('ticket.comment').then(function (zaf) {
                 var div = document.createElement('div');
@@ -275,14 +276,14 @@
                   imageToReplace.outerHTML = '';
                 }
                 client.set('ticket.comment.text', div.innerHTML).then(function () {
-                  client.invoke('ticket.editor.inlineImage', canvas.toDataURL('image/png'));
+                  client.invoke('ticket.editor.inlineImage', imageUrl);
                   client.invoke('app.close');
                   app.ports.reset.send(null);
                 });
               });
             } else {
               newImage.id = 'export-image';
-              newImage.src = canvas.toDataURL('image/png');
+              newImage.src = imageUrl;
               document.body.replaceChild(newImage, document.getElementById('export-image'));
             }
           });
