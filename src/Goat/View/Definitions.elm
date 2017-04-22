@@ -1,12 +1,58 @@
-module Goat.View.Definitions exposing (viewDefinitions)
+module Goat.View.Definitions exposing (..)
 
+import Array.Hamt as Array exposing (Array)
+import AutoExpand
 import Color exposing (Color)
 import Color.Convert
-import Goat.ControlOptions as ControlOptions exposing (fontSizes)
+import Goat.ControlOptions as ControlOptions
+import Goat.Flags exposing (Image)
+import Goat.Helpers exposing (..)
+import Goat.Icons as Icons
+import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Goat.View.Annotation as Annotation
+import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
+import Html.Events exposing (onClick, onWithOptions)
+import Json.Decode as Json
+import Keyboard.Extra exposing (Key(Shift), KeyChange, isPressed)
+import List.Zipper exposing (Zipper)
+import Mouse exposing (Position)
+import Rocket exposing ((=>))
+import SingleTouch as ST
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
+import Svg.Lazy
+import Touch as T
+
+
+viewNonSpotlightAnnotations : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewNonSpotlightAnnotations annotationState annotations =
+    annotations
+        |> Array.toList
+        |> List.indexedMap (Annotation.viewAnnotation annotationState)
+        |> List.concat
+
+
+viewMaskCutOut : AnnotationState -> ( Int, ShapeType, Shape ) -> List (Svg Msg)
+viewMaskCutOut annotationState ( index, shapeType, shape ) =
+    Annotation.viewShape (Annotation.annotationStateEvents index annotationState) shapeType (Just Color.black) shape
+
+
+viewSpotlights : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewSpotlights annotationState annotations =
+    annotations
+        |> Array.toIndexedList
+        |> List.filterMap (Maybe.map (viewMaskCutOut annotationState) << spotlightToMaskCutout)
+        |> List.concat
+
+
+viewBlurs : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewBlurs annotationState annotations =
+    annotations
+        |> Array.toIndexedList
+        |> List.filterMap (uncurry (Annotation.viewBlur annotationState))
+        |> List.concat
 
 
 viewArrowHeadDefinition : Color -> Svg Msg
