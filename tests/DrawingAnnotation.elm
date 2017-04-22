@@ -1,19 +1,13 @@
 module DrawingAnnotation exposing (all)
 
+import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Fixtures exposing (end, model, start)
-import Goat.Model
-    exposing
-        ( Annotation(..)
-        , AnnotationState(..)
-        , Drawing(..)
-        , LineType(..)
-        , Shape
-        , ShapeType(..)
-        )
-import Goat.Update exposing (continueDrawing, finishLineDrawing, finishPixelateDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
+import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..))
+import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
+import Goat.Utils exposing (shiftPosition)
 import Test exposing (..)
-import TestUtil exposing (getFirstAnnotation, getDrawingStateCurPos)
+import TestUtil exposing (getDrawingStateCurPos, getFirstAnnotation)
 
 
 all : Test
@@ -94,4 +88,28 @@ finishDrawingTests =
                     |> finishPixelateDrawing start end
                     |> getFirstAnnotation
                     |> Expect.equal (Just (Pixelate start end))
+        , test "should cancel drawing if it is too small" <|
+            \() ->
+                model
+                    |> changeDrawing (DrawLine Arrow)
+                    |> startDrawing start
+                    |> continueDrawing (shiftPosition 1 1 start)
+                    |> finishDrawing (shiftPosition 2 2 start)
+                    |> Tuple.first
+                    |> .edits
+                    |> .present
+                    |> Array.isEmpty
+                    |> Expect.true "drawing should not be added to array"
+        , test "should cancel drawing if it is too small, with more tolerance for spotlights" <|
+            \() ->
+                model
+                    |> changeDrawing (DrawSpotlight Rect)
+                    |> startDrawing start
+                    |> continueDrawing (shiftPosition 4 4 start)
+                    |> finishDrawing (shiftPosition 6 6 start)
+                    |> Tuple.first
+                    |> .edits
+                    |> .present
+                    |> Array.isEmpty
+                    |> Expect.true "spotlight drawing should not be added to array"
         ]
