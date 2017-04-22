@@ -11,7 +11,7 @@ import Goat.Model
         , Shape
         , ShapeType(..)
         )
-import Goat.Update exposing (continueDrawing, finishLineDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
+import Goat.Update exposing (continueDrawing, finishLineDrawing, finishPixelateDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation, getDrawingStateCurPos)
 
@@ -88,4 +88,10 @@ finishDrawingTests =
                     |> getFirstAnnotation
                     |> Maybe.map (Expect.equal (Spotlight Rect <| Shape start end model.strokeColor model.strokeStyle))
                     |> Maybe.withDefault (Expect.fail "Array missing spotlight rect annotation")
+        , test "should add a pixelate annotation to the edit history" <|
+            \() ->
+                model
+                    |> finishPixelateDrawing start end
+                    |> getFirstAnnotation
+                    |> Expect.equal (Just (Pixelate start end))
         ]

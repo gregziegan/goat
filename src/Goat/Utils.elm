@@ -168,9 +168,9 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
-        DrawBlur ->
+        DrawPixelate ->
             case drawing2 of
-                DrawBlur ->
+                DrawPixelate ->
                     True
 
                 _ ->
@@ -243,7 +243,7 @@ getPositions annotation =
         Spotlight shapeType shape ->
             shape.start => shape.end
 
-        Blur start end ->
+        Pixelate start end ->
             start => end
 
 
@@ -262,7 +262,7 @@ getAnnotationAttributes annotation existingAttrs =
         Spotlight _ shape ->
             AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
 
-        Blur _ _ ->
+        Pixelate _ _ ->
             existingAttrs
 
 

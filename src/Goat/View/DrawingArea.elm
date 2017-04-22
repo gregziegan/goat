@@ -164,12 +164,12 @@ viewDrawingArea model annotationAttrs image =
             Definitions.viewSpotlights model.annotationState annotations
 
         blurs =
-            Definitions.viewBlurs model.annotationState <|
+            Definitions.viewPixelates model.annotationState <|
                 case model.annotationState of
                     DrawingAnnotation start curPos ->
                         case model.drawing of
-                            DrawBlur ->
-                                Array.push (Blur start curPos) annotations
+                            DrawPixelate ->
+                                Array.push (Pixelate start curPos) annotations
 
                             _ ->
                                 annotations

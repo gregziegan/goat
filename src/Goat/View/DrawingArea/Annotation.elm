@@ -161,7 +161,7 @@ viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSiz
                     Ellipse ->
                         Svg.ellipse (spotlightAttrs shapeType) []
 
-            DrawBlur ->
+            DrawPixelate ->
                 Svg.text ""
 
 
@@ -330,10 +330,10 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
                 |> List.singleton
 
 
-viewBlur : AnnotationState -> Int -> Annotation -> Maybe (List (Svg Msg))
-viewBlur annotationState index annotation =
+viewPixelate : AnnotationState -> Int -> Annotation -> Maybe (List (Svg Msg))
+viewPixelate annotationState index annotation =
     case annotation of
-        Blur start end ->
+        Pixelate start end ->
             Just [ Svg.rect (rectAttrs start end ++ [ Attr.fill "black", Attr.style "all" ] ++ (annotationStateEvents index annotationState)) [] ]
 
         _ ->
@@ -371,6 +371,6 @@ viewAnnotation annotationState index annotation =
                 viewShape annotationStateAttrs shapeType Nothing shape
                     |> flip List.append (vertices Rectangular shape)
 
-            Blur start end ->
+            Pixelate start end ->
                 [ Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ annotationStateAttrs) [] ]
                     |> flip List.append (vertices Rectangular { start = start, end = end })

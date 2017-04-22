@@ -34,11 +34,11 @@ viewSpotlights annotationState annotations =
         |> List.concat
 
 
-viewBlurs : AnnotationState -> Array Annotation -> List (Svg Msg)
-viewBlurs annotationState annotations =
+viewPixelates : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewPixelates annotationState annotations =
     annotations
         |> Array.toIndexedList
-        |> List.filterMap (uncurry (Annotation.viewBlur annotationState))
+        |> List.filterMap (uncurry (Annotation.viewPixelate annotationState))
         |> List.concat
 
 

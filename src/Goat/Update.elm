@@ -355,8 +355,8 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                         finishSpotlightDrawing start pos shapeType model
                             => []
 
-                    DrawBlur ->
-                        finishBlurDrawing start pos model
+                    DrawPixelate ->
+                        finishPixelateDrawing start pos model
                             => []
 
         _ ->
@@ -435,10 +435,10 @@ finishLineDrawing start end lineType model =
         |> addAnnotation (Lines lineType (Shape start (calcLinePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
 
 
-finishBlurDrawing : StartPosition -> EndPosition -> Model -> Model
-finishBlurDrawing start end model =
+finishPixelateDrawing : StartPosition -> EndPosition -> Model -> Model
+finishPixelateDrawing start end model =
     model
-        |> addAnnotation (Blur start end)
+        |> addAnnotation (Pixelate start end)
 
 
 finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
@@ -485,7 +485,7 @@ updateStrokeColor strokeColor annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | strokeColor = strokeColor }
 
-        Blur _ _ ->
+        Pixelate _ _ ->
             annotation
 
 
@@ -504,7 +504,7 @@ updateFill fill annotation =
         Spotlight shapeType shape ->
             annotation
 
-        Blur _ _ ->
+        Pixelate _ _ ->
             annotation
 
 
@@ -523,7 +523,7 @@ updateStrokeStyle strokeStyle annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | strokeStyle = strokeStyle }
 
-        Blur _ _ ->
+        Pixelate _ _ ->
             annotation
 
 
@@ -673,8 +673,8 @@ resize discretize resizingData annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType (resizeVertices (calcShapePos discretize) resizingData shape)
 
-        Blur start end ->
-            Blur (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).end
+        Pixelate start end ->
+            Pixelate (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).end
 
 
 shift :
@@ -703,8 +703,8 @@ move translate annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType (shift translate shape)
 
-        Blur start end ->
-            Blur (shiftPosition (Tuple.first translate) (Tuple.second translate) start) (shiftPosition (Tuple.first translate) (Tuple.second translate) end)
+        Pixelate start end ->
+            Pixelate (shiftPosition (Tuple.first translate) (Tuple.second translate) start) (shiftPosition (Tuple.first translate) (Tuple.second translate) end)
 
 
 closeDropdown : Model -> Model
@@ -880,8 +880,8 @@ shiftForPaste annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
 
-        Blur start end ->
-            Blur (positionMap ((+) 10) start) (positionMap ((+) 10) end)
+        Pixelate start end ->
+            Pixelate (positionMap ((+) 10) start) (positionMap ((+) 10) end)
 
 
 pasteAnnotation : Model -> Model

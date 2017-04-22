@@ -251,5 +251,5 @@ viewShapeSvg drawing =
                 Ellipse ->
                     Icons.viewSpotlightEllipse
 
-        DrawBlur ->
-            Icons.viewBlur
+        DrawPixelate ->
+            Icons.viewPixelate
