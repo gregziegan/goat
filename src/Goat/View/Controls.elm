@@ -8,14 +8,14 @@ import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (drawingsAreEqual, isSpotlightDrawing)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
-import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
+import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style, title)
 import Html.Events exposing (onClick, onWithOptions)
 import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
 
 
 viewControls : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewControls ({ edits, keyboardState, drawing, annotationState } as model) { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
+viewControls { edits, keyboardState, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
     div
         [ class "controls" ]
         [ div [ class "columns" ]
@@ -24,11 +24,11 @@ viewControls ({ edits, keyboardState, drawing, annotationState } as model) { str
             ]
         , viewHistoryControls edits
         , div [ class "columns" ]
-            (List.map (viewDrawingButton drawing) ControlOptions.drawings
-                ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor
-                   , viewFillDropdown toDropdownMenu fill
-                   , viewLineStrokeDropdown toDropdownMenu strokeStyle
-                   , viewFontSizeDropdown toDropdownMenu
+            (List.map (viewDrawingButton operatingSystem drawing) ControlOptions.drawings
+                ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
+                   , viewFillDropdown toDropdownMenu fill operatingSystem
+                   , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
+                   , viewFontSizeDropdown toDropdownMenu operatingSystem
                    ]
             )
         ]
@@ -37,17 +37,24 @@ viewControls ({ edits, keyboardState, drawing, annotationState } as model) { str
 viewHistoryControls : UndoList (Array Annotation) -> Html Msg
 viewHistoryControls edits =
     div [ class "history-controls" ]
-        [ button [ onClick Undo, class "history-button", disabled <| not <| UndoList.hasPast edits ] [ Icons.viewUndoArrow ]
-        , button [ onClick Redo, class "history-button flip", disabled <| not <| UndoList.hasFuture edits ] [ Icons.viewUndoArrow ]
+        [ button [ onClick Undo, class "history-button", disabled <| not <| UndoList.hasPast edits, title "Undo" ] [ Icons.viewUndoArrow ]
+        , button [ onClick Redo, class "history-button flip", disabled <| not <| UndoList.hasFuture edits, title "Redo" ] [ Icons.viewUndoArrow ]
         ]
 
 
-viewFontSizeDropdown : (AttributeDropdown -> Html Msg) -> Html Msg
-viewFontSizeDropdown toDropdownMenu =
+viewFontSizeDropdown : (AttributeDropdown -> Html Msg) -> OperatingSystem -> Html Msg
+viewFontSizeDropdown toDropdownMenu os =
     div [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fonts
             , class "drawing-button"
+            , title <|
+                case os of
+                    MacOS ->
+                        "Font Sizes (N)"
+
+                    Windows ->
+                        "Fon̲t Sizes"
             ]
             [ Icons.viewFontSize
             , Icons.viewCornerArrow
@@ -113,13 +120,20 @@ viewFontSizeOption selectedFontSize fontSize =
         [ text <| toString <| fontSize ]
 
 
-viewLineStrokeDropdown : (AttributeDropdown -> Html Msg) -> StrokeStyle -> Html Msg
-viewLineStrokeDropdown toDropdownMenu strokeStyle =
+viewStrokeStyleDropdown : (AttributeDropdown -> Html Msg) -> StrokeStyle -> OperatingSystem -> Html Msg
+viewStrokeStyleDropdown toDropdownMenu strokeStyle os =
     div
         [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Strokes
             , class "drawing-button"
+            , title <|
+                case os of
+                    MacOS ->
+                        "Stroke Styles"
+
+                    Windows ->
+                        "S̲troke Styles"
             ]
             [ Icons.viewStrokeStyle strokeStyle
             , Icons.viewCornerArrow
@@ -128,13 +142,20 @@ viewLineStrokeDropdown toDropdownMenu strokeStyle =
         ]
 
 
-viewFillDropdown : (AttributeDropdown -> Html Msg) -> Maybe Color -> Html Msg
-viewFillDropdown toDropdownMenu fill =
+viewFillDropdown : (AttributeDropdown -> Html Msg) -> Maybe Color -> OperatingSystem -> Html Msg
+viewFillDropdown toDropdownMenu fill os =
     div
         [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown Fills
             , class "drawing-button"
+            , title <|
+                case os of
+                    MacOS ->
+                        "Fills (F)"
+
+                    Windows ->
+                        "F̲ills"
             ]
             [ Icons.viewFill fill
             , Icons.viewCornerArrow
@@ -143,13 +164,20 @@ viewFillDropdown toDropdownMenu fill =
         ]
 
 
-viewStrokeColorDropdown : (AttributeDropdown -> Html Msg) -> Color -> Html Msg
-viewStrokeColorDropdown toDropdownMenu strokeColor =
+viewStrokeColorDropdown : (AttributeDropdown -> Html Msg) -> Color -> OperatingSystem -> Html Msg
+viewStrokeColorDropdown toDropdownMenu strokeColor os =
     div
         [ class "dropdown-things" ]
         [ button
             [ onClick <| ToggleDropdown StrokeColors
             , class "drawing-button"
+            , title <|
+                case os of
+                    MacOS ->
+                        "Stroke Colors (K)"
+
+                    Windows ->
+                        "Strok̲e Colors"
             ]
             [ Icons.viewStrokeColor strokeColor
             , Icons.viewCornerArrow
@@ -158,8 +186,8 @@ viewStrokeColorDropdown toDropdownMenu strokeColor =
         ]
 
 
-viewLineStrokeOptions : StrokeStyle -> Html Msg
-viewLineStrokeOptions strokeStyle =
+viewStrokeStyleOptions : StrokeStyle -> Html Msg
+viewStrokeStyleOptions strokeStyle =
     ControlOptions.strokeStyles
         |> List.map (viewStrokeStyleOption strokeStyle)
         |> div [ class "dropdown-options" ]
@@ -199,20 +227,111 @@ viewDropdownOptions model { fill, strokeColor, strokeStyle, fontSize } selectedO
                 viewStrokeColorOptions strokeColor
 
             Strokes ->
-                viewLineStrokeOptions strokeStyle
+                viewStrokeStyleOptions strokeStyle
 
 
-viewDrawingButton : Drawing -> Drawing -> Html Msg
-viewDrawingButton selectedDrawing drawing =
+viewDrawingButton : OperatingSystem -> Drawing -> Drawing -> Html Msg
+viewDrawingButton os selectedDrawing drawing =
     button
         [ classList
             [ "drawing-button" => True
             , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
             , "drawing-button--spotlight" => isSpotlightDrawing drawing
             ]
+        , title (drawingToTitle os drawing)
         , onClick <| ChangeDrawing drawing
         ]
         [ viewShapeSvg drawing ]
+
+
+drawingToTitle : OperatingSystem -> Drawing -> String
+drawingToTitle os drawing =
+    case os of
+        MacOS ->
+            macDrawingToTitle drawing
+
+        Windows ->
+            windowsDrawingToTitle drawing
+
+
+windowsDrawingToTitle : Drawing -> String
+windowsDrawingToTitle drawing =
+    case drawing of
+        DrawLine lineType ->
+            case lineType of
+                Arrow ->
+                    "A̲rrow"
+
+                StraightLine ->
+                    "L̲ine"
+
+        DrawShape shapeType ->
+            case shapeType of
+                Rect ->
+                    "R̲ectangle"
+
+                RoundedRect ->
+                    "Ro̲unded Rectangle"
+
+                Ellipse ->
+                    "E̲llipse"
+
+        DrawTextBox ->
+            "T̲ext"
+
+        DrawSpotlight shapeType ->
+            case shapeType of
+                Rect ->
+                    "Spotlig̲ht Rectangle"
+
+                RoundedRect ->
+                    "Spotlight Rounded Rec̲tangle"
+
+                Ellipse ->
+                    "Spotlight Elli̲pse"
+
+        DrawPixelate ->
+            "P̲ixelate"
+
+
+macDrawingToTitle : Drawing -> String
+macDrawingToTitle drawing =
+    case drawing of
+        DrawLine lineType ->
+            case lineType of
+                Arrow ->
+                    "Arrow (A)"
+
+                StraightLine ->
+                    "Line (L)"
+
+        DrawShape shapeType ->
+            case shapeType of
+                Rect ->
+                    "Rectangle (R)"
+
+                RoundedRect ->
+                    "Rounded Rectangle (O)"
+
+                Ellipse ->
+                    "Ellipse (E)"
+
+        DrawTextBox ->
+            "Text (T)"
+
+        DrawSpotlight shapeType ->
+            case shapeType of
+                Rect ->
+                    "Spotlight Rectangle (P)"
+
+                RoundedRect ->
+                    "Spotlight Rounded Rectangle (C)"
+
+                Ellipse ->
+                    "Spotlight Ellipse (I)"
+
+        DrawPixelate ->
+            "Pixelate (P)"
 
 
 viewShapeSvg : Drawing -> Html Msg

@@ -748,43 +748,49 @@ handleKeyboardShortcuts keyChange model =
     case keyChange of
         KeyDown key ->
             case key of
-                Number1 ->
+                CharA ->
                     { model | drawing = DrawLine Arrow }
 
-                Number2 ->
+                CharL ->
                     { model | drawing = DrawLine StraightLine }
 
-                Number3 ->
+                CharR ->
                     { model | drawing = DrawShape Rect }
 
-                Number4 ->
+                CharO ->
                     { model | drawing = DrawShape RoundedRect }
 
-                Number5 ->
+                CharE ->
                     { model | drawing = DrawShape Ellipse }
 
-                Number6 ->
+                CharT ->
                     { model | drawing = DrawTextBox }
 
-                Number7 ->
+                CharG ->
                     { model | drawing = DrawSpotlight Rect }
 
-                Number8 ->
-                    { model | drawing = DrawSpotlight RoundedRect }
+                CharC ->
+                    if isPressed Shift model.keyboardState then
+                        model
+                    else
+                        { model | drawing = DrawSpotlight RoundedRect }
 
-                Number9 ->
+                CharI ->
                     { model | drawing = DrawSpotlight Ellipse }
 
-                CharQ ->
+                CharP ->
+                    { model | drawing = DrawPixelate }
+
+                CharN ->
                     toggleDropdown Fonts model
 
-                CharW ->
+                CharK ->
                     toggleDropdown StrokeColors model
 
-                CharE ->
+                CharF ->
                     toggleDropdown Fills model
 
-                CharR ->
+                CharS ->
                     toggleDropdown Strokes model
 
                 _ ->
