@@ -2,11 +2,11 @@ module Goat.View exposing (view)
 
 import Goat.Flags exposing (Image)
 import Goat.Helpers exposing (..)
-import Goat.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.View.Controls as Controls
 import Goat.View.DrawingArea as DrawingArea
+import Goat.View.ImageSelector as ImageSelector
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
@@ -51,30 +51,7 @@ view model =
             if model.imageSelected then
                 viewImageAnnotator model <| List.Zipper.current images
             else
-                div [] [ h3 [] [ text "Please select an image to annotate:" ], viewImageSelector images ]
-
-
-viewImageSelector : Zipper Image -> Html Msg
-viewImageSelector images =
-    images
-        |> List.Zipper.toList
-        |> List.map viewImageOption
-        |> div [ class "image-selector" ]
-
-
-viewImageOption : Image -> Html Msg
-viewImageOption image =
-    button
-        [ class "image-option"
-        , Html.Attributes.width <| round image.width
-        , Html.Attributes.height <| round image.height
-        , onClick <| SelectImage image
-        ]
-        [ img [ src image.url, Html.Attributes.height <| round image.height, Html.Attributes.width <| round image.width ] []
-        , div [ onClick <| SelectImage image, class "image-edit-pencil" ]
-            [ Icons.viewPencil
-            ]
-        ]
+                ImageSelector.view images
 
 
 viewLoadingScreen : Html Msg
