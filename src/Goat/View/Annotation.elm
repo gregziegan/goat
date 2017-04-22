@@ -3,10 +3,11 @@ module Goat.View.Annotation exposing (..)
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
-import Goat.Helpers exposing (..)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Goat.View.Utils exposing (..)
 import Goat.View.Vertices as Vertices
+import Goat.Utils exposing (calcLinePos, calcShapePos, toDrawingPosition, toPosition)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)

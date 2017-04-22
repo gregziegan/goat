@@ -1,6 +1,6 @@
 module Goat.Subscriptions exposing (subscriptions)
 
-import Goat.Helpers exposing (toDrawingPosition)
+import Goat.Utils exposing (toDrawingPosition)
 import Goat.Model exposing (AnnotationState(DrawingAnnotation, ResizingAnnotation, MovingAnnotation), Model)
 import Goat.Ports as Ports
 import Goat.Update exposing (Msg(KeyboardMsg, ContinueDrawing, ResizeAnnotation, MoveAnnotation, Reset, SetImages, SelectImage))

@@ -5,7 +5,7 @@ import AutoExpand
 import Color exposing (Color)
 import Dom
 import Goat.Flags exposing (Image)
-import Goat.Helpers exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
+import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
 import Html.Attributes as Attr

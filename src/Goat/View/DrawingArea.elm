@@ -2,11 +2,12 @@ module Goat.View.DrawingArea exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.Flags exposing (Image)
-import Goat.Helpers exposing (..)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Goat.Utils exposing (toDrawingPosition, toPosition, getFirstSpotlightIndex)
 import Goat.View.Annotation as Annotation
 import Goat.View.Definitions as Definitions
+import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
