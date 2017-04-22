@@ -215,7 +215,32 @@
         }
       }
 
-      function exportBlob (svg) {
+      function exportToZendesk(image) {
+        client.get('ticket.comment').then(function (zaf) {
+          var div = document.createElement('div');
+          var comment = zaf['ticket.comment'].text;
+          div.innerHTML = comment;
+          var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
+          var imageToReplace = div.querySelector('img[data-imageuploadid="' + savedImage.id + '"]');
+          if (selectionBox && imageToReplace) {
+            selectionBox.outerHTML = '';
+          } else {
+            imageToReplace.outerHTML = '';
+          }
+          client.set('ticket.comment.text', div.innerHTML).then(function () {
+            client.invoke('ticket.editor.inlineImage', image.src);
+            client.invoke('app.close');
+            app.ports.reset.send(null);
+          });
+        });
+      }
+
+      function exportToWeb(image) {
+        image.id = 'export-image';
+        document.body.replaceChild(image, document.getElementById('export-image'));
+      }
+
+      function getPng(svg) {
         var image = savedImage;
         var svgData = new XMLSerializer().serializeToString(svg);
 
@@ -229,33 +254,11 @@
         var newImage = document.createElement('img');
         newImage.width = image.width;
         newImage.height = image.height;
-        createImage(newImage, "data:image/svg+xml;base64," + btoa(svgData))
+        return createImage(newImage, "data:image/svg+xml;base64," + btoa(svgData))
           .then(function() {
             ctx.drawImage( newImage, 0, 0, image.width, image.height);
-            var imageUrl = canvas.toDataURL('image/png');
-            if (isInZendeskAppContext) {
-              client.get('ticket.comment').then(function (zaf) {
-                var div = document.createElement('div');
-                var comment = zaf['ticket.comment'].text;
-                div.innerHTML = comment;
-                var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
-                var imageToReplace = div.querySelector('img[data-imageuploadid="' + image.id + '"]');
-                if (selectionBox && imageToReplace) {
-                  selectionBox.outerHTML = '';
-                } else {
-                  imageToReplace.outerHTML = '';
-                }
-                client.set('ticket.comment.text', div.innerHTML).then(function () {
-                  client.invoke('ticket.editor.inlineImage', imageUrl);
-                  client.invoke('app.close');
-                  app.ports.reset.send(null);
-                });
-              });
-            } else {
-              newImage.id = 'export-image';
-              newImage.src = imageUrl;
-              document.body.replaceChild(newImage, document.getElementById('export-image'));
-            }
+            newImage.src = canvas.toDataURL('image/png');
+            return newImage;
           });
       }
 
