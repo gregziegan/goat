@@ -1,4 +1,4 @@
-module Goat.View.Vertices exposing (..)
+module Goat.View.DrawingArea.Vertices exposing (..)
 
 import Color exposing (Color)
 import Color.Convert

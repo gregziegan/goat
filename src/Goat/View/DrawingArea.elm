@@ -5,8 +5,8 @@ import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (toDrawingPosition, toPosition, getFirstSpotlightIndex)
-import Goat.View.Annotation as Annotation
-import Goat.View.Definitions as Definitions
+import Goat.View.DrawingArea.Annotation as Annotation
+import Goat.View.DrawingArea.Definitions as Definitions
 import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)

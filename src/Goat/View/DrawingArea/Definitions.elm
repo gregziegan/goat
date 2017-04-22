@@ -1,4 +1,4 @@
-module Goat.View.Definitions exposing (..)
+module Goat.View.DrawingArea.Definitions exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
@@ -6,7 +6,7 @@ import Color.Convert
 import Goat.ControlOptions as ControlOptions
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.View.Annotation as Annotation
+import Goat.View.DrawingArea.Annotation as Annotation
 import Goat.View.Utils exposing (..)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
