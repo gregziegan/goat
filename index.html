@@ -69,9 +69,7 @@
             { id: '0', url: 'images/goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
             { id: '0', url: 'images/goat2.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751}
           ];
-          // readInImages(goats).then(function (localImages) {
-            app.ports.setImages.send(goats);
-          // });
+          app.ports.setImages.send(goats);
         }
       });
 
