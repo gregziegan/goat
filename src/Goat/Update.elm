@@ -363,11 +363,6 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
             model => []
 
 
-resetSelection : Model -> Model
-resetSelection model =
-    { model | annotationState = ReadyToDraw }
-
-
 resetToReadyToDraw : Model -> Model
 resetToReadyToDraw model =
     { model | annotationState = ReadyToDraw }
