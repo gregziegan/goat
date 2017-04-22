@@ -1,8 +1,8 @@
-module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, directionToCursor)
+module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, directionToCursor, annotationStateAttributes)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
-import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), ResizeDirection(..), Drawing(..), EndPosition, LineType(..), Model, Shape, ShapeType(..), StartPosition, StrokeStyle(..))
+import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), Drawing(..), EndPosition, LineType(..), Model, ResizeDirection(..), Shape, ShapeType(..), StartPosition, StrokeStyle(..))
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import Json.Decode as Json
@@ -381,3 +381,22 @@ directionToCursor direction =
 
         Move ->
             "moveCursor"
+
+
+annotationStateAttributes : Model -> AnnotationAttributes
+annotationStateAttributes model =
+    case model.annotationState of
+        SelectedAnnotation _ annotationAttrs ->
+            annotationAttrs
+
+        MovingAnnotation _ _ _ annotationAttrs ->
+            annotationAttrs
+
+        ResizingAnnotation _ annotationAttrs ->
+            annotationAttrs
+
+        EditingATextBox _ annotationAttrs ->
+            annotationAttrs
+
+        _ ->
+            currentAnnotationAttributes model
