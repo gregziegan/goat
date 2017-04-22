@@ -1,4 +1,4 @@
-module DrawingAnnotations exposing (all)
+module DrawingAnnotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (end, model, start)
