@@ -1,12 +1,45 @@
-module Goat.View.Definitions exposing (viewDefinitions)
+module Goat.View.DrawingArea.Definitions exposing (..)
 
+import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
 import Color.Convert
-import Goat.ControlOptions as ControlOptions exposing (fontSizes)
+import Goat.ControlOptions as ControlOptions
+import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Goat.View.DrawingArea.Annotation as Annotation
+import Goat.View.Utils exposing (..)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
+
+
+viewNonSpotlightAnnotations : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewNonSpotlightAnnotations annotationState annotations =
+    annotations
+        |> Array.toList
+        |> List.indexedMap (Annotation.viewAnnotation annotationState)
+        |> List.concat
+
+
+viewMaskCutOut : AnnotationState -> ( Int, ShapeType, Shape ) -> List (Svg Msg)
+viewMaskCutOut annotationState ( index, shapeType, shape ) =
+    Annotation.viewShape (Annotation.annotationStateEvents index annotationState) shapeType (Just Color.black) shape
+
+
+viewSpotlights : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewSpotlights annotationState annotations =
+    annotations
+        |> Array.toIndexedList
+        |> List.filterMap (Maybe.map (viewMaskCutOut annotationState) << spotlightToMaskCutout)
+        |> List.concat
+
+
+viewBlurs : AnnotationState -> Array Annotation -> List (Svg Msg)
+viewBlurs annotationState annotations =
+    annotations
+        |> Array.toIndexedList
+        |> List.filterMap (uncurry (Annotation.viewBlur annotationState))
+        |> List.concat
 
 
 viewArrowHeadDefinition : Color -> Svg Msg

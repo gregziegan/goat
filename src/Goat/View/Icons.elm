@@ -1,4 +1,4 @@
-module Goat.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle, viewBlur)
+module Goat.View.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle, viewBlur)
 
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)

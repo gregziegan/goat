@@ -101,10 +101,11 @@ e.g: (assume a top-left to bottom-right draw)
 
 Start StartPlusX
 +----------+
-| |
-| |
-| |
-| |
+|**********|
+|**********|
+|**********|
+|**********|
+|**********|
 +----------+
 StartPlusY End
 
