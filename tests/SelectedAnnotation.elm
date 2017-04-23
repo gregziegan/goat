@@ -36,16 +36,14 @@ updateAnySelectedAnnotationsTests =
                     |> selectAnnotation 0
                     |> updateAnySelectedAnnotations (updateStrokeColor testColor)
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (Lines Arrow <| Shape start end testColor model.strokeStyle))
-                    |> Maybe.withDefault (Expect.fail "Array missing desired annotation")
+                    |> Expect.equal (Just (Lines Arrow (Shape start end testColor model.strokeStyle)))
         , test "does not update a NotSelected annotation" <|
             \() ->
                 model
                     |> addAnnotation (Lines Arrow aShape)
                     |> updateAnySelectedAnnotations (updateStrokeStyle DashedMedium)
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (Lines Arrow aShape))
-                    |> Maybe.withDefault (Expect.fail "Array missing desired annotation")
+                    |> Expect.equal (Just (Lines Arrow aShape))
         , test "only updates the Selected annotation" <|
             \() ->
                 model
@@ -57,8 +55,7 @@ updateAnySelectedAnnotationsTests =
                     |> .edits
                     |> .present
                     |> Array.get 2
-                    |> Maybe.map (Expect.equal (Shapes Ellipse (Just testColor) aShape))
-                    |> Maybe.withDefault (Expect.fail "Array missing desired annotation")
+                    |> Expect.equal (Just (Shapes Ellipse (Just testColor) aShape))
         ]
 
 

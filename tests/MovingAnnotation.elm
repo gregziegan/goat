@@ -90,6 +90,5 @@ finishMovingAnnotationTests =
                     |> moveAnnotation end
                     |> finishMovingAnnotation
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (move ( end.x - start.x, end.y - start.y ) (Lines Arrow aShape)))
-                    |> Maybe.withDefault (Expect.fail "moved annotation is missing!")
+                    |> Expect.equal (Just (move ( end.x - start.x, end.y - start.y ) (Lines Arrow aShape)))
         ]
