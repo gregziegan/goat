@@ -5,7 +5,7 @@ import Goat.View.DrawingArea.Definitions exposing (viewDefinitions)
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
-import View.Util exposing (svgDrawspace)
+import View.TestUtil exposing (svgDrawspace)
 
 
 all : Test
