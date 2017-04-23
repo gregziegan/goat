@@ -288,7 +288,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                 |> resetToReadyToDraw
                 => [ case model.images of
                         Just images ->
-                            Ports.exportToImage <| List.Zipper.current images
+                            Ports.exportToImage (List.Zipper.current images).id
 
                         Nothing ->
                             Cmd.none

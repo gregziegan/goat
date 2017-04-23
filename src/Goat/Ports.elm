@@ -6,7 +6,7 @@ import Goat.Flags exposing (Image)
 -- Talk to Javascript
 
 
-port exportToImage : Image -> Cmd msg
+port exportToImage : String -> Cmd msg
 
 
 port listenForUpload : () -> Cmd msg
