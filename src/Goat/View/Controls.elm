@@ -22,7 +22,7 @@ viewControls { edits, keyboardState, drawing, annotationState, operatingSystem }
             [ button [ onClick ReturnToImageSelection, class "cancel-button" ] [ text "Cancel" ]
             , button [ onClick Save, class "save-button" ] [ text "Save" ]
             ]
-        , viewHistoryControls edits
+        , viewHistoryControls operatingSystem edits
         , div [ class "columns" ]
             (List.map (viewDrawingButton operatingSystem drawing) ControlOptions.drawings
                 ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
@@ -34,11 +34,35 @@ viewControls { edits, keyboardState, drawing, annotationState, operatingSystem }
         ]
 
 
-viewHistoryControls : UndoList (Array Annotation) -> Html Msg
-viewHistoryControls edits =
+viewHistoryControls : OperatingSystem -> UndoList (Array Annotation) -> Html Msg
+viewHistoryControls os edits =
     div [ class "history-controls" ]
-        [ button [ onClick Undo, class "history-button", disabled <| not <| UndoList.hasPast edits, title "Undo" ] [ Icons.viewUndoArrow ]
-        , button [ onClick Redo, class "history-button flip", disabled <| not <| UndoList.hasFuture edits, title "Redo" ] [ Icons.viewUndoArrow ]
+        [ button
+            [ onClick Undo
+            , class "history-button"
+            , disabled ((not << UndoList.hasPast) edits)
+            , title <|
+                case os of
+                    MacOS ->
+                        "Undo (⌘ + Z)"
+
+                    Windows ->
+                        "Undo (Ctrl + Z)"
+            ]
+            [ Icons.viewUndoArrow ]
+        , button
+            [ onClick Redo
+            , class "history-button flip"
+            , disabled ((not << UndoList.hasFuture) edits)
+            , title <|
+                case os of
+                    MacOS ->
+                        "Redo (⌘ + ⇧ Shift + Z)"
+
+                    Windows ->
+                        "Redo (Ctrl + ⇧ Shift + Z)"
+            ]
+            [ Icons.viewUndoArrow ]
         ]
 
 
