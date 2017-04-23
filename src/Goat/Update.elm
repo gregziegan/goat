@@ -338,13 +338,8 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                         let
                             numAnnotations =
                                 Array.length model.edits.present
-
-                            initialTextBox =
-                                TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations))
                         in
-                            model
-                                |> addAnnotation (TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations)))
-                                |> startEditingText numAnnotations
+                            finishTextBoxDrawing start pos model
                                 => [ "text-box-edit--"
                                         ++ toString numAnnotations
                                         |> Dom.focus
@@ -440,6 +435,17 @@ finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
 finishShapeDrawing start end shapeType model =
     model
         |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
+
+
+finishTextBoxDrawing : StartPosition -> EndPosition -> Model -> Model
+finishTextBoxDrawing start end model =
+    let
+        numAnnotations =
+            Array.length model.edits.present
+    in
+        model
+            |> addAnnotation (TextBox (TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations))))
+            |> startEditingText numAnnotations
 
 
 finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model

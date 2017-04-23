@@ -2,9 +2,9 @@ module DrawingAnnotation exposing (all)
 
 import Array.Hamt as Array
 import Expect exposing (Expectation)
-import Fixtures exposing (end, model, start)
+import Fixtures exposing (end, model, start, aTextArea)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..))
-import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
+import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishTextBoxDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
 import Goat.Utils exposing (shiftPosition)
 import Test exposing (..)
 import TestUtil exposing (getDrawingStateCurPos, getFirstAnnotation)
@@ -72,6 +72,12 @@ finishDrawingTests =
                     |> finishShapeDrawing start end Rect
                     |> getFirstAnnotation
                     |> Expect.equal (Just (Shapes Rect model.fill (Shape start end model.strokeColor model.strokeStyle)))
+        , test "should add a textbox annotation to the edit history " <|
+            \() ->
+                model
+                    |> finishTextBoxDrawing start end
+                    |> getFirstAnnotation
+                    |> Expect.equal (Just (TextBox aTextArea))
         , test "should add a spotlight annotation with a spotlight fill to the edit history" <|
             \() ->
                 model
