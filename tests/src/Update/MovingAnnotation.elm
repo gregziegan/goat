@@ -1,4 +1,4 @@
-module MovingAnnotation exposing (all)
+module Update.MovingAnnotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)

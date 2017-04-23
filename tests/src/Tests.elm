@@ -1,25 +1,25 @@
 module Tests exposing (..)
 
-import DrawingAnnotation
-import EditingATextBox
+import Update.DrawingAnnotation
+import Update.EditingATextBox
+import Update.MovingAnnotation
+import Update.ResizingAnnotation
+import Update.SelectedAnnotation
 import Utils
-import MovingAnnotation
-import ResizingAnnotation
-import SelectedAnnotation
 import Test exposing (..)
-import View.DrawingArea.Annotation as Annotation
-import View.DrawingArea.Definitions as Definitions
+import View.DrawingArea.Annotation
+import View.DrawingArea.Definitions
 
 
 all : Test
 all =
     describe "Annotation App Suite"
-        [ DrawingAnnotation.all
-        , SelectedAnnotation.all
-        , MovingAnnotation.all
-        , ResizingAnnotation.all
-        , EditingATextBox.all
-        , Annotation.all
-        , Definitions.all
+        [ Update.DrawingAnnotation.all
+        , Update.SelectedAnnotation.all
+        , Update.MovingAnnotation.all
+        , Update.ResizingAnnotation.all
+        , Update.EditingATextBox.all
+        , View.DrawingArea.Annotation.all
+        , View.DrawingArea.Definitions.all
         , Utils.all
         ]

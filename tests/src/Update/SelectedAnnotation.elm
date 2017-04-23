@@ -1,4 +1,4 @@
-module SelectedAnnotation exposing (..)
+module Update.SelectedAnnotation exposing (..)
 
 import Array.Hamt as Array
 import Expect exposing (Expectation)

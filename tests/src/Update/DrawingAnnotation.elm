@@ -1,4 +1,4 @@
-module DrawingAnnotation exposing (all)
+module Update.DrawingAnnotation exposing (all)
 
 import Array.Hamt as Array
 import Expect exposing (Expectation)

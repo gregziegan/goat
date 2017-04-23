@@ -1,4 +1,4 @@
-module ResizingAnnotation exposing (all)
+module Update.ResizingAnnotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
