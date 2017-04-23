@@ -85,6 +85,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
 
         FinishDrawing pos ->
             finishDrawing pos model
+                |> Tuple.mapSecond ((::) (Ports.continuousExport ()))
 
         FocusTextArea index ->
             model
@@ -112,7 +113,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
         FinishEditingText index ->
             model
                 |> finishEditingText index
-                => []
+                => [ Ports.continuousExport () ]
 
         SetImages images ->
             { model | images = List.Zipper.fromList images, imageSelected = False }
@@ -160,28 +161,28 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                 |> updateAnySelectedAnnotations (updateFill fill)
                 |> setFill fill
                 |> closeDropdown
-                => []
+                => [ Ports.continuousExport () ]
 
         SelectStrokeColor strokeColor ->
             model
                 |> updateAnySelectedAnnotations (updateStrokeColor strokeColor)
                 |> setStrokeColor strokeColor
                 |> closeDropdown
-                => []
+                => [ Ports.continuousExport () ]
 
         SelectStrokeStyle strokeStyle ->
             model
                 |> updateAnySelectedAnnotations (updateStrokeStyle strokeStyle)
                 |> setStrokeStyle strokeStyle
                 |> closeDropdown
-                => []
+                => [ Ports.continuousExport () ]
 
         SelectFontSize fontSize ->
             model
                 |> updateAnySelectedAnnotations (updateFontSize fontSize)
                 |> setFontSize fontSize
                 |> closeDropdown
-                => []
+                => [ Ports.continuousExport () ]
 
         ToggleDropdown editOption ->
             model
@@ -224,7 +225,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
             model
                 |> moveAnnotation endPos
                 |> finishMovingAnnotation
-                => []
+                => [ Ports.continuousExport () ]
 
         StartResizingAnnotation index vertex start ->
             model
@@ -241,17 +242,17 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
             model
                 |> resizeAnnotation pos
                 |> finishResizingAnnotation
-                => []
+                => [ Ports.continuousExport () ]
 
         BringAnnotationToFront index ->
             model
                 |> bringAnnotationToFront index
-                => []
+                => [ Ports.continuousExport () ]
 
         SendAnnotationToBack index ->
             model
                 |> sendAnnotationToBack index
-                => []
+                => [ Ports.continuousExport () ]
 
         ToggleAnnotationMenu pos ->
             model
@@ -266,18 +267,18 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
 
         Undo ->
             undoEdit model
-                => []
+                => [ Ports.continuousExport () ]
 
         Redo ->
             redoEdit model
-                => []
+                => [ Ports.continuousExport () ]
 
         Save ->
             model
                 |> resetToReadyToDraw
                 => [ case model.images of
                         Just images ->
-                            Ports.exportToImage <| List.Zipper.current images
+                            Ports.exportToImage (List.Zipper.current images).id
 
                         Nothing ->
                             Cmd.none

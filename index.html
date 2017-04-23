@@ -36,11 +36,21 @@
 
       var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac, inZendesk : isInZendeskAppContext });
       var savedImage;
+      var lastSvgString = '';
+      var zendeskExportId;
 
       // ports
-      app.ports.exportToImage.subscribe(function (image) {
-        savedImage = image;
-        window.requestAnimationFrame(exportImage);
+      app.ports.continuousExport.subscribe(function() {
+        requestAnimationFrame(cacheImageChanges);
+      });
+
+      app.ports.exportToImage.subscribe(function (imageId) {
+        zendeskExportId = imageId;
+        if (lastSvgString !== '') {
+          exportHelper(savedImage);
+        } else {
+          window.requestAnimationFrame(exportImage);
+        }
       });
 
       app.ports.listenForUpload.subscribe(function () {
@@ -157,11 +167,30 @@
         };
       }
 
-      function exportImage() {
-        var svg = document.getElementById( "drawing" );
-        var svgCopy = svg.cloneNode(true)
+      function cacheImageChanges() {
+        var svg = document.getElementById("drawing");
+        var svgCopy = svg.cloneNode(true);
         encodeSvgBlobs(svgCopy)
-          .then(exportBlob)
+          .then(getPng)
+          .then(function(image) {
+            savedImage = image;
+          })
+      }
+
+      function exportImage() {
+        var svg = document.getElementById("drawing");
+        var svgCopy = svg.cloneNode(true);
+        encodeSvgBlobs(svgCopy)
+          .then(getPng)
+          .then(exportHelper)
+      }
+
+      function exportHelper(image) {
+        if (isInZendeskAppContext) {
+          exportToZendesk(image);
+        } else {
+          exportToWeb(image);
+        }
       }
 
       function fetchBlob(url) {
@@ -185,10 +214,18 @@
               return blobImageTo64(xhrResponse.response)
                 .then(function(e) {
                   var b64Url = e.target.result;
-                  var images = svg.querySelectorAll('image')
+                  var images = svg.querySelectorAll('image');
                   images[0].setAttribute('xlink:href', b64Url);
                   images[1].setAttribute('xlink:href', b64Url);
-                  return svg
+                  var svgChildren = svg.cloneNode(true).children;
+
+                  for (var i = 0; i < svgChildren.length; i++) {
+                    var child = svgChildren[i];
+                    if (child.getAttribute('data-vertex')) {
+                      svg.removeChild(svg.querySelector('circle[data-vertex="true"]'));
+                    }
+                  }
+                  return svg;
                 });
             }
           });
@@ -221,7 +258,7 @@
           var comment = zaf['ticket.comment'].text;
           div.innerHTML = comment;
           var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
-          var imageToReplace = div.querySelector('img[data-imageuploadid="' + savedImage.id + '"]');
+          var imageToReplace = div.querySelector('img[data-imageuploadid="' + zendeskExportId + '"]');
           if (selectionBox && imageToReplace) {
             selectionBox.outerHTML = '';
           } else {
@@ -241,22 +278,24 @@
       }
 
       function getPng(svg) {
-        var image = savedImage;
         var svgData = new XMLSerializer().serializeToString(svg);
+        lastSvgString = svgData;
+        var width = parseInt(svg.getAttribute('width'), 10);
+        var height = parseInt(svg.getAttribute('height'), 10);
 
         var canvas = document.createElement("canvas");
-        canvas.width = image.width;
-        canvas.height = image.height;
+        canvas.width = width;
+        canvas.height = height;
         autoScale(canvas);
 
         var ctx = canvas.getContext("2d");
 
         var newImage = document.createElement('img');
-        newImage.width = image.width;
-        newImage.height = image.height;
+        newImage.width = width;
+        newImage.height = height;
         return createImage(newImage, "data:image/svg+xml;base64," + btoa(svgData))
           .then(function() {
-            ctx.drawImage( newImage, 0, 0, image.width, image.height);
+            ctx.drawImage( newImage, 0, 0, width, height);
             newImage.src = canvas.toDataURL('image/png');
             return newImage;
           });
