@@ -1,5 +1,6 @@
 module Tests exposing (..)
 
+import Update.Controls
 import Update.DrawingAnnotation
 import Update.EditingATextBox
 import Update.MovingAnnotation
@@ -14,7 +15,8 @@ import View.DrawingArea.Definitions
 all : Test
 all =
     describe "Annotation App Suite"
-        [ Update.DrawingAnnotation.all
+        [ Update.Controls.all
+        , Update.DrawingAnnotation.all
         , Update.SelectedAnnotation.all
         , Update.MovingAnnotation.all
         , Update.ResizingAnnotation.all

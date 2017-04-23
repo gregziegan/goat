@@ -714,20 +714,20 @@ closeDropdown model =
 
 
 toggleDropdown : AttributeDropdown -> Model -> Model
-toggleDropdown editOption model =
+toggleDropdown attributeDropdown model =
     { model
         | currentDropdown =
             case model.currentDropdown of
                 Just dropdown ->
-                    if dropdown == editOption then
+                    if dropdown == attributeDropdown then
                         Nothing
                     else
-                        Just editOption
+                        Just attributeDropdown
 
                 Nothing ->
-                    Just editOption
+                    Just attributeDropdown
         , drawing =
-            case editOption of
+            case attributeDropdown of
                 Fonts ->
                     DrawTextBox
 
