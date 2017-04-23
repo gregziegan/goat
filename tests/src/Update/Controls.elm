@@ -3,7 +3,7 @@ module Update.Controls exposing (all)
 import Expect exposing (Expectation)
 import Fixtures exposing (aTextArea, end, model, start)
 import Goat.Model exposing (AttributeDropdown(..), Drawing(..))
-import Goat.Update exposing (toggleDropdown)
+import Goat.Update exposing (Msg(ChangeDrawing, CloseDropdown, ToggleDropdown), changeDrawing, toggleDropdown, update)
 import Test exposing (..)
 
 
@@ -11,6 +11,7 @@ all : Test
 all =
     describe "Control UI tests"
         [ toggleDropdownTests
+        , controlsUpdateTests
         ]
 
 
@@ -43,4 +44,31 @@ toggleDropdownTests =
                     |> toggleDropdown Fonts
                     |> .drawing
                     |> Expect.equal DrawTextBox
+        ]
+
+
+controlsUpdateTests : Test
+controlsUpdateTests =
+    describe "Updates from Control UI Messages"
+        [ test "ToggleDropdown has the same output as toggleDropdown" <|
+            \() ->
+                model
+                    |> update (ToggleDropdown Fills)
+                    |> Tuple.first
+                    |> Expect.equal (toggleDropdown Fills model)
+        , test "ChangeDrawing changes the drawing" <|
+            \() ->
+                model
+                    |> update (ChangeDrawing DrawTextBox)
+                    |> Tuple.first
+                    |> .drawing
+                    |> Expect.equal DrawTextBox
+        , test "CloseDropdown sets currentDropdown to Nothing" <|
+            \() ->
+                model
+                    |> changeDrawing DrawPixelate
+                    |> update CloseDropdown
+                    |> Tuple.first
+                    |> .currentDropdown
+                    |> Expect.equal Nothing
         ]
