@@ -1,10 +1,10 @@
-module DrawingAnnotation exposing (all)
+module Update.DrawingAnnotation exposing (all)
 
 import Array.Hamt as Array
 import Expect exposing (Expectation)
-import Fixtures exposing (end, model, start)
+import Fixtures exposing (end, model, start, aTextArea)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..))
-import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
+import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishTextBoxDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
 import Goat.Utils exposing (shiftPosition)
 import Test exposing (..)
 import TestUtil exposing (getDrawingStateCurPos, getFirstAnnotation)
@@ -59,29 +59,31 @@ finishDrawingTests =
                 model
                     |> finishLineDrawing start end StraightLine
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (Lines StraightLine <| Shape start end model.strokeColor model.strokeStyle))
-                    |> Maybe.withDefault (Expect.fail "Array missing line annotation")
+                    |> Expect.equal (Just (Lines StraightLine (Shape start end model.strokeColor model.strokeStyle)))
         , test "should add an arrow annotation to the edit history" <|
             \() ->
                 model
                     |> finishLineDrawing start end Arrow
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (Lines Arrow <| Shape start end model.strokeColor model.strokeStyle))
-                    |> Maybe.withDefault (Expect.fail "Array missing arrow annotation")
+                    |> Expect.equal (Just (Lines Arrow (Shape start end model.strokeColor model.strokeStyle)))
         , test "should add a shape annotation to the edit history" <|
             \() ->
                 model
                     |> finishShapeDrawing start end Rect
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (Shapes Rect model.fill <| Shape start end model.strokeColor model.strokeStyle))
-                    |> Maybe.withDefault (Expect.fail "Array missing rect annotation")
+                    |> Expect.equal (Just (Shapes Rect model.fill (Shape start end model.strokeColor model.strokeStyle)))
+        , test "should add a textbox annotation to the edit history " <|
+            \() ->
+                model
+                    |> finishTextBoxDrawing start end
+                    |> getFirstAnnotation
+                    |> Expect.equal (Just (TextBox aTextArea))
         , test "should add a spotlight annotation with a spotlight fill to the edit history" <|
             \() ->
                 model
                     |> finishSpotlightDrawing start end Rect
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (Spotlight Rect <| Shape start end model.strokeColor model.strokeStyle))
-                    |> Maybe.withDefault (Expect.fail "Array missing spotlight rect annotation")
+                    |> Expect.equal (Just (Spotlight Rect (Shape start end model.strokeColor model.strokeStyle)))
         , test "should add a pixelate annotation to the edit history" <|
             \() ->
                 model

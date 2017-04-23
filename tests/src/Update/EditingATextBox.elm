@@ -1,4 +1,4 @@
-module EditingATextBox exposing (all)
+module Update.EditingATextBox exposing (all)
 
 import Array.Hamt as Array
 import Expect exposing (Expectation)

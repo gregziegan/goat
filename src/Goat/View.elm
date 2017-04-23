@@ -36,17 +36,15 @@ import Svg.Attributes as Attr
 
     How views are split up:
       /Views/
-
-          -> Controls = functions for the Drawing controls
-          -> DrawingArea = functions that build up a drawing area with its submodules
-          /DrawingArea/
-             -> Annotation = functions for rendering an individual annotation
-             -> Definitions = functions for rendering the svg defs
-             -> Vertices = functions for rendering an annotation's vertices on selection
-          -> Icons = functions to render svg icons for controls, image selector, etc
-          -> ImageSelector = functions to render the image selection gallery
-          -> Utils = utility functions for view-specific transformations
-
+        -> Controls = functions for the Drawing controls
+        -> DrawingArea = functions that build up a drawing area with its submodules
+        /DrawingArea/
+           -> Annotation = functions for rendering an individual annotation
+           -> Definitions = functions for rendering the svg defs
+           -> Vertices = functions for rendering an annotation's vertices on selection
+        -> Icons = functions to render svg icons for controls, image selector, etc
+        -> ImageSelector = functions to render the image selection gallery
+        -> Utils = utility functions for view-specific transformations
 
 -}
 

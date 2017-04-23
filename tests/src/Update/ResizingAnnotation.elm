@@ -1,4 +1,4 @@
-module ResizingAnnotation exposing (all)
+module Update.ResizingAnnotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
@@ -65,8 +65,7 @@ resizeAnnotationTests =
                     |> startResizingAnnotation 0 Start start
                     |> resizeAnnotation end
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (resize False { resizingData | curPos = end } (Lines Arrow aShape)))
-                    |> Maybe.withDefault (Expect.fail "resized annotation is missing!")
+                    |> Expect.equal (Just (resize False { resizingData | curPos = end } (Lines Arrow aShape)))
         ]
 
 
@@ -90,6 +89,5 @@ finishResizingAnnotationTests =
                     |> resizeAnnotation end
                     |> finishResizingAnnotation
                     |> getFirstAnnotation
-                    |> Maybe.map (Expect.equal (resize False { resizingData | curPos = end } (Lines Arrow aShape)))
-                    |> Maybe.withDefault (Expect.fail "resized annotation is missing!")
+                    |> Expect.equal (Just (resize False { resizingData | curPos = end } (Lines Arrow aShape)))
         ]
