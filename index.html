@@ -34,13 +34,13 @@
       var client = window.ZAFClient ? ZAFClient.init() : null;
       var isInZendeskAppContext = !!client;
 
-
       var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac, inZendesk : isInZendeskAppContext });
-      var savedImage;
+      var zendeskExportId;
+      var b64ImageDict = {};
 
       // ports
-      app.ports.exportToImage.subscribe(function (image) {
-        savedImage = image;
+      app.ports.exportToImage.subscribe(function (imageId) {
+        zendeskExportId = imageId;
         window.requestAnimationFrame(exportImage);
       });
 
@@ -51,7 +51,14 @@
         });
         target.addEventListener("drop", function (e) {
           e.preventDefault();
-          loadImage(e.dataTransfer.files[0]);
+          var file = e.dataTransfer.files[0]
+          if (!file.type.match(/image.*/)) {
+            return;
+          }
+          loadImage(file)
+            .then(function(loadedImage) {
+              app.ports.newImage.send(loadedImage);
+            })
         }, true);
       });
 
@@ -61,11 +68,10 @@
         } else {
           var goats = [
             { id: '0', url: 'images/goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
-            { id: '0', url: 'images/goat2.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751}
+            { id: '1', url: 'images/goat2.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751}
           ];
-          readInImages(goats).then(function (localImages) {
-            app.ports.setImages.send(localImages);
-          });
+          app.ports.setImages.send(goats);
+          Array.prototype.forEach.call(goats, loadImageDataIntoCache);
         }
       });
 
@@ -78,30 +84,74 @@
         })
       }
 
+      var DOMURL = window.URL || window.webkitURL || window;
+
       // helper functions
+      function loadImageDataIntoCache(imageObject) {
+        var newImg = new Image();
+        newImg.width = imageObject.width;
+        newImg.height = imageObject.height;
+        createImage(newImg, imageObject.url)
+          .then(function(img) {
+            b64ImageDict[imageObject.id] = getB64FromImg(newImg);
+          })
+      }
+
+      function imageFileToB64(src) {
+        return new Promise(function(resolve) {
+          var reader = new FileReader();
+          reader.onload = resolve
+          reader.readAsDataURL(src);
+        })
+      }
+
+      function createImage(img, imageUrl) {
+        return new Promise(function(resolve) {
+          img.crossOrigin = 'anonymous';
+          img.onload = function() {
+            resolve(this)
+          }
+          img.src = imageUrl;
+        });
+      }
+
       function loadImage(src) {
-        if (!src.type.match(/image.*/)) {
-          return;
-        }
-        var reader = new FileReader();
-        reader.onload = function (e) {
-          var imageUrl = e.target.result;
-          var contentType = 'image/png';
-          var newImg = new Image();
-          newImg.crossOrigin = 'anonymous';
-          newImg.onload = function () {
-            app.ports.newImage.send({
+        return imageFileToB64(src)
+          .then(function(e) {
+            b64ImageDict['0'] = e.target.result;
+            var contentType = 'image/png';
+            var blob = b64toBlob(e.target.result.replace('data:image/png;base64,', ''), contentType);
+            var imageUrl = DOMURL.createObjectURL(blob);
+            var newImage = new Image();
+            return createImage(newImage, imageUrl)
+          }).then(function(img) {
+            return {
               id: '0',
-              url: imageUrl,
-              width: this.naturalWidth,
-              height: this.naturalHeight,
-              originalWidth: this.naturalWidth,
-              originalHeight: this.naturalHeight
-            });
-          };
-          newImg.src = imageUrl;
-        };
-        reader.readAsDataURL(src);
+              url: img.src,
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+              originalWidth: img.naturalWidth,
+              originalHeight: img.naturalHeight
+            }
+          });
+      }
+
+      function b64toBlob(b64Data) {
+        var contentType = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+        var sliceSize = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 512;
+
+        var byteCharacters = atob(b64Data);
+        var byteArrays = [];
+        for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+          var slice = byteCharacters.slice(offset, offset + sliceSize);
+          var byteNumbers = new Array(slice.length);
+          for (var i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+          var byteArray = new Uint8Array(byteNumbers);
+          byteArrays.push(byteArray);
+        }
+        return new Blob(byteArrays, { type: contentType });
       }
 
       function toImageObject(image) {
@@ -120,68 +170,103 @@
         };
       }
 
-      function toLocalImage(imageObject) {
-        return new Promise(function (resolve) {
-          var img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = function () {
-            resolve({ img: img, imageObject: imageObject, status: 'ok' });
-          };
-
-          img.src = imageObject.url;
-        });
-      }
-
-      function getImageUrl(img, imageObject) {
-        return new Promise(function (resolve) {
-          var canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-
-          var ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0);
-
-          var newImageObject = imageObject;
-          newImageObject.url = canvas.toDataURL("image/png");
-          resolve(newImageObject);
-        });
-      }
-
       function exportImage() {
-        var image = savedImage;
-        var svg = document.getElementById( "drawing" );
-        var svgData = new XMLSerializer().serializeToString( svg );
+        var svg = document.getElementById("drawing");
+        var svgCopy = svg.cloneNode(true);
+        var sanitizedSvg = encodeSvgBlobs(svgCopy);
+        getPng(sanitizedSvg)
+          .then(exportHelper);
+      }
 
-        var canvas = document.createElement( "canvas" );
-        var ctx = canvas.getContext( "2d" );
-
-        var img = document.createElement( "img" );
-        img.onload = function() {
-          ctx.drawImage( img, 0, 0 );
-          if (isInZendeskAppContext) {
-            client.get('ticket.comment').then(function (zaf) {
-              var div = document.createElement('div');
-              var comment = zaf['ticket.comment'].text;
-              div.innerHTML = comment;
-              var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
-              var imageToReplace = div.querySelector('img[data-imageuploadid="' + image.id + '"]');
-              if (selectionBox && imageToReplace) {
-                selectionBox.outerHTML = '';
-              } else {
-                imageToReplace.outerHTML = '';
-              }
-              client.set('ticket.comment.text', div.innerHTML).then(function () {
-                client.invoke('ticket.editor.inlineImage', canvas.toDataURL('image/png'));
-                client.invoke('app.close');
-                app.ports.reset.send(null);
-              });
-            });
-          } else {
-            img.id = 'export-image';
-            document.body.replaceChild(img, document.getElementById('export-image'));
-          }
+      function exportHelper(image) {
+        if (isInZendeskAppContext) {
+          exportToZendesk(image);
+        } else {
+          exportToWeb(image);
         }
-        img.setAttribute( "src", "data:image/svg+xml;base64," + btoa( svgData ) );
+      }
+
+      function encodeSvgBlobs(svg) {
+        var imageBlobUrl = svg.querySelector('image').getAttribute('xlink:href');
+
+        var b64Url = b64ImageDict[zendeskExportId];
+        var images = svg.querySelectorAll('image');
+        images[0].setAttribute('xlink:href', b64Url);
+        images[1].setAttribute('xlink:href', b64Url);
+        return svg;
+      }
+
+      function autoScale(canvas) {
+        // adapted from https://www.html5rocks.com/en/tutorials/canvas/hidpi/
+        var context = canvas.getContext('2d');
+        var devicePixelRatio = window.devicePixelRatio || 1;
+        var backingStoreRatio = context.webkitBackingStorePixelRatio ||
+                              context.mozBackingStorePixelRatio ||
+                              context.msBackingStorePixelRatio ||
+                              context.oBackingStorePixelRatio ||
+                              context.backingStorePixelRatio || 1;
+        var ratio = devicePixelRatio / backingStoreRatio;
+        if (devicePixelRatio !== backingStoreRatio) {
+            var oldWidth = canvas.width;
+            var oldHeight = canvas.height;
+            canvas.width = oldWidth * ratio;
+            canvas.height = oldHeight * ratio;
+            canvas.style.width = oldWidth + 'px';
+            canvas.style.height = oldHeight + 'px';
+            context.scale(ratio, ratio);
+        }
+      }
+
+      function exportToZendesk(image) {
+        client.get('ticket.comment').then(function (zaf) {
+          var div = document.createElement('div');
+          var comment = zaf['ticket.comment'].text;
+          div.innerHTML = comment;
+          var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
+          var imageToReplace = div.querySelector('img[data-imageuploadid="' + zendeskExportId + '"]');
+          if (selectionBox && imageToReplace) {
+            selectionBox.outerHTML = '';
+          } else {
+            imageToReplace.outerHTML = '';
+          }
+          client.set('ticket.comment.text', div.innerHTML).then(function () {
+            client.invoke('ticket.editor.inlineImage', image.src);
+            client.invoke('app.close');
+            app.ports.reset.send(null);
+          });
+        });
+      }
+
+      function exportToWeb(image) {
+        image.id = 'export-image';
+        document.body.replaceChild(image, document.getElementById('export-image'));
+      }
+
+      function getPng(svg) {
+        var svgData = new XMLSerializer().serializeToString(svg);
+        lastSvgString = svgData;
+        var width = parseInt(svg.getAttribute('width'), 10);
+        var height = parseInt(svg.getAttribute('height'), 10);
+
+        var newImage = document.createElement('img');
+        newImage.width = width;
+        newImage.height = height;
+        return createImage(newImage, "data:image/svg+xml;base64," + btoa(svgData))
+          .then(function() {
+            var imageUrl = getB64FromImg(newImage);
+            newImage.src = imageUrl;
+            return newImage;
+          });
+      }
+
+      function getB64FromImg(img) {
+        var canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        autoScale(canvas);
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        return canvas.toDataURL('image/png');
       }
 
       function readInImagesFromZendesk() {
@@ -189,28 +274,18 @@
           var div = document.createElement('div');
           var comment = zaf['ticket.comment'].text;
           div.innerHTML = comment;
-          var selectedImage = div.querySelector('span.zd-editor--rich-text-comment--resize-box img')
+          var selectedImage = div.querySelector('span.zd-editor--rich-text-comment--resize-box img');
           if (selectedImage) {
-            readInImages([toImageObject(selectedImage)])
-              .then(function (localImages) {
-                app.ports.newImage.send(localImages[0]);
-              });
+            var imageObject = toImageObject(selectedImage);
+            app.ports.newImage.send(imageObject);
+            loadImageDataIntoCache(imageObject);
           } else {
             var images = div.querySelectorAll('img');
             var imageObjects = Array.prototype.map.call(images, toImageObject);
-            readInImages(imageObjects).then(function (localImages) {
-              app.ports.setImages.send(localImages);
-            });
+            app.ports.setImages.send(imageObjects);
+            Array.prototype.forEach.call(imageObjects, loadImageDataIntoCache);
           }
         });
-      }
-
-      function readInImages(imageObjects) {
-        return Promise.all(Array.prototype.map.call(imageObjects, toLocalImage)).then(function (allLocalImageData) {
-          return Promise.all(Array.prototype.map.call(allLocalImageData, function (localData) {
-            return getImageUrl(localData.img, localData.imageObject);
-          }));
-        })
       }
     </script>
   </body>
