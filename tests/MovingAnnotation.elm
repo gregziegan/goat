@@ -4,7 +4,7 @@ import Expect exposing (Expectation)
 import Fixtures exposing (aShape, end, model, start)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..))
 import Goat.Update exposing (addAnnotation, finishMovingAnnotation, move, moveAnnotation, startMovingAnnotation)
-import Goat.Helpers exposing (getPositions, shiftPosition, currentAnnotationAttributes)
+import Goat.Utils exposing (getPositions, shiftPosition, currentAnnotationAttributes)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation, isAnnotationMovedByCorrectAmount)
 

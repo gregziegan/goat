@@ -1,10 +1,11 @@
-module View.Annotation exposing (all)
+module View.DrawingArea.Annotation exposing (all)
 
 import Color exposing (Color)
 import Color.Convert
 import Expect exposing (Expectation)
-import Fixtures exposing (end, model, start, aShape, aTextArea, testColor)
-import Goat.Helpers exposing (linePath, toLineStyle, fontSizeToLineHeight)
+import Fixtures exposing (end, goat, model, start, aShape, aTextArea, testColor)
+import Goat.Flags exposing (Image)
+import Goat.View.Utils exposing (linePath, toLineStyle, fontSizeToLineHeight)
 import Goat.Model
     exposing
         ( Annotation(..)
@@ -15,7 +16,8 @@ import Goat.Model
         , ShapeType(..)
         , TextArea
         )
-import Goat.View exposing (viewAnnotation)
+import Goat.View.DrawingArea.Annotation exposing (viewAnnotation)
+import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
@@ -25,7 +27,10 @@ import View.Util exposing (svgDrawspace)
 all : Test
 all =
     describe "drawing"
-        [ viewAnnotationTests ]
+        [ viewAnnotationTests
+        , imageTests
+        , pixelatedImageTests
+        ]
 
 
 lineSelector : Shape -> List Selector
@@ -93,6 +98,39 @@ tspanSelector { start, end, fontSize, fill } =
     , attribute "x" <| toString <| Basics.min start.x end.x
     , attribute "fill" <| Color.Convert.colorToHex fill
     ]
+
+
+imageSelector : Image -> List Selector
+imageSelector { width, height, url } =
+    [ attribute "width" (toString (round width))
+    , attribute "height" (toString (round height))
+
+    -- , attribute "xlink:href" url -- possible bug with elm-html-test, will test when there's a fix
+    ]
+
+
+imageTests : Test
+imageTests =
+    describe "viewImage"
+        [ test "original image has appropriate attributes to render" <|
+            \() ->
+                goat
+                    |> viewImage
+                    |> Query.fromHtml
+                    |> Query.has (attribute "mask" "url(#pixelateMask)" :: imageSelector goat)
+        ]
+
+
+pixelatedImageTests : Test
+pixelatedImageTests =
+    describe "viewPixelatedImage"
+        [ test "pixelated image has the appropriate attributes to render" <|
+            \() ->
+                goat
+                    |> viewPixelatedImage
+                    |> Query.fromHtml
+                    |> Query.has (attribute "filter" "url(#pixelate)" :: imageSelector goat)
+        ]
 
 
 viewAnnotationTests : Test

@@ -1,14 +1,14 @@
-module Helpers exposing (all)
+module Utils exposing (all)
 
 import Expect exposing (Expectation)
-import Goat.Helpers exposing (stepMouse, arrowAngle)
+import Goat.Utils exposing (stepMouse, arrowAngle)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation, position)
 
 
 all : Test
 all =
-    describe "Helpers module"
+    describe "Utils module"
         [ fuzz2 position position "mouse step function works properly" <|
             \pos1 pos2 ->
                 stepMouse pos1 pos2

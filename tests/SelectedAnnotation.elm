@@ -12,14 +12,18 @@ import Goat.Model
         , ShapeType(..)
         , StrokeStyle(..)
         )
-import Goat.Update exposing (addAnnotation, selectAnnotation, updateAnySelectedAnnotations, updateStrokeColor, updateStrokeStyle, updateFill)
+import Goat.Update exposing (addAnnotation, bringAnnotationToFront, sendAnnotationToBack, selectAnnotation, updateAnySelectedAnnotations, updateStrokeColor, updateStrokeStyle, updateFill)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
 
 
 all : Test
 all =
-    describe "SelectedAnnotation Updates" [ updateAnySelectedAnnotationsTests ]
+    describe "SelectedAnnotation Updates"
+        [ updateAnySelectedAnnotationsTests
+        , bringToFrontTests
+        , sendToBackTests
+        ]
 
 
 updateAnySelectedAnnotationsTests : Test
@@ -55,4 +59,34 @@ updateAnySelectedAnnotationsTests =
                     |> Array.get 2
                     |> Maybe.map (Expect.equal (Shapes Ellipse (Just testColor) aShape))
                     |> Maybe.withDefault (Expect.fail "Array missing desired annotation")
+        ]
+
+
+bringToFrontTests : Test
+bringToFrontTests =
+    describe "bringAnnotationToFront" <|
+        [ test "pushes selected annotation to end of array" <|
+            \() ->
+                model
+                    |> addAnnotation (Lines Arrow aShape)
+                    |> addAnnotation (Shapes Rect Nothing aShape)
+                    |> bringAnnotationToFront 0
+                    |> .edits
+                    |> .present
+                    |> Array.get 1
+                    |> Expect.equal (Just (Lines Arrow aShape))
+        ]
+
+
+sendToBackTests : Test
+sendToBackTests =
+    describe "sendAnnotationToBack"
+        [ test "brings annotation to front of array" <|
+            \() ->
+                model
+                    |> addAnnotation (Lines Arrow aShape)
+                    |> addAnnotation (Shapes Rect Nothing aShape)
+                    |> sendAnnotationToBack 1
+                    |> getFirstAnnotation
+                    |> Expect.equal (Just (Shapes Rect Nothing aShape))
         ]

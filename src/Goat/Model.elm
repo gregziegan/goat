@@ -30,7 +30,7 @@ type Drawing
     | DrawShape ShapeType
     | DrawTextBox
     | DrawSpotlight ShapeType
-    | DrawBlur
+    | DrawPixelate
 
 
 type StrokeStyle
@@ -91,7 +91,7 @@ type Annotation
     | Shapes ShapeType (Maybe Color) Shape
     | TextBox TextArea
     | Spotlight ShapeType Shape
-    | Blur StartPosition EndPosition
+    | Pixelate StartPosition EndPosition
 
 
 {-| Vertices are classified by their relationship to the `start` and `end`
@@ -101,10 +101,11 @@ e.g: (assume a top-left to bottom-right draw)
 
 Start StartPlusX
 +----------+
-| |
-| |
-| |
-| |
+|**********|
+|**********|
+|**********|
+|**********|
+|**********|
 +----------+
 StartPlusY End
 

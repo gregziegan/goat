@@ -1,4 +1,4 @@
-module Goat.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle, viewBlur)
+module Goat.View.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle, viewPixelate)
 
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
@@ -220,8 +220,8 @@ viewStrokeStyle strokeStyle =
                 [ Svg.path [ d "M0 4h6V0H0v4zm9 0h6V0H9v4z", fillRule "nonzero", fill "currentColor" ] [] ]
 
 
-viewBlur : Html msg
-viewBlur =
+viewPixelate : Html msg
+viewPixelate =
     svg [ viewBox "0 0 20 20", width "20", height "20" ]
         [ g [ fillRule "evenodd" ]
             [ path [ d "M2 4h4v4H2z", fillOpacity ".195" ]

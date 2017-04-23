@@ -1,12 +1,8 @@
-module Goat.Helpers exposing (isDrawingTooSmall, isSpotlightDrawing, toPx, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, drawingsAreEqual, onMouseDown, onMouseUp, toDrawingPosition, defaultPrevented, stopPropagation, toPosition, spotlightToMaskCutout, annotationStateToCursor, getFirstSpotlightIndex, toLineStyle, fontSizeToLineHeight, linePath, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, directionToCursor)
+module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, drawingsAreEqual, toDrawingPosition, toPosition, getFirstSpotlightIndex, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, annotationStateAttributes)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
-import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), ResizeDirection(..), Drawing(..), EndPosition, LineType(..), Model, Shape, ShapeType(..), StartPosition, StrokeStyle(..))
-import Html exposing (Attribute)
-import Html.Events exposing (on)
-import Json.Decode as Json
-import Keyboard.Extra as Keyboard exposing (Direction, Key(Shift), isPressed)
+import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), Drawing(..), EndPosition, LineType(..), Model, ResizeDirection(..), Shape, ShapeType(..), StartPosition, StrokeStyle(..))
 import List.Extra
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
@@ -39,11 +35,6 @@ isSpotlightDrawing drawing =
 
         _ ->
             False
-
-
-toPx : number -> String
-toPx number =
-    toString number ++ "px"
 
 
 calcShapePos : Bool -> StartPosition -> EndPosition -> EndPosition
@@ -97,59 +88,9 @@ stepMouse start curPos =
         |> positionMapY ((+) start.y)
 
 
-toLineStyle : StrokeStyle -> ( String, String )
-toLineStyle strokeStyle =
-    case strokeStyle of
-        SolidThin ->
-            "2" => ""
-
-        SolidMedium ->
-            "4" => ""
-
-        SolidThick ->
-            "6" => ""
-
-        SolidVeryThick ->
-            "8" => ""
-
-        DashedThin ->
-            "2" => "10, 5"
-
-        DashedMedium ->
-            "4" => "10, 5"
-
-        DashedThick ->
-            "6" => "10, 5"
-
-        DashedVeryThick ->
-            "8" => "10, 5"
-
-
 toDrawingPosition : Mouse.Position -> Mouse.Position
 toDrawingPosition mouse =
     { mouse | x = mouse.x - ControlOptions.controlUIWidth, y = mouse.y - 10 }
-
-
-annotationStateToCursor : AnnotationState -> String
-annotationStateToCursor annotationState =
-    case annotationState of
-        ReadyToDraw ->
-            "crosshair"
-
-        DrawingAnnotation _ _ ->
-            "crosshair"
-
-        MovingAnnotation _ _ _ _ ->
-            "move"
-
-        ResizingAnnotation _ _ ->
-            "nesw-resize"
-
-        EditingATextBox _ _ ->
-            "default"
-
-        _ ->
-            "crosshair"
 
 
 arrowAngle : StartPosition -> EndPosition -> Float
@@ -180,16 +121,6 @@ calcDistance a b =
 toPosition : ST.SingleTouch -> Position
 toPosition st =
     Position (round st.touch.clientX) (round st.touch.clientY)
-
-
-onMouseDown : Json.Decoder msg -> Attribute msg
-onMouseDown decodeToMsg =
-    on "mousedown" decodeToMsg
-
-
-onMouseUp : Json.Decoder msg -> Attribute msg
-onMouseUp decodeToMsg =
-    on "mouseup" decodeToMsg
 
 
 mapAtIndex : Int -> (a -> a) -> Array a -> Array a
@@ -237,9 +168,9 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
-        DrawBlur ->
+        DrawPixelate ->
             case drawing2 of
-                DrawBlur ->
+                DrawPixelate ->
                     True
 
                 _ ->
@@ -254,36 +185,6 @@ isSpotlightShape annotation =
 
         _ ->
             False
-
-
-fontSizeToLineHeight : Int -> Float
-fontSizeToLineHeight fontSize =
-    toFloat fontSize * 1.2
-
-
-linePath : StartPosition -> EndPosition -> String
-linePath start end =
-    "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
-
-
-spotlightToMaskCutout : ( Int, Annotation ) -> Maybe ( Int, ShapeType, Shape )
-spotlightToMaskCutout ( index, annotation ) =
-    case annotation of
-        Spotlight shapeType shape ->
-            Just ( index, shapeType, shape )
-
-        _ ->
-            Nothing
-
-
-defaultPrevented : Html.Events.Options
-defaultPrevented =
-    Html.Events.Options False True
-
-
-stopPropagation : Html.Events.Options
-stopPropagation =
-    Html.Events.Options True False
 
 
 removeItem : Int -> Array a -> Array a
@@ -342,7 +243,7 @@ getPositions annotation =
         Spotlight shapeType shape ->
             shape.start => shape.end
 
-        Blur start end ->
+        Pixelate start end ->
             start => end
 
 
@@ -361,7 +262,7 @@ getAnnotationAttributes annotation existingAttrs =
         Spotlight _ shape ->
             AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
 
-        Blur _ _ ->
+        Pixelate _ _ ->
             existingAttrs
 
 
@@ -370,14 +271,20 @@ currentAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
     AnnotationAttributes strokeColor fill strokeStyle fontSize
 
 
-directionToCursor : ResizeDirection -> String
-directionToCursor direction =
-    case direction of
-        NWSE ->
-            "northWestCursor"
+annotationStateAttributes : Model -> AnnotationAttributes
+annotationStateAttributes model =
+    case model.annotationState of
+        SelectedAnnotation _ annotationAttrs ->
+            annotationAttrs
 
-        NESW ->
-            "northEastCursor"
+        MovingAnnotation _ _ _ annotationAttrs ->
+            annotationAttrs
 
-        Move ->
-            "moveCursor"
+        ResizingAnnotation _ annotationAttrs ->
+            annotationAttrs
+
+        EditingATextBox _ annotationAttrs ->
+            annotationAttrs
+
+        _ ->
+            currentAnnotationAttributes model

@@ -5,7 +5,7 @@ import AutoExpand
 import Color exposing (Color)
 import Dom
 import Goat.Flags exposing (Image)
-import Goat.Helpers exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
+import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
 import Html.Attributes as Attr
@@ -355,17 +355,12 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                         finishSpotlightDrawing start pos shapeType model
                             => []
 
-                    DrawBlur ->
-                        finishBlurDrawing start pos model
+                    DrawPixelate ->
+                        finishPixelateDrawing start pos model
                             => []
 
         _ ->
             model => []
-
-
-resetSelection : Model -> Model
-resetSelection model =
-    { model | annotationState = ReadyToDraw }
 
 
 resetToReadyToDraw : Model -> Model
@@ -435,10 +430,10 @@ finishLineDrawing start end lineType model =
         |> addAnnotation (Lines lineType (Shape start (calcLinePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
 
 
-finishBlurDrawing : StartPosition -> EndPosition -> Model -> Model
-finishBlurDrawing start end model =
+finishPixelateDrawing : StartPosition -> EndPosition -> Model -> Model
+finishPixelateDrawing start end model =
     model
-        |> addAnnotation (Blur start end)
+        |> addAnnotation (Pixelate start end)
 
 
 finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
@@ -485,7 +480,7 @@ updateStrokeColor strokeColor annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | strokeColor = strokeColor }
 
-        Blur _ _ ->
+        Pixelate _ _ ->
             annotation
 
 
@@ -504,7 +499,7 @@ updateFill fill annotation =
         Spotlight shapeType shape ->
             annotation
 
-        Blur _ _ ->
+        Pixelate _ _ ->
             annotation
 
 
@@ -523,7 +518,7 @@ updateStrokeStyle strokeStyle annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | strokeStyle = strokeStyle }
 
-        Blur _ _ ->
+        Pixelate _ _ ->
             annotation
 
 
@@ -673,8 +668,8 @@ resize discretize resizingData annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType (resizeVertices (calcShapePos discretize) resizingData shape)
 
-        Blur start end ->
-            Blur (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).end
+        Pixelate start end ->
+            Pixelate (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).end
 
 
 shift :
@@ -703,8 +698,8 @@ move translate annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType (shift translate shape)
 
-        Blur start end ->
-            Blur (shiftPosition (Tuple.first translate) (Tuple.second translate) start) (shiftPosition (Tuple.first translate) (Tuple.second translate) end)
+        Pixelate start end ->
+            Pixelate (shiftPosition (Tuple.first translate) (Tuple.second translate) start) (shiftPosition (Tuple.first translate) (Tuple.second translate) end)
 
 
 closeDropdown : Model -> Model
@@ -753,43 +748,49 @@ handleKeyboardShortcuts keyChange model =
     case keyChange of
         KeyDown key ->
             case key of
-                Number1 ->
+                CharA ->
                     { model | drawing = DrawLine Arrow }
 
-                Number2 ->
+                CharL ->
                     { model | drawing = DrawLine StraightLine }
 
-                Number3 ->
+                CharR ->
                     { model | drawing = DrawShape Rect }
 
-                Number4 ->
+                CharO ->
                     { model | drawing = DrawShape RoundedRect }
 
-                Number5 ->
+                CharE ->
                     { model | drawing = DrawShape Ellipse }
 
-                Number6 ->
+                CharT ->
                     { model | drawing = DrawTextBox }
 
-                Number7 ->
+                CharG ->
                     { model | drawing = DrawSpotlight Rect }
 
-                Number8 ->
-                    { model | drawing = DrawSpotlight RoundedRect }
+                CharC ->
+                    if isPressed Shift model.keyboardState then
+                        model
+                    else
+                        { model | drawing = DrawSpotlight RoundedRect }
 
-                Number9 ->
+                CharI ->
                     { model | drawing = DrawSpotlight Ellipse }
 
-                CharQ ->
+                CharP ->
+                    { model | drawing = DrawPixelate }
+
+                CharN ->
                     toggleDropdown Fonts model
 
-                CharW ->
+                CharK ->
                     toggleDropdown StrokeColors model
 
-                CharE ->
+                CharF ->
                     toggleDropdown Fills model
 
-                CharR ->
+                CharS ->
                     toggleDropdown Strokes model
 
                 _ ->
@@ -880,8 +881,8 @@ shiftForPaste annotation =
         Spotlight shapeType shape ->
             Spotlight shapeType { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
 
-        Blur start end ->
-            Blur (positionMap ((+) 10) start) (positionMap ((+) 10) end)
+        Pixelate start end ->
+            Pixelate (positionMap ((+) 10) start) (positionMap ((+) 10) end)
 
 
 pasteAnnotation : Model -> Model
