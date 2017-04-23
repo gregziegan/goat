@@ -1,12 +1,9 @@
-port module Goat.Ports exposing (continuousExport, exportToImage, listenForUpload, setImages, newImage, reset, requestImages)
+port module Goat.Ports exposing (exportToImage, listenForUpload, setImages, newImage, reset, requestImages)
 
 import Goat.Flags exposing (Image)
 
 
 -- Talk to Javascript
-
-
-port continuousExport : () -> Cmd msg
 
 
 port exportToImage : String -> Cmd msg

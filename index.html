@@ -35,22 +35,13 @@
       var isInZendeskAppContext = !!client;
 
       var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac, inZendesk : isInZendeskAppContext });
-      var savedImage;
-      var lastSvgString = '';
       var zendeskExportId;
+      var b64ImageDict = {};
 
       // ports
-      app.ports.continuousExport.subscribe(function() {
-        requestAnimationFrame(cacheImageChanges);
-      });
-
       app.ports.exportToImage.subscribe(function (imageId) {
         zendeskExportId = imageId;
-        if (lastSvgString !== '') {
-          exportHelper(savedImage);
-        } else {
-          window.requestAnimationFrame(exportImage);
-        }
+        window.requestAnimationFrame(exportImage);
       });
 
       app.ports.listenForUpload.subscribe(function () {
@@ -77,9 +68,10 @@
         } else {
           var goats = [
             { id: '0', url: 'images/goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
-            { id: '0', url: 'images/goat2.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751}
+            { id: '1', url: 'images/goat2.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751}
           ];
           app.ports.setImages.send(goats);
+          Array.prototype.forEach.call(goats, loadImageDataIntoCache);
         }
       });
 
@@ -95,7 +87,17 @@
       var DOMURL = window.URL || window.webkitURL || window;
 
       // helper functions
-      function blobImageTo64(src) {
+      function loadImageDataIntoCache(imageObject) {
+        var newImg = new Image();
+        newImg.width = imageObject.width;
+        newImg.height = imageObject.height;
+        createImage(newImg, imageObject.url)
+          .then(function(img) {
+            b64ImageDict[imageObject.id] = getB64FromImg(newImg);
+          })
+      }
+
+      function imageFileToB64(src) {
         return new Promise(function(resolve) {
           var reader = new FileReader();
           reader.onload = resolve
@@ -114,8 +116,9 @@
       }
 
       function loadImage(src) {
-        return blobImageTo64(src)
+        return imageFileToB64(src)
           .then(function(e) {
+            b64ImageDict['0'] = e.target.result;
             var contentType = 'image/png';
             var blob = b64toBlob(e.target.result.replace('data:image/png;base64,', ''), contentType);
             var imageUrl = DOMURL.createObjectURL(blob);
@@ -167,22 +170,12 @@
         };
       }
 
-      function cacheImageChanges() {
-        var svg = document.getElementById("drawing");
-        var svgCopy = svg.cloneNode(true);
-        encodeSvgBlobs(svgCopy)
-          .then(getPng)
-          .then(function(image) {
-            savedImage = image;
-          })
-      }
-
       function exportImage() {
         var svg = document.getElementById("drawing");
         var svgCopy = svg.cloneNode(true);
-        encodeSvgBlobs(svgCopy)
-          .then(getPng)
-          .then(exportHelper)
+        var sanitizedSvg = encodeSvgBlobs(svgCopy);
+        getPng(sanitizedSvg)
+          .then(exportHelper);
       }
 
       function exportHelper(image) {
@@ -193,42 +186,22 @@
         }
       }
 
-      function fetchBlob(url) {
-        return new Promise(function(resolve) {
-          var xhr = new XMLHttpRequest();
-          xhr.open('GET', url, true);
-          xhr.responseType = 'blob';
-          xhr.onload = function() {
-            resolve(this)
-          }
-          xhr.send();
-        });
-      }
-
       function encodeSvgBlobs(svg) {
         var imageBlobUrl = svg.querySelector('image').getAttribute('xlink:href');
 
-        return fetchBlob(imageBlobUrl)
-          .then(function(xhrResponse) {
-            if (xhrResponse.status == 200) {
-              return blobImageTo64(xhrResponse.response)
-                .then(function(e) {
-                  var b64Url = e.target.result;
-                  var images = svg.querySelectorAll('image');
-                  images[0].setAttribute('xlink:href', b64Url);
-                  images[1].setAttribute('xlink:href', b64Url);
-                  var svgChildren = svg.cloneNode(true).children;
+        var b64Url = b64ImageDict[svg.querySelector('.image-to-annotate').getAttribute('data-upload-id')];
+        var images = svg.querySelectorAll('image');
+        images[0].setAttribute('xlink:href', b64Url);
+        images[1].setAttribute('xlink:href', b64Url);
 
-                  for (var i = 0; i < svgChildren.length; i++) {
-                    var child = svgChildren[i];
-                    if (child.getAttribute('data-vertex')) {
-                      svg.removeChild(svg.querySelector('circle[data-vertex="true"]'));
-                    }
-                  }
-                  return svg;
-                });
-            }
-          });
+        var svgChildren = svg.cloneNode(true).children;
+        for (var i = 0; i < svgChildren.length; i++) {
+          var child = svgChildren[i];
+          if (child.getAttribute('data-vertex')) {
+            svg.removeChild(svg.querySelector('circle[data-vertex="true"]'));
+          }
+        }
+        return svg;
       }
 
       function autoScale(canvas) {
@@ -283,22 +256,25 @@
         var width = parseInt(svg.getAttribute('width'), 10);
         var height = parseInt(svg.getAttribute('height'), 10);
 
-        var canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        autoScale(canvas);
-
-        var ctx = canvas.getContext("2d");
-
         var newImage = document.createElement('img');
         newImage.width = width;
         newImage.height = height;
         return createImage(newImage, "data:image/svg+xml;base64," + btoa(svgData))
           .then(function() {
-            ctx.drawImage( newImage, 0, 0, width, height);
-            newImage.src = canvas.toDataURL('image/png');
+            var imageUrl = getB64FromImg(newImage);
+            newImage.src = imageUrl;
             return newImage;
           });
+      }
+
+      function getB64FromImg(img) {
+        var canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        autoScale(canvas);
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        return canvas.toDataURL('image/png');
       }
 
       function readInImagesFromZendesk() {
@@ -306,13 +282,16 @@
           var div = document.createElement('div');
           var comment = zaf['ticket.comment'].text;
           div.innerHTML = comment;
-          var selectedImage = div.querySelector('span.zd-editor--rich-text-comment--resize-box img')
+          var selectedImage = div.querySelector('span.zd-editor--rich-text-comment--resize-box img');
           if (selectedImage) {
-            app.ports.newImage.send(toImageObject(selectedImage));
+            var imageObject = toImageObject(selectedImage);
+            app.ports.newImage.send(imageObject);
+            loadImageDataIntoCache(imageObject);
           } else {
             var images = div.querySelectorAll('img');
             var imageObjects = Array.prototype.map.call(images, toImageObject);
             app.ports.setImages.send(imageObjects);
+            Array.prototype.forEach.call(imageObjects, loadImageDataIntoCache);
           }
         });
       }
