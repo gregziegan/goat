@@ -193,14 +193,6 @@
         var images = svg.querySelectorAll('image');
         images[0].setAttribute('xlink:href', b64Url);
         images[1].setAttribute('xlink:href', b64Url);
-
-        var svgChildren = svg.cloneNode(true).children;
-        for (var i = 0; i < svgChildren.length; i++) {
-          var child = svgChildren[i];
-          if (child.getAttribute('data-vertex')) {
-            svg.removeChild(svg.querySelector('circle[data-vertex="true"]'));
-          }
-        }
         return svg;
       }
 

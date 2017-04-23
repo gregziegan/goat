@@ -989,7 +989,6 @@ viewVertex vertexEvents x y =
          , Attr.stroke "white"
          , Attr.strokeWidth "2"
          , Attr.filter "url(#dropShadow)"
-         , attribute "data-vertex" "true"
          ]
             ++ vertexEvents
         )
