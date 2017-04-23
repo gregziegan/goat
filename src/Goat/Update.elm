@@ -288,7 +288,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                 |> resetToReadyToDraw
                 => [ case model.images of
                         Just images ->
-                            Ports.exportToImage <| List.Zipper.current images
+                            Ports.exportToImage (List.Zipper.current images).id
 
                         Nothing ->
                             Cmd.none
@@ -349,13 +349,8 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                         let
                             numAnnotations =
                                 Array.length model.edits.present
-
-                            initialTextBox =
-                                TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations))
                         in
-                            model
-                                |> addAnnotation (TextBox <| TextArea start pos strokeColor fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations)))
-                                |> startEditingText numAnnotations
+                            finishTextBoxDrawing start pos model
                                 => [ "text-box-edit--"
                                         ++ toString numAnnotations
                                         |> Dom.focus
@@ -451,6 +446,17 @@ finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
 finishShapeDrawing start end shapeType model =
     model
         |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
+
+
+finishTextBoxDrawing : StartPosition -> EndPosition -> Model -> Model
+finishTextBoxDrawing start end model =
+    let
+        numAnnotations =
+            Array.length model.edits.present
+    in
+        model
+            |> addAnnotation (TextBox (TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations))))
+            |> startEditingText numAnnotations
 
 
 finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
@@ -730,20 +736,20 @@ closeOpenDrawingDropdowns model =
 
 
 toggleDropdown : AttributeDropdown -> Model -> Model
-toggleDropdown editOption model =
+toggleDropdown attributeDropdown model =
     { model
         | currentDropdown =
             case model.currentDropdown of
                 Just dropdown ->
-                    if dropdown == editOption then
+                    if dropdown == attributeDropdown then
                         Nothing
                     else
-                        Just editOption
+                        Just attributeDropdown
 
                 Nothing ->
-                    Just editOption
+                    Just attributeDropdown
         , drawing =
-            case editOption of
+            case attributeDropdown of
                 ShapesDropdown ->
                     model.shape
 

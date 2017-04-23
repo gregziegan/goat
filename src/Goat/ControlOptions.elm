@@ -6,8 +6,8 @@ import Goat.Model exposing (Drawing(DrawPixelate, DrawLine, DrawShape, DrawTextB
 
 strokeColors : List Color
 strokeColors =
-    [ Color.rgb 255 0 0
-    , Color.rgb 255 0 212
+    [ Color.rgb 255 0 212
+    , Color.rgb 255 0 0
     , Color.rgb 73 0 255
     , Color.rgb 0 202 255
     , Color.rgb 16 255 0
@@ -21,8 +21,8 @@ strokeColors =
 fills : List (Maybe Color)
 fills =
     [ Nothing
-    , Just (Color.rgb 255 0 0)
     , Just (Color.rgb 255 0 212)
+    , Just (Color.rgb 255 0 0)
     , Just (Color.rgb 73 0 255)
     , Just (Color.rgb 0 202 255)
     , Just (Color.rgb 16 255 0)

@@ -33,7 +33,7 @@ viewPixelatedImage { width, height, url } =
 
 
 viewImage : Image -> Svg Msg
-viewImage { width, height, url } =
+viewImage { url, width, height } =
     Svg.image
         [ Attr.class "image-to-annotate"
         , Attr.width (toString (round width))

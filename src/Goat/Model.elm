@@ -180,23 +180,34 @@ type alias AnnotationMenu =
 
 
 type alias Model =
-    { edits : UndoList (Array Annotation)
+    { -- Annotation Editing State
+      edits : UndoList (Array Annotation)
     , annotationState : AnnotationState
+    , clipboard : Maybe Annotation
+
+    -- Control UI State
+    , drawing : Drawing
     , shape : Drawing
     , spotlight : Drawing
     , fill : Maybe Color
     , strokeColor : Color
     , strokeStyle : StrokeStyle
     , fontSize : Int
-    , keyboardState : Keyboard.State
-    , images : Maybe (Zipper Image)
-    , imageSelected : Bool
     , currentDropdown : Maybe AttributeDropdown
-    , drawing : Drawing
-    , operatingSystem : OperatingSystem
+
+    -- Image Annotator Modals
     , annotationMenu : Maybe AnnotationMenu
     , showingAnyMenu : Bool
-    , clipboard : Maybe Annotation
+
+    -- Image Selection State
+    , images : Maybe (Zipper Image)
+    , imageSelected : Bool
+
+    -- Keys pressed
+    , keyboardState : Keyboard.State
+
+    -- System/Environment State
+    , operatingSystem : OperatingSystem
     , context : Context
     }
 
@@ -221,26 +232,26 @@ spotlights =
 init : Flags -> ( Model, List (Cmd msg) )
 init { isMac, inZendesk } =
     { edits = UndoList.fresh Array.empty
+    , annotationState = ReadyToDraw
+    , clipboard = Nothing
+    , drawing = DrawLine Arrow
     , shape = DrawShape Rect
     , spotlight = DrawSpotlight Rect
     , fill = Nothing
-    , strokeColor = Color.rgb 255 0 0
+    , strokeColor = Color.rgb 255 0 212
     , strokeStyle = SolidMedium
     , fontSize = 20
-    , keyboardState = Keyboard.initialState
+    , currentDropdown = Nothing
+    , annotationMenu = Nothing
+    , showingAnyMenu = False
     , images = List.Zipper.fromList []
     , imageSelected = False
-    , currentDropdown = Nothing
-    , drawing = DrawLine Arrow
-    , annotationState = ReadyToDraw
+    , keyboardState = Keyboard.initialState
     , operatingSystem =
         if isMac then
             MacOS
         else
             Windows
-    , annotationMenu = Nothing
-    , showingAnyMenu = False
-    , clipboard = Nothing
     , context =
         if inZendesk then
             Zendesk
