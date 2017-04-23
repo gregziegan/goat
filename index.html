@@ -189,7 +189,7 @@
       function encodeSvgBlobs(svg) {
         var imageBlobUrl = svg.querySelector('image').getAttribute('xlink:href');
 
-        var b64Url = b64ImageDict[svg.querySelector('.image-to-annotate').getAttribute('data-upload-id')];
+        var b64Url = b64ImageDict[zendeskExportId];
         var images = svg.querySelectorAll('image');
         images[0].setAttribute('xlink:href', b64Url);
         images[1].setAttribute('xlink:href', b64Url);

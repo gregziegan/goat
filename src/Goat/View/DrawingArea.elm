@@ -33,13 +33,14 @@ viewPixelatedImage { width, height, url } =
 
 
 viewImage : Image -> Svg Msg
-viewImage { width, height, url } =
+viewImage { id, url, width, height } =
     Svg.image
         [ Attr.class "image-to-annotate"
         , Attr.width (toString (round width))
         , Attr.height (toString (round height))
         , Attr.xlinkHref url
         , Attr.mask "url(#pixelateMask)"
+        , attribute "data-upload-id" id
         ]
         []
 
