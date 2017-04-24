@@ -49,9 +49,8 @@ viewArrowHeadDefinition color =
         , Attr.orient "auto"
         , Attr.markerWidth "6"
         , Attr.markerHeight "6"
-
-        -- , Attr.refX "65"
-        -- , Attr.refY "39"
+        , Attr.refX "65"
+        , Attr.refY "39"
         , Attr.class "pointerCursor"
         , Attr.viewBox "0 0 82 77"
         , Attr.filter "url(#dropShadow)"
