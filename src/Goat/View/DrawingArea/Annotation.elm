@@ -61,7 +61,7 @@ shapeAttributes shapeType shape fill =
         ++ strokeAttrs shape.strokeStyle shape.strokeColor
         ++ case shapeType of
             Rect ->
-                rectAttrs shape.start shape.end
+                rectAttrs shape.start shape.end ++ [ Attr.strokeLinejoin "round" ]
 
             RoundedRect ->
                 rectAttrs shape.start shape.end ++ [ Attr.rx "15", Attr.ry "15" ]
