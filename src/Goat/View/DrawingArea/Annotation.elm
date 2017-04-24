@@ -5,9 +5,9 @@ import Color exposing (Color)
 import Color.Convert
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.View.Utils exposing (..)
+import Goat.Utils exposing (arrowAngle, calcLinePos, calcShapePos, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Vertices as Vertices
-import Goat.Utils exposing (calcLinePos, calcShapePos, toDrawingPosition, toPosition)
+import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
@@ -92,18 +92,147 @@ simpleLineAttrs { start, end } =
 
 
 arrowAttributes : Shape -> List (Svg.Attribute Msg)
-arrowAttributes shape =
-    [ Attr.markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex shape.strokeColor ++ ")"
+arrowAttributes { start, end, strokeColor } =
+    let
+        dx =
+            toFloat (end.x - start.x)
 
-    -- , Attr.filter "url(#dropShadow)"
-    ]
+        dy =
+            toFloat (end.y - start.y)
+
+        d =
+            sqrt (dx ^ 2 + dy ^ 2)
+
+        halfWayPt =
+            dy * 0.54286
+
+        arcPt =
+            dy * 0.85714
+
+        theta =
+            (2 * pi)
+                - (arrowAngle start end)
+                |> Debug.log "theta"
+
+        perpen =
+            (pi / 2) - theta
+
+        -- |> Debug.log ""
+        comp =
+            pi - theta
+
+        -- * -1
+    in
+        -- [ Attr.markerStart ("url(#arrow-head--" ++ Color.Convert.colorToHex strokeColor ++ ")")
+        -- , Attr.markerEnd ("url(#arrow-tail--)" ++ Color.Convert.colorToHex strokeColor ++ ")")
+        [ Attr.fill (Color.Convert.colorToHex strokeColor)
+
+        -- , Attr.d
+        --     ("M "
+        --         ++ posToString start
+        --         ++ "l"
+        --         ++ toString (13 * cos perpen)
+        --         ++ ","
+        --         ++ toString (13 * sin perpen)
+        --         ++ "l "
+        --         ++ toString dx
+        --         ++ ","
+        --         ++ toString dy
+        --         ++ "l "
+        --         ++ toString (26 * cos comp)
+        --         ++ ","
+        --         ++ toString (26 * sin comp)
+        --         ++ "l"
+        --         ++ toString -dx
+        --         ++ ","
+        --         ++ toString -dy
+        --         ++ "l"
+        --         ++ toString (13 * cos perpen)
+        --         ++ ","
+        --         ++ toString (13 * sin perpen)
+        --     )
+        -- , Attr.d
+        --     ("M "
+        --         ++ posToString start
+        --         ++ "l"
+        --         ++ toString (13 * cos perpen)
+        --         ++ ","
+        --         ++ toString (13 * sin perpen)
+        --         ++ "l "
+        --         ++ toString dx
+        --         ++ ","
+        --         ++ toString dy
+        --         ++ "l "
+        --         ++ toString (26 * cos comp)
+        --         ++ ","
+        --         ++ toString (26 * sin comp)
+        --         ++ "l"
+        --         ++ toString -dx
+        --         ++ ","
+        --         ++ toString -dy
+        --         ++ "l"
+        --         ++ toString (13 * cos perpen)
+        --         ++ ","
+        --         ++ toString (13 * sin perpen)
+        -- ++ "c -5,"
+        -- ++ (toString halfWayPt)
+        -- ++ " -5,"
+        -- ++ (toString arcPt)
+        -- ++ " -5,"
+        -- ++ (toString dy)
+        -- ++ "l -16,0"
+        -- ++ "c 0,"
+        -- ++ (toString (arcPt - dy))
+        -- ++ " 0,"
+        -- ++ (toString (halfWayPt - dy))
+        -- ++ " -5,"
+        -- ++ (toString -dy)
+        -- ++ "z"
+        --)
+        , Attr.d
+            ("M "
+                ++ posToString start
+                ++ "l"
+                ++ toString (13 * cos perpen)
+                ++ ","
+                ++ toString (13 * sin perpen)
+                ++ "l "
+                ++ toString dx
+                ++ ","
+                ++ toString dy
+                ++ "l "
+                ++ toString (-26 * cos (-theta + (pi / 2)))
+                ++ ","
+                ++ toString (-26 * sin (-theta + (pi / 2)))
+                ++ "l"
+                ++ toString -dx
+                ++ ","
+                ++ toString -dy
+                ++ "z"
+             -- ++ "l"
+             -- ++ toString (13 * cos -comp)
+             -- ++ ","
+             -- ++ toString (13 * sin -comp)
+            )
+
+        -- ++ "l"
+        -- ++ toString (13 * cos perpen)
+        -- ++ ","
+        -- ++ toString (13 * sin perpen)
+        -- , Attr.filter "url(#dropShadow)"
+        ]
+
+
+posToString : Position -> String
+posToString pos =
+    toString pos.x ++ "," ++ toString pos.y
 
 
 lineAttributes : LineType -> Shape -> List (Svg.Attribute Msg)
 lineAttributes lineType shape =
     case lineType of
         Arrow ->
-            arrowAttributes shape ++ simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
+            arrowAttributes shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
 
         StraightLine ->
             simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
