@@ -139,30 +139,29 @@ arrowAttributes { start, end, strokeColor } =
                     ++ ","
                     ++ toString (dy * 0.85714)
                     ++ " "
-                    ++ toString dx
+                    ++ toString (dx + (2.5 * cos perpen))
                     ++ ","
-                    ++ toString (dy + (2.5 * sin theta) + 2.5)
-                    -- ++ "l "
-                    -- ++ toString dx
-                    -- ++ ","
-                    -- ++ toString dy
+                    ++ toString (dy + (2.5 * sin perpen))
                     ++ "l "
                     ++ toString (-13 * cos (-theta + (pi / 2)))
                     ++ ","
                     ++ toString (-13 * sin (-theta + (pi / 2)))
                     ++ "c"
-                    ++ toString (arcPt - dx)
+                    ++ toString (arcPt - dx + (2.5 * cos perpen))
                     ++ ","
-                    ++ toString ((-dy * 0.85714) + (2.5 * sin -theta) + 2.5)
+                    ++ toString (((dy * 0.85714) - dy) + (2.5 * sin perpen))
                     ++ " "
-                    ++ toString (halfWayPt - dx)
+                    ++ toString (halfWayPt - dx + (2.5 * cos perpen))
                     ++ ","
-                    ++ toString ((-dy * 0.54286) + (2.5 * sin -theta) + 2.5)
+                    ++ toString (((dy * 0.54286) - dy) + (2.5 * sin perpen))
                     ++ " "
-                    ++ toString -dx
+                    ++ toString (-dx + (2.5 * cos perpen))
                     ++ ","
-                    ++ toString (-dy + (2.5 * sin -theta) + 2.5)
-                    ++ "z"
+                    ++ toString (-dy + (2.5 * sin perpen))
+                    ++ "l"
+                    ++ toString (4 * cos perpen)
+                    ++ ","
+                    ++ toString (4 * sin perpen)
                 )
 
         -- , Attr.filter "url(#dropShadow)"
