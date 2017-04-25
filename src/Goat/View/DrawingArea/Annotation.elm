@@ -7,6 +7,7 @@ import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (arrowAngle, calcLinePos, calcShapePos, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Vertices as Vertices
+import Goat.Utils exposing (shiftPosition)
 import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
@@ -100,9 +101,6 @@ arrowAttributes { start, end, strokeColor } =
         dy =
             toFloat (end.y - start.y)
 
-        d =
-            sqrt (dx ^ 2 + dy ^ 2)
-
         halfWayPt =
             dx * 0.54286
 
@@ -115,57 +113,70 @@ arrowAttributes { start, end, strokeColor } =
 
         perpen =
             (pi / 2) - theta
-
-        comp =
-            pi - theta
     in
-        -- [ Attr.markerEnd ("url(#arrow-head--" ++ Color.Convert.colorToHex strokeColor ++ ")")
-        -- , Attr.markerStart ("url(#arrow-tail--)" ++ Color.Convert.colorToHex strokeColor ++ ")")
-        [ Attr.fill (Color.Convert.colorToHex strokeColor)
-        , Attr.d <|
-            Debug.log "d"
-                ("M "
-                    ++ posToString start
-                    ++ "l"
-                    ++ toString (4 * cos perpen)
-                    ++ ","
-                    ++ toString (4 * sin perpen)
-                    ++ "c"
-                    ++ toString halfWayPt
-                    ++ ","
-                    ++ toString (dy * 0.54286)
-                    ++ " "
-                    ++ toString arcPt
-                    ++ ","
-                    ++ toString (dy * 0.85714)
-                    ++ " "
-                    ++ toString (dx + (2.5 * cos perpen))
-                    ++ ","
-                    ++ toString (dy + (2.5 * sin perpen))
-                    ++ "l "
-                    ++ toString (-13 * cos (-theta + (pi / 2)))
-                    ++ ","
-                    ++ toString (-13 * sin (-theta + (pi / 2)))
-                    ++ "c"
-                    ++ toString (arcPt - dx + (2.5 * cos perpen))
-                    ++ ","
-                    ++ toString (((dy * 0.85714) - dy) + (2.5 * sin perpen))
-                    ++ " "
-                    ++ toString (halfWayPt - dx + (2.5 * cos perpen))
-                    ++ ","
-                    ++ toString (((dy * 0.54286) - dy) + (2.5 * sin perpen))
-                    ++ " "
-                    ++ toString (-dx + (2.5 * cos perpen))
-                    ++ ","
-                    ++ toString (-dy + (2.5 * sin perpen))
-                    ++ "l"
-                    ++ toString (4 * cos perpen)
-                    ++ ","
-                    ++ toString (4 * sin perpen)
-                )
-
-        -- , Attr.filter "url(#dropShadow)"
+        [ Attr.stroke "none"
+        , Attr.fill (Color.Convert.colorToHex strokeColor)
+        , Attr.d
+            ("M "
+                ++ posToString start
+                ++ "l"
+                ++ toString (4 * cos perpen)
+                ++ ","
+                ++ toString (4 * sin perpen)
+                ++ "c"
+                ++ toString halfWayPt
+                ++ ","
+                ++ toString (dy * 0.54286)
+                ++ " "
+                ++ toString arcPt
+                ++ ","
+                ++ toString (dy * 0.85714)
+                ++ " "
+                ++ toString (dx + (2.5 * cos perpen))
+                ++ ","
+                ++ toString (dy + (2.5 * sin perpen))
+                ++ "l "
+                ++ toString (-13 * cos (-theta + (pi / 2)))
+                ++ ","
+                ++ toString (-13 * sin (-theta + (pi / 2)))
+                ++ "c"
+                ++ toString (arcPt - dx + (2.5 * cos perpen))
+                ++ ","
+                ++ toString (((dy * 0.85714) - dy) + (2.5 * sin perpen))
+                ++ " "
+                ++ toString (halfWayPt - dx + (2.5 * cos perpen))
+                ++ ","
+                ++ toString (((dy * 0.54286) - dy) + (2.5 * sin perpen))
+                ++ " "
+                ++ toString (-dx + (2.5 * cos perpen))
+                ++ ","
+                ++ toString (-dy + (2.5 * sin perpen))
+                ++ "l"
+                ++ toString (4 * cos perpen)
+                ++ ","
+                ++ toString (4 * sin perpen)
+            )
+        , Attr.filter "url(#dropShadow)"
         ]
+
+
+viewArrowHead start end strokeColor =
+    let
+        theta =
+            (2 * pi)
+                - (arrowAngle start end)
+
+        perpen =
+            (pi / 2) - theta
+    in
+        Svg.path
+            [ Attr.d ("M" ++ toString end.x ++ "," ++ toString (toFloat end.y - 2.5) ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z")
+            , Attr.fill <| Color.Convert.colorToHex strokeColor
+            , Attr.stroke "none"
+            , Attr.transform ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
+            , Attr.filter "url(#dropShadow)"
+            ]
+            []
 
 
 posToString : Position -> String
@@ -177,7 +188,7 @@ lineAttributes : LineType -> Shape -> List (Svg.Attribute Msg)
 lineAttributes lineType shape =
     case lineType of
         Arrow ->
-            arrowAttributes shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
+            strokeAttrs shape.strokeStyle shape.strokeColor ++ arrowAttributes shape
 
         StraightLine ->
             simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
@@ -205,7 +216,10 @@ viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSiz
             DrawLine lineType ->
                 case lineType of
                     Arrow ->
-                        Svg.path (lineAttrs lineType) []
+                        Svg.g []
+                            [ Svg.path (lineAttrs lineType) []
+                            , viewArrowHead start (calcLinePos discretize start curPos) strokeColor
+                            ]
 
                     StraightLine ->
                         Svg.path (lineAttrs lineType) []
@@ -333,7 +347,9 @@ viewLine attrs lineType shape =
             [ Svg.path (lineAttributes lineType shape ++ attrs) [] ]
 
         Arrow ->
-            [ Svg.path (lineAttributes lineType shape ++ attrs) [] ]
+            [ Svg.path (lineAttributes lineType shape ++ attrs) []
+            , viewArrowHead shape.start shape.end shape.strokeColor
+            ]
 
 
 viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> List (Svg Msg)
