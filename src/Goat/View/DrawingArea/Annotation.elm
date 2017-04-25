@@ -160,17 +160,14 @@ arrowAttributes { start, end, strokeColor } =
         ]
 
 
+viewArrowHead : StartPosition -> EndPosition -> Color -> Svg Msg
 viewArrowHead start end strokeColor =
     let
         theta =
-            (2 * pi)
-                - (arrowAngle start end)
-
-        perpen =
-            (pi / 2) - theta
+            (2 * pi) - (arrowAngle start end)
     in
         Svg.path
-            [ Attr.d ("M" ++ toString end.x ++ "," ++ toString (toFloat end.y - 2.5) ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z")
+            [ Attr.d ("M" ++ toString end.x ++ "," ++ toString (toFloat end.y - 2.8) ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z")
             , Attr.fill <| Color.Convert.colorToHex strokeColor
             , Attr.stroke "none"
             , Attr.transform ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
