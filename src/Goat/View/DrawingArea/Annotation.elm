@@ -5,9 +5,10 @@ import Color exposing (Color)
 import Color.Convert
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.View.Utils exposing (..)
+import Goat.Utils exposing (arrowAngle, calcLinePos, calcShapePos, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Vertices as Vertices
-import Goat.Utils exposing (calcLinePos, calcShapePos, toDrawingPosition, toPosition)
+import Goat.Utils exposing (shiftPosition)
+import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
@@ -61,7 +62,7 @@ shapeAttributes shapeType shape fill =
         ++ strokeAttrs shape.strokeStyle shape.strokeColor
         ++ case shapeType of
             Rect ->
-                rectAttrs shape.start shape.end
+                rectAttrs shape.start shape.end ++ [ Attr.strokeLinejoin "round" ]
 
             RoundedRect ->
                 rectAttrs shape.start shape.end ++ [ Attr.rx "15", Attr.ry "15" ]
@@ -93,17 +94,42 @@ simpleLineAttrs { start, end } =
 
 arrowAttributes : Shape -> List (Svg.Attribute Msg)
 arrowAttributes shape =
-    [ Attr.markerEnd <| "url(#arrow-head--" ++ Color.Convert.colorToHex shape.strokeColor ++ ")"
-
-    -- , Attr.filter "url(#dropShadow)"
+    [ Attr.stroke "none"
+    , Attr.fill (Color.Convert.colorToHex shape.strokeColor)
+    , Attr.d (arrowPath shape)
+    , Attr.filter "url(#dropShadow)"
     ]
+
+
+viewArrowHead : List (Svg.Attribute Msg) -> ( Int, Int ) -> StartPosition -> EndPosition -> Color -> Svg Msg
+viewArrowHead attrs ( dx, dy ) start end strokeColor =
+    let
+        theta =
+            (2 * pi)
+                - (arrowAngle start end)
+    in
+        Svg.path
+            (attrs
+                ++ [ Attr.d (arrowHeadPath end)
+                   , Attr.fill <| Color.Convert.colorToHex strokeColor
+                   , Attr.stroke "none"
+                   , Attr.transform ("translate(" ++ toString dx ++ "," ++ toString dy ++ ") rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
+                   , Attr.filter "url(#dropShadow)"
+                   ]
+            )
+            []
+
+
+posToString : Position -> String
+posToString pos =
+    toString pos.x ++ "," ++ toString pos.y
 
 
 lineAttributes : LineType -> Shape -> List (Svg.Attribute Msg)
 lineAttributes lineType shape =
     case lineType of
         Arrow ->
-            arrowAttributes shape ++ simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
+            strokeAttrs shape.strokeStyle shape.strokeColor ++ arrowAttributes shape
 
         StraightLine ->
             simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
@@ -131,7 +157,10 @@ viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSiz
             DrawLine lineType ->
                 case lineType of
                     Arrow ->
-                        Svg.path (lineAttrs lineType) []
+                        Svg.g []
+                            [ Svg.path (lineAttrs lineType) []
+                            , viewArrowHead [] ( 0, 0 ) start (calcLinePos discretize start curPos) strokeColor
+                            ]
 
                     StraightLine ->
                         Svg.path (lineAttrs lineType) []
@@ -252,14 +281,16 @@ annotationStateVertexEvents index annotationState vertex direction =
                 []
 
 
-viewLine : List (Svg.Attribute Msg) -> LineType -> Shape -> List (Svg Msg)
-viewLine attrs lineType shape =
+viewLine : ( Int, Int ) -> List (Svg.Attribute Msg) -> LineType -> Shape -> List (Svg Msg)
+viewLine offset attrs lineType shape =
     case lineType of
         StraightLine ->
             [ Svg.path (lineAttributes lineType shape ++ attrs) [] ]
 
         Arrow ->
-            [ Svg.path (lineAttributes lineType shape ++ attrs) [] ]
+            [ Svg.path (lineAttributes lineType shape ++ attrs) []
+            , viewArrowHead attrs offset shape.start shape.end shape.strokeColor
+            ]
 
 
 viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> List (Svg Msg)
@@ -306,7 +337,7 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
             textBox.text
                 |> String.split "\n"
                 |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
-                |> Svg.text_ ([ Attr.y <| toString <| Basics.min start.y end.y ] ++ attrs)
+                |> Svg.text_ ([ Attr.y <| toString <| Basics.min start.y end.y, Attr.fontFamily "sans-serif" ] ++ attrs)
                 |> List.singleton
 
         SelectedWithVertices ->
@@ -324,6 +355,7 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
                             "black"
                      , Attr.strokeWidth "0.5px"
                      , Attr.fontSize <| toString fontSize
+                     , Attr.fontFamily "sans-serif"
                      ]
                         ++ attrs
                     )
@@ -349,6 +381,17 @@ viewAnnotation annotationState index annotation =
         annotationStateAttrs =
             annotationStateEvents index annotationState
 
+        offset =
+            case annotationState of
+                MovingAnnotation annIndex _ offset _ ->
+                    if annIndex == index then
+                        offset
+                    else
+                        ( 0, 0 )
+
+                _ ->
+                    ( 0, 0 )
+
         toVertexEvents =
             annotationStateVertexEvents index annotationState
 
@@ -357,7 +400,7 @@ viewAnnotation annotationState index annotation =
     in
         case annotation of
             Lines lineType shape ->
-                viewLine annotationStateAttrs lineType shape
+                viewLine offset annotationStateAttrs lineType shape
                     |> flip List.append (vertices Linear shape)
 
             Shapes shapeType fill shape ->
