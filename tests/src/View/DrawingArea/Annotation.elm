@@ -5,7 +5,6 @@ import Color.Convert
 import Expect exposing (Expectation)
 import Fixtures exposing (end, goat, model, start, aShape, aTextArea, testColor)
 import Goat.Flags exposing (Image)
-import Goat.View.Utils exposing (linePath, toLineStyle, fontSizeToLineHeight)
 import Goat.Model
     exposing
         ( Annotation(..)
@@ -16,8 +15,10 @@ import Goat.Model
         , ShapeType(..)
         , TextArea
         )
+import Goat.Utils exposing (arrowAngle)
 import Goat.View.DrawingArea.Annotation exposing (viewAnnotation)
 import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
+import Goat.View.Utils exposing (arrowPath, arrowHeadPath, linePath, toLineStyle, fontSizeToLineHeight)
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
@@ -39,6 +40,30 @@ lineSelector shape =
     , attribute "d" (linePath shape.start shape.end)
     ]
         ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
+
+
+arrowSelector : Shape -> List Selector
+arrowSelector shape =
+    [ attribute "stroke" "none"
+    , attribute "fill" (Color.Convert.colorToHex shape.strokeColor)
+    , attribute "d" (arrowPath shape)
+    , attribute "filter" ("url(#dropShadow)")
+    ]
+
+
+arrowHeadSelector : ( Int, Int ) -> Shape -> List Selector
+arrowHeadSelector ( dx, dy ) { start, end, strokeColor } =
+    let
+        theta =
+            (2 * pi)
+                - (arrowAngle start end)
+    in
+        [ attribute "d" (arrowHeadPath end)
+        , attribute "fill" <| Color.Convert.colorToHex strokeColor
+        , attribute "stroke" "none"
+        , attribute "transform" ("translate(" ++ toString dx ++ "," ++ toString dy ++ ") rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
+        , attribute "filter" "url(#dropShadow)"
+        ]
 
 
 strokeSelectors : String -> String -> Color -> List Selector
@@ -152,8 +177,19 @@ viewAnnotationTests =
                     |> viewAnnotation ReadyToDraw 0
                     |> svgDrawspace
                     |> Query.fromHtml
-                    |> Query.find [ tag "path" ]
-                    |> Query.has (lineSelector aShape)
+                    |> Query.findAll [ tag "path" ]
+                    |> Query.first
+                    |> Query.has (arrowSelector aShape)
+        , test "An arrow head has the appropriate view attributes" <|
+            \() ->
+                aShape
+                    |> Lines Arrow
+                    |> viewAnnotation ReadyToDraw 0
+                    |> svgDrawspace
+                    |> Query.fromHtml
+                    |> Query.findAll [ tag "path" ]
+                    |> Query.index 1
+                    |> Query.has (arrowHeadSelector ( 0, 0 ) aShape)
         , test "A rectangle has the appropriate view attributes" <|
             \() ->
                 aShape

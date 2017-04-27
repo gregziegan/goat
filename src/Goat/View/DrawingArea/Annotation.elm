@@ -92,113 +92,13 @@ simpleLineAttrs { start, end } =
     ]
 
 
-arrowAngle2 a b =
-    let
-        theta =
-            atan2 (toFloat (b.y - a.y)) (toFloat (b.x - a.x))
-
-        radians =
-            if theta < 0.0 then
-                (2 * pi) + theta
-            else
-                theta
-    in
-        radians
-
-
 arrowAttributes : Shape -> List (Svg.Attribute Msg)
 arrowAttributes shape =
-    let
-        start =
-            { x = toFloat shape.start.x, y = toFloat shape.start.y }
-
-        end =
-            { x =
-                if shape.end.x > shape.start.x && shape.end.y > shape.start.y then
-                    (-20 * cos -theta) + toFloat shape.end.x
-                else if shape.end.x < shape.start.x && shape.end.y < shape.start.y then
-                    (20 * cos -comp) + toFloat shape.end.x
-                else if shape.end.x < shape.start.x && shape.end.y > shape.start.y then
-                    (20 * cos -comp) + toFloat shape.end.x
-                else
-                    (-20 * cos -theta) + toFloat shape.end.x
-            , y =
-                if shape.end.x > shape.start.x && shape.end.y > shape.start.y then
-                    (-20 * sin -theta) + toFloat shape.end.y
-                else if shape.end.x < shape.start.x && shape.end.y < shape.start.y then
-                    (-20 * sin -comp) + toFloat shape.end.y
-                else if shape.end.x < shape.start.x && shape.end.y > shape.start.y then
-                    (-20 * sin -comp) + toFloat shape.end.y
-                else
-                    (20 * sin theta) + toFloat shape.end.y
-            }
-
-        dx =
-            end.x - start.x
-
-        dy =
-            end.y - start.y
-
-        halfWayPt =
-            dx * 0.54286
-
-        arcPt =
-            dx * 0.85714
-
-        theta =
-            (2 * pi)
-                - (arrowAngle shape.start shape.end)
-
-        perpen =
-            (pi / 2) - theta
-
-        comp =
-            pi - theta
-    in
-        [ Attr.stroke "none"
-        , Attr.fill (Color.Convert.colorToHex shape.strokeColor)
-        , Attr.d
-            ("M "
-                ++ posToString shape.start
-                ++ "l"
-                ++ toString (4 * cos perpen)
-                ++ ","
-                ++ toString (4 * sin perpen)
-                ++ "c"
-                ++ toString halfWayPt
-                ++ ","
-                ++ toString (dy * 0.54286)
-                ++ " "
-                ++ toString arcPt
-                ++ ","
-                ++ toString (dy * 0.85714)
-                ++ " "
-                ++ toString (dx + (2.5 * cos perpen))
-                ++ ","
-                ++ toString (dy + (2.5 * sin perpen))
-                ++ "l "
-                ++ toString (-13 * cos (-theta + (pi / 2)))
-                ++ ","
-                ++ toString (-13 * sin (-theta + (pi / 2)))
-                ++ "c"
-                ++ toString (arcPt - dx + (2.5 * cos perpen))
-                ++ ","
-                ++ toString (((dy * 0.85714) - dy) + (2.5 * sin perpen))
-                ++ " "
-                ++ toString (halfWayPt - dx + (2.5 * cos perpen))
-                ++ ","
-                ++ toString (((dy * 0.54286) - dy) + (2.5 * sin perpen))
-                ++ " "
-                ++ toString (-dx + (2.5 * cos perpen))
-                ++ ","
-                ++ toString (-dy + (2.5 * sin perpen))
-                ++ "l"
-                ++ toString (4 * cos perpen)
-                ++ ","
-                ++ toString (4 * sin perpen)
-            )
-        , Attr.filter "url(#dropShadow)"
-        ]
+    [ Attr.stroke "none"
+    , Attr.fill (Color.Convert.colorToHex shape.strokeColor)
+    , Attr.d (arrowPath shape)
+    , Attr.filter "url(#dropShadow)"
+    ]
 
 
 viewArrowHead : List (Svg.Attribute Msg) -> ( Int, Int ) -> StartPosition -> EndPosition -> Color -> Svg Msg
@@ -207,13 +107,10 @@ viewArrowHead attrs ( dx, dy ) start end strokeColor =
         theta =
             (2 * pi)
                 - (arrowAngle start end)
-
-        perpen =
-            (pi / 2) - theta
     in
         Svg.path
             (attrs
-                ++ [ Attr.d ("M" ++ toString (toFloat end.x - 20.6667) ++ "," ++ toString (toFloat end.y - 2.8) ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z")
+                ++ [ Attr.d (arrowHeadPath end)
                    , Attr.fill <| Color.Convert.colorToHex strokeColor
                    , Attr.stroke "none"
                    , Attr.transform ("translate(" ++ toString dx ++ "," ++ toString dy ++ ") rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
