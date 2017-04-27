@@ -68,12 +68,13 @@ button:active, button:focus, button:hover {
 
 .dropdown-things {
   display: flex;
+  position: relative;
 }
 
 .dropdown-options {
   position: absolute;
-  margin-left: 35px;
-  margin-top: 3px;
+  top: 57%;
+  left: 69%;
   border-radius: 1px;
   overflow: hidden;
   height: 30px;
