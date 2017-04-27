@@ -214,8 +214,8 @@ type alias Model =
 
 shapes : List Drawing
 shapes =
-    [ DrawShape Rect
-    , DrawShape RoundedRect
+    [ DrawShape RoundedRect
+    , DrawShape Rect
     , DrawShape Ellipse
     , DrawLine StraightLine
     ]
@@ -223,8 +223,8 @@ shapes =
 
 spotlights : List Drawing
 spotlights =
-    [ DrawSpotlight Rect
-    , DrawSpotlight RoundedRect
+    [ DrawSpotlight RoundedRect
+    , DrawSpotlight Rect
     , DrawSpotlight Ellipse
     ]
 
@@ -235,8 +235,8 @@ init { isMac, inZendesk } =
     , annotationState = ReadyToDraw
     , clipboard = Nothing
     , drawing = DrawLine Arrow
-    , shape = DrawShape Rect
-    , spotlight = DrawSpotlight Rect
+    , shape = DrawShape RoundedRect
+    , spotlight = DrawSpotlight RoundedRect
     , fill = Nothing
     , strokeColor = Color.rgb 255 0 212
     , strokeStyle = SolidMedium
