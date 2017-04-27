@@ -341,7 +341,15 @@ continueDrawing pos model =
                 , freeDrawPositions =
                     case model.drawing of
                         DrawFreeHand ->
-                            pos :: model.freeDrawPositions
+                            case model.freeDrawPositions of
+                                [] ->
+                                    [ pos ]
+
+                                lastPos :: rest ->
+                                    if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
+                                        model.freeDrawPositions
+                                    else
+                                        pos :: model.freeDrawPositions
 
                         _ ->
                             model.freeDrawPositions
@@ -989,22 +997,22 @@ shiftForPaste : Annotation -> Annotation
 shiftForPaste annotation =
     case annotation of
         Lines lineType line ->
-            Lines lineType { line | start = positionMap ((+) 10) line.start, end = positionMap ((+) 10) line.end }
+            Lines lineType { line | start = shiftPosition 10 10 line.start, end = shiftPosition 10 10 line.end }
 
         FreeDraw shape positions ->
-            FreeDraw { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end } positions
+            FreeDraw { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end } (List.map (shiftPosition 10 10) positions)
 
         Shapes shapeType fill shape ->
-            Shapes shapeType fill { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
+            Shapes shapeType fill { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
 
         TextBox textArea ->
-            TextBox { textArea | start = positionMap ((+) 10) textArea.start, end = positionMap ((+) 10) textArea.end }
+            TextBox { textArea | start = shiftPosition 10 10 textArea.start, end = shiftPosition 10 10 textArea.end }
 
         Spotlight shapeType shape ->
-            Spotlight shapeType { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
+            Spotlight shapeType { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
 
         Pixelate start end ->
-            Pixelate (positionMap ((+) 10) start) (positionMap ((+) 10) end)
+            Pixelate (shiftPosition 10 10 start) (shiftPosition 10 10 end)
 
 
 pasteAnnotation : Model -> Model

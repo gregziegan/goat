@@ -58,7 +58,7 @@ fillAttrs fill =
 
 freeDrawAttributes : Shape -> List Position -> List (Svg.Attribute Msg)
 freeDrawAttributes shape positions =
-    [ Attr.d (freeDrawPath shape.start (List.reverse positions))
+    [ Attr.d (freeDrawPath shape.start (List.reverse (shape.end :: positions)))
     , Attr.fill "none"
     , Attr.strokeLinejoin "round"
     ]
@@ -322,7 +322,7 @@ viewFreeDraw selectState attrs shape positions =
          ]
             ++ if selectState == Selected then
                 [ Svg.path
-                    [ Attr.d (freeDrawPath shape.start (List.reverse positions))
+                    [ Attr.d (freeDrawPath shape.start (List.reverse (shape.end :: positions)))
                     , Attr.stroke "blue"
                     , Attr.strokeWidth "0.5"
                     , Attr.fill "none"
