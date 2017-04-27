@@ -337,7 +337,7 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
             textBox.text
                 |> String.split "\n"
                 |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
-                |> Svg.text_ ([ Attr.y <| toString <| Basics.min start.y end.y ] ++ attrs)
+                |> Svg.text_ ([ Attr.y <| toString <| Basics.min start.y end.y, Attr.fontFamily "sans-serif" ] ++ attrs)
                 |> List.singleton
 
         SelectedWithVertices ->
@@ -355,6 +355,7 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
                             "black"
                      , Attr.strokeWidth "0.5px"
                      , Attr.fontSize <| toString fontSize
+                     , Attr.fontFamily "sans-serif"
                      ]
                         ++ attrs
                     )
