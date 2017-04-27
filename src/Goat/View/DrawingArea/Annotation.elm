@@ -201,7 +201,8 @@ arrowAttributes shape =
         ]
 
 
-viewArrowHead start end strokeColor =
+viewArrowHead : List (Svg.Attribute Msg) -> ( Int, Int ) -> StartPosition -> EndPosition -> Color -> Svg Msg
+viewArrowHead attrs ( dx, dy ) start end strokeColor =
     let
         theta =
             (2 * pi)
@@ -211,12 +212,14 @@ viewArrowHead start end strokeColor =
             (pi / 2) - theta
     in
         Svg.path
-            [ Attr.d ("M" ++ toString (toFloat end.x - 20.6667) ++ "," ++ toString (toFloat end.y - 2.5) ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z")
-            , Attr.fill <| Color.Convert.colorToHex strokeColor
-            , Attr.stroke "none"
-            , Attr.transform ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
-            , Attr.filter "url(#dropShadow)"
-            ]
+            (attrs
+                ++ [ Attr.d ("M" ++ toString (toFloat end.x - 20.6667) ++ "," ++ toString (toFloat end.y - 2.8) ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z")
+                   , Attr.fill <| Color.Convert.colorToHex strokeColor
+                   , Attr.stroke "none"
+                   , Attr.transform ("translate(" ++ toString dx ++ "," ++ toString dy ++ ") rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
+                   , Attr.filter "url(#dropShadow)"
+                   ]
+            )
             []
 
 
@@ -259,7 +262,7 @@ viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSiz
                     Arrow ->
                         Svg.g []
                             [ Svg.path (lineAttrs lineType) []
-                            , viewArrowHead start (calcLinePos discretize start curPos) strokeColor
+                            , viewArrowHead [] ( 0, 0 ) start (calcLinePos discretize start curPos) strokeColor
                             ]
 
                     StraightLine ->
@@ -381,15 +384,15 @@ annotationStateVertexEvents index annotationState vertex direction =
                 []
 
 
-viewLine : List (Svg.Attribute Msg) -> LineType -> Shape -> List (Svg Msg)
-viewLine attrs lineType shape =
+viewLine : ( Int, Int ) -> List (Svg.Attribute Msg) -> LineType -> Shape -> List (Svg Msg)
+viewLine offset attrs lineType shape =
     case lineType of
         StraightLine ->
             [ Svg.path (lineAttributes lineType shape ++ attrs) [] ]
 
         Arrow ->
             [ Svg.path (lineAttributes lineType shape ++ attrs) []
-            , viewArrowHead shape.start shape.end shape.strokeColor
+            , viewArrowHead attrs offset shape.start shape.end shape.strokeColor
             ]
 
 
@@ -480,6 +483,17 @@ viewAnnotation annotationState index annotation =
         annotationStateAttrs =
             annotationStateEvents index annotationState
 
+        offset =
+            case annotationState of
+                MovingAnnotation annIndex _ offset _ ->
+                    if annIndex == index then
+                        offset
+                    else
+                        ( 0, 0 )
+
+                _ ->
+                    ( 0, 0 )
+
         toVertexEvents =
             annotationStateVertexEvents index annotationState
 
@@ -488,7 +502,7 @@ viewAnnotation annotationState index annotation =
     in
         case annotation of
             Lines lineType shape ->
-                viewLine annotationStateAttrs lineType shape
+                viewLine offset annotationStateAttrs lineType shape
                     |> flip List.append (vertices Linear shape)
 
             Shapes shapeType fill shape ->
