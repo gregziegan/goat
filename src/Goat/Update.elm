@@ -140,6 +140,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                     Keyboard.updateWithKeyChange keyMsg model.keyboardState
             in
                 { model | keyboardState = keyboardState }
+                    |> alterToolbarWithKeyboard maybeKeyChange
                     |> alterDrawingsWithKeyboard maybeKeyChange
 
         CloseAllMenus ->
@@ -777,60 +778,68 @@ finishEditingText index model =
     }
 
 
-handleKeyboardShortcuts : KeyChange -> Model -> Model
-handleKeyboardShortcuts keyChange model =
-    case keyChange of
-        KeyDown key ->
-            case key of
-                CharA ->
-                    { model | drawing = DrawLine Arrow }
+alterToolbarWithKeyboard : Maybe KeyChange -> Model -> Model
+alterToolbarWithKeyboard keyChangeMaybe model =
+    case keyChangeMaybe of
+        Just keyChange ->
+            case keyChange of
+                KeyDown key ->
+                    case key of
+                        Escape ->
+                            closeDropdown model
 
-                CharL ->
-                    { model | drawing = DrawLine StraightLine }
+                        CharA ->
+                            { model | drawing = DrawLine Arrow }
 
-                CharR ->
-                    { model | drawing = DrawShape Rect }
+                        CharL ->
+                            { model | drawing = DrawLine StraightLine }
 
-                CharO ->
-                    { model | drawing = DrawShape RoundedRect }
+                        CharR ->
+                            { model | drawing = DrawShape Rect }
 
-                CharE ->
-                    { model | drawing = DrawShape Ellipse }
+                        CharO ->
+                            { model | drawing = DrawShape RoundedRect }
 
-                CharT ->
-                    { model | drawing = DrawTextBox }
+                        CharE ->
+                            { model | drawing = DrawShape Ellipse }
 
-                CharG ->
-                    { model | drawing = DrawSpotlight Rect }
+                        CharT ->
+                            { model | drawing = DrawTextBox }
 
-                CharC ->
-                    if isPressed Shift model.keyboardState then
-                        model
-                    else
-                        { model | drawing = DrawSpotlight RoundedRect }
+                        CharG ->
+                            { model | drawing = DrawSpotlight Rect }
 
-                CharI ->
-                    { model | drawing = DrawSpotlight Ellipse }
+                        CharC ->
+                            if isPressed Shift model.keyboardState then
+                                model
+                            else
+                                { model | drawing = DrawSpotlight RoundedRect }
 
-                CharP ->
-                    { model | drawing = DrawPixelate }
+                        CharI ->
+                            { model | drawing = DrawSpotlight Ellipse }
 
-                CharN ->
-                    toggleDropdown Fonts model
+                        CharP ->
+                            { model | drawing = DrawPixelate }
 
-                CharK ->
-                    toggleDropdown StrokeColors model
+                        CharN ->
+                            toggleDropdown Fonts model
 
-                CharF ->
-                    toggleDropdown Fills model
+                        CharK ->
+                            toggleDropdown StrokeColors model
 
-                CharS ->
-                    toggleDropdown Strokes model
+                        CharF ->
+                            toggleDropdown Fills model
 
-                _ ->
+                        CharS ->
+                            toggleDropdown Strokes model
+
+                        _ ->
+                            model
+
+                KeyUp _ ->
                     model
 
-        KeyUp key ->
+        Nothing ->
             model
 
 
@@ -989,7 +998,6 @@ alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
                 case model.annotationState of
                     ReadyToDraw ->
                         alterDrawing ctrlPressed keyChange model
-                            |> handleKeyboardShortcuts keyChange
                             |> handlePaste ctrlPressed keyChange
                             => []
 
