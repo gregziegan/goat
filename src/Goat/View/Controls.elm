@@ -135,7 +135,6 @@ viewFontSizeDropdown toDropdownMenu os =
                         "Fon̲t Sizes"
             ]
             [ Icons.viewFontSize
-            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Fonts
         ]
@@ -214,7 +213,6 @@ viewStrokeStyleDropdown toDropdownMenu strokeStyle os =
                         "S̲troke Styles"
             ]
             [ Icons.viewStrokeStyle strokeStyle
-            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Strokes
         ]
@@ -236,7 +234,6 @@ viewFillDropdown toDropdownMenu fill os =
                         "F̲ills"
             ]
             [ Icons.viewFill fill
-            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Fills
         ]
@@ -258,7 +255,6 @@ viewStrokeColorDropdown toDropdownMenu strokeColor os =
                         "Strok̲e Colors"
             ]
             [ Icons.viewStrokeColor strokeColor
-            , Icons.viewCornerArrow
             ]
         , toDropdownMenu StrokeColors
         ]
