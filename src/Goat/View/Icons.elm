@@ -1,4 +1,4 @@
-module Goat.View.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle, viewPixelate)
+module Goat.View.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle, viewPixelate, freeHand)
 
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
@@ -250,3 +250,9 @@ viewPixelate =
                 []
             ]
         ]
+
+
+freeHand : Html msg
+freeHand =
+    svg [ viewBox "0 0 20 20", width "20", height "20" ]
+        [ Svg.path [ d "M11 0L0 11l1 1L12 1z", fillRule "nonzero", fill "currentColor" ] [] ]

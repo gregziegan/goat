@@ -25,6 +25,7 @@ viewControls { edits, shape, spotlight, keyboardState, drawing, annotationState,
         , viewHistoryControls operatingSystem edits
         , div [ class "columns" ]
             [ viewDrawingButton operatingSystem drawing (DrawLine Arrow)
+            , viewDrawingButton operatingSystem drawing DrawFreeHand
             , viewDrawingButton operatingSystem drawing DrawTextBox
             , viewShapesDropdown toDropdownMenu drawing shape operatingSystem
             , viewSpotlightsDropdown toDropdownMenu drawing spotlight operatingSystem
@@ -372,6 +373,9 @@ windowsDrawingToTitle drawing =
                 StraightLine ->
                     "L̲ine"
 
+        DrawFreeHand ->
+            "Free H̲and"
+
         DrawShape shapeType ->
             case shapeType of
                 Rect ->
@@ -412,6 +416,9 @@ macDrawingToTitle drawing =
                 StraightLine ->
                     "Line (L)"
 
+        DrawFreeHand ->
+            "Free Hand (H)"
+
         DrawShape shapeType ->
             case shapeType of
                 Rect ->
@@ -451,6 +458,9 @@ viewShapeSvg drawing =
 
                 Arrow ->
                     Icons.viewArrow
+
+        DrawFreeHand ->
+            Icons.freeHand
 
         DrawShape shapeType ->
             case shapeType of

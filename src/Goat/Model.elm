@@ -28,6 +28,7 @@ type alias EndPosition =
 
 type Drawing
     = DrawLine LineType
+    | DrawFreeHand
     | DrawShape ShapeType
     | DrawTextBox
     | DrawSpotlight ShapeType
@@ -91,6 +92,7 @@ type Vertices
 
 type Annotation
     = Lines LineType Shape
+    | FreeDraw Shape (List Position)
     | Shapes ShapeType (Maybe Color) Shape
     | TextBox TextArea
     | Spotlight ShapeType Shape
@@ -184,6 +186,7 @@ type alias Model =
     { -- Annotation Editing State
       edits : UndoList (Array Annotation)
     , annotationState : AnnotationState
+    , freeDrawPositions : List Position
     , clipboard : Maybe Annotation
 
     -- Control UI State
@@ -235,6 +238,7 @@ init : Flags -> ( Model, List (Cmd msg) )
 init { isMac, inZendesk } =
     { edits = UndoList.fresh Array.empty
     , annotationState = ReadyToDraw
+    , freeDrawPositions = []
     , clipboard = Nothing
     , drawing = DrawLine Arrow
     , shape = DrawShape RoundedRect

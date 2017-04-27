@@ -11,7 +11,7 @@ import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttribut
 import Html.Attributes as Attr
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp), isPressed)
 import List.Zipper exposing (Zipper)
-import Mouse exposing (Position)
+import Mouse exposing (Position, position)
 import Rocket exposing ((=>))
 import Task exposing (succeed)
 import UndoList exposing (UndoList)
@@ -336,14 +336,23 @@ continueDrawing : Position -> Model -> Model
 continueDrawing pos model =
     case model.annotationState of
         DrawingAnnotation start _ ->
-            { model | annotationState = DrawingAnnotation start pos }
+            { model
+                | annotationState = DrawingAnnotation start pos
+                , freeDrawPositions =
+                    case model.drawing of
+                        DrawFreeHand ->
+                            pos :: model.freeDrawPositions
+
+                        _ ->
+                            model.freeDrawPositions
+            }
 
         _ ->
             model
 
 
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
-finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
+finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize, freeDrawPositions } as model) =
     case model.annotationState of
         DrawingAnnotation start _ ->
             if isDrawingTooSmall (isSpotlightDrawing model.drawing) start pos then
@@ -354,6 +363,10 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                 case model.drawing of
                     DrawLine lineType ->
                         finishLineDrawing start pos lineType model
+                            => []
+
+                    DrawFreeHand ->
+                        finishFreeDrawing start pos freeDrawPositions model
                             => []
 
                     DrawShape shapeType ->
@@ -451,6 +464,13 @@ finishLineDrawing start end lineType model =
         |> addAnnotation (Lines lineType (Shape start (calcLinePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
 
 
+finishFreeDrawing : StartPosition -> EndPosition -> List Position -> Model -> Model
+finishFreeDrawing start end positions model =
+    model
+        |> addAnnotation (FreeDraw (Shape start end model.strokeColor model.strokeStyle) positions)
+        |> clearFreeDrawPositions
+
+
 finishPixelateDrawing : StartPosition -> EndPosition -> Model -> Model
 finishPixelateDrawing start end model =
     model
@@ -497,11 +517,19 @@ editTextBoxAnnotation index autoExpandState autoExpandText model =
         |> skipChange model
 
 
+clearFreeDrawPositions : Model -> Model
+clearFreeDrawPositions model =
+    { model | freeDrawPositions = [] }
+
+
 updateStrokeColor : Color -> Annotation -> Annotation
 updateStrokeColor strokeColor annotation =
     case annotation of
         Lines lineType line ->
             Lines lineType { line | strokeColor = strokeColor }
+
+        FreeDraw shape positions ->
+            FreeDraw { shape | strokeColor = strokeColor } positions
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill { shape | strokeColor = strokeColor }
@@ -522,6 +550,9 @@ updateFill fill annotation =
         Lines _ _ ->
             annotation
 
+        FreeDraw _ _ ->
+            annotation
+
         Shapes shapeType _ shape ->
             Shapes shapeType fill shape
 
@@ -540,6 +571,9 @@ updateStrokeStyle strokeStyle annotation =
     case annotation of
         Lines lineType line ->
             Lines lineType { line | strokeStyle = strokeStyle }
+
+        FreeDraw shape positions ->
+            FreeDraw { shape | strokeStyle = strokeStyle } positions
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill { shape | strokeStyle = strokeStyle }
@@ -691,6 +725,9 @@ resize discretize resizingData annotation =
         Lines lineType shape ->
             Lines lineType (resizeVertices (calcLinePos discretize) resizingData shape)
 
+        FreeDraw _ _ ->
+            annotation
+
         Shapes shapeType fill shape ->
             Shapes shapeType fill (resizeVertices (calcShapePos discretize) resizingData shape)
 
@@ -720,6 +757,9 @@ move translate annotation =
     case annotation of
         Lines lineType line ->
             Lines lineType (shift translate line)
+
+        FreeDraw shape positions ->
+            FreeDraw (shift translate shape) (List.map (shiftPosition (Tuple.first translate) (Tuple.second translate)) positions)
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill (shift translate shape)
@@ -951,6 +991,9 @@ shiftForPaste annotation =
         Lines lineType line ->
             Lines lineType { line | start = positionMap ((+) 10) line.start, end = positionMap ((+) 10) line.end }
 
+        FreeDraw shape positions ->
+            FreeDraw { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end } positions
+
         Shapes shapeType fill shape ->
             Shapes shapeType fill { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
 
@@ -1105,6 +1148,9 @@ changeShapeAndSpotlightDropdowns drawing model =
 
                 StraightLine ->
                     { model | shape = drawing }
+
+        DrawFreeHand ->
+            model
 
         DrawShape _ ->
             { model | shape = drawing }
