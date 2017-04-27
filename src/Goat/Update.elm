@@ -33,6 +33,8 @@ type Msg
     | SelectStrokeStyle StrokeStyle
     | SelectFontSize Int
       -- Control UI updates
+    | WaitForDropdownToggle AttributeDropdown
+    | CancelDropdownWait
     | ToggleDropdown AttributeDropdown
     | ChangeDrawing Drawing
     | CloseDropdown
@@ -188,9 +190,21 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                 |> closeDropdown
                 => []
 
+        WaitForDropdownToggle attributeDropdown ->
+            model
+                |> waitForDropdownToggle attributeDropdown
+                |> closeDropdown
+                => []
+
+        CancelDropdownWait ->
+            model
+                |> cancelWaitForDropdownToggle
+                => []
+
         ToggleDropdown editOption ->
             model
                 |> toggleDropdown editOption
+                |> cancelWaitForDropdownToggle
                 => []
 
         CloseDropdown ->
@@ -734,6 +748,28 @@ closeOpenDrawingDropdowns model =
             else
                 model.currentDropdown
     }
+
+
+waitForDropdownToggle : AttributeDropdown -> Model -> Model
+waitForDropdownToggle attributeDropdown model =
+    { model
+        | waitingForDropdownToggle = Just attributeDropdown
+        , drawing =
+            case attributeDropdown of
+                ShapesDropdown ->
+                    model.shape
+
+                SpotlightsDropdown ->
+                    model.spotlight
+
+                _ ->
+                    model.drawing
+    }
+
+
+cancelWaitForDropdownToggle : Model -> Model
+cancelWaitForDropdownToggle model =
+    { model | waitingForDropdownToggle = Nothing }
 
 
 toggleDropdown : AttributeDropdown -> Model -> Model

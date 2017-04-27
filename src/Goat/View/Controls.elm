@@ -3,13 +3,13 @@ module Goat.View.Controls exposing (viewControls, viewDropdownMenu)
 import Array.Hamt exposing (Array)
 import Color exposing (Color)
 import Goat.ControlOptions as ControlOptions exposing (fontSizes)
-import Goat.View.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (drawingsAreEqual, isSpotlightDrawing)
+import Goat.View.Icons as Icons
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style, title)
-import Html.Events exposing (onClick, onWithOptions)
+import Html.Events exposing (onClick, onMouseDown, onMouseUp, onWithOptions)
 import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
 
@@ -73,7 +73,8 @@ viewShapesDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> Op
 viewShapesDropdown toDropdownMenu selectedDrawing curShape os =
     div [ class "dropdown-things" ]
         [ button
-            [ onClick <| ToggleDropdown ShapesDropdown
+            [ onMouseDown (WaitForDropdownToggle ShapesDropdown)
+            , onMouseUp CancelDropdownWait
             , classList
                 [ "drawing-button" => True
                 , "drawing-button--selected" => List.member selectedDrawing shapes --List.isEmpty (List.filter (drawingsAreEqual drawing) shapes)
@@ -97,7 +98,8 @@ viewSpotlightsDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -
 viewSpotlightsDropdown toDropdownMenu selectedDrawing curSpotlight os =
     div [ class "dropdown-things" ]
         [ button
-            [ onClick <| ToggleDropdown SpotlightsDropdown
+            [ onMouseDown (WaitForDropdownToggle SpotlightsDropdown)
+            , onMouseUp CancelDropdownWait
             , classList
                 [ "drawing-button" => True
                 , "drawing-button--selected" => List.member selectedDrawing spotlights

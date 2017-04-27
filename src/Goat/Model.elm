@@ -10,6 +10,7 @@ import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
 import Goat.Flags exposing (Flags, Image)
 import Goat.Ports as Ports
+import Time exposing (Time)
 
 
 type Context
@@ -189,6 +190,7 @@ type alias Model =
     , drawing : Drawing
     , shape : Drawing
     , spotlight : Drawing
+    , waitingForDropdownToggle : Maybe AttributeDropdown
     , fill : Maybe Color
     , strokeColor : Color
     , strokeStyle : StrokeStyle
@@ -237,6 +239,7 @@ init { isMac, inZendesk } =
     , drawing = DrawLine Arrow
     , shape = DrawShape RoundedRect
     , spotlight = DrawSpotlight RoundedRect
+    , waitingForDropdownToggle = Nothing
     , fill = Nothing
     , strokeColor = Color.rgb 255 0 212
     , strokeStyle = SolidMedium
