@@ -26,6 +26,7 @@ goat =
 model : Model
 model =
     { edits = UndoList.fresh Array.empty
+    , waitingForDropdownToggle = Nothing
     , fill = Nothing
     , strokeColor = Color.red
     , strokeStyle = SolidMedium
