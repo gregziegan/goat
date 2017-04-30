@@ -5,15 +5,15 @@ import Color exposing (Color)
 import Color.Convert
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.Utils exposing (arrowAngle, calcLinePos, calcShapePos, toDrawingPosition, toPosition)
+import Goat.Utils exposing (arrowAngle, calcLinePos, shiftPosition, calcShapePos, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Vertices as Vertices
-import Goat.Utils exposing (shiftPosition)
 import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra exposing (Key(Shift), KeyChange, isPressed)
+import List.Extra
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
 import SingleTouch as ST
@@ -54,6 +54,15 @@ fillAttrs fill =
             [ Attr.fillOpacity "0"
             , Attr.pointerEvents "visibleStroke"
             ]
+
+
+freeDrawAttributes : Shape -> List Position -> List (Svg.Attribute Msg)
+freeDrawAttributes shape positions =
+    [ Attr.d (freeDrawPath shape.start (List.reverse (shape.end :: positions)))
+    , Attr.fill "none"
+    , Attr.strokeLinejoin "round"
+    ]
+        ++ strokeAttrs shape.strokeStyle shape.strokeColor
 
 
 shapeAttributes : ShapeType -> Shape -> Maybe Color -> List (Svg.Attribute Msg)
@@ -120,11 +129,6 @@ viewArrowHead attrs ( dx, dy ) start end strokeColor =
             []
 
 
-posToString : Position -> String
-posToString pos =
-    toString pos.x ++ "," ++ toString pos.y
-
-
 lineAttributes : LineType -> Shape -> List (Svg.Attribute Msg)
 lineAttributes lineType shape =
     case lineType of
@@ -136,7 +140,7 @@ lineAttributes lineType shape =
 
 
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
-viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
+viewDrawing { drawing, keyboardState, freeDrawPositions } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
     let
         discretize =
             isPressed Shift keyboardState
@@ -164,6 +168,9 @@ viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSiz
 
                     StraightLine ->
                         Svg.path (lineAttrs lineType) []
+
+            DrawFreeHand ->
+                Svg.path (freeDrawAttributes (Shape start curPos strokeColor strokeStyle) freeDrawPositions) []
 
             DrawShape shapeType ->
                 case shapeType of
@@ -194,24 +201,39 @@ viewDrawing { drawing, keyboardState } { strokeColor, fill, strokeStyle, fontSiz
                 Svg.text ""
 
 
-getSelectState : Int -> AnnotationState -> SelectState
-getSelectState annIndex annotationState =
+getSelectState : Int -> Annotation -> AnnotationState -> SelectState
+getSelectState annIndex annotation annotationState =
     case annotationState of
         SelectedAnnotation index _ ->
             if index == annIndex then
-                SelectedWithVertices
+                case annotation of
+                    FreeDraw _ _ ->
+                        Selected
+
+                    _ ->
+                        SelectedWithVertices
             else
                 NotSelected
 
         MovingAnnotation index _ _ _ ->
             if index == annIndex then
-                SelectedWithVertices
+                case annotation of
+                    FreeDraw _ _ ->
+                        Selected
+
+                    _ ->
+                        SelectedWithVertices
             else
                 NotSelected
 
         ResizingAnnotation { index } _ ->
             if index == annIndex then
-                SelectedWithVertices
+                case annotation of
+                    FreeDraw _ _ ->
+                        Selected
+
+                    _ ->
+                        SelectedWithVertices
             else
                 NotSelected
 
@@ -291,6 +313,53 @@ viewLine offset attrs lineType shape =
             [ Svg.path (lineAttributes lineType shape ++ attrs) []
             , viewArrowHead attrs offset shape.start shape.end shape.strokeColor
             ]
+
+
+viewFreeDraw : SelectState -> List (Svg.Attribute Msg) -> Shape -> List Position -> List (Svg Msg)
+viewFreeDraw selectState attrs shape positions =
+    let
+        leftMostX =
+            List.Extra.minimumBy .x positions
+                |> Maybe.map .x
+                |> Maybe.withDefault 0
+
+        rightMostX =
+            List.Extra.maximumBy .x positions
+                |> Maybe.map .x
+                |> Maybe.withDefault 0
+
+        topMostY =
+            List.Extra.minimumBy .y positions
+                |> Maybe.map .y
+                |> Maybe.withDefault 0
+
+        bottomMostY =
+            List.Extra.maximumBy .y positions
+                |> Maybe.map .y
+                |> Maybe.withDefault 0
+    in
+        [ Svg.g attrs
+            ([ Svg.path (freeDrawAttributes shape positions) []
+             ]
+                ++ if selectState == Selected then
+                    [ Svg.rect
+                        [ Attr.x (toString (leftMostX - 5))
+                        , Attr.y (toString (topMostY - 5))
+                        , Attr.width (toString (10 + rightMostX - leftMostX))
+                        , Attr.height (toString (10 + bottomMostY - topMostY))
+                        , Attr.stroke "#555"
+                        , Attr.strokeWidth "0.5"
+                        , Attr.strokeDasharray "10, 5"
+                        , Attr.fill "none"
+                        , Attr.strokeLinejoin "round"
+                        , Attr.pointerEvents "none"
+                        ]
+                        []
+                    ]
+                   else
+                    []
+            )
+        ]
 
 
 viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> List (Svg Msg)
@@ -376,7 +445,7 @@ viewAnnotation : AnnotationState -> Int -> Annotation -> List (Svg Msg)
 viewAnnotation annotationState index annotation =
     let
         selectState =
-            getSelectState index annotationState
+            getSelectState index annotation annotationState
 
         annotationStateAttrs =
             annotationStateEvents index annotationState
@@ -402,6 +471,9 @@ viewAnnotation annotationState index annotation =
             Lines lineType shape ->
                 viewLine offset annotationStateAttrs lineType shape
                     |> flip List.append (vertices Linear shape)
+
+            FreeDraw shape positions ->
+                viewFreeDraw selectState annotationStateAttrs shape positions
 
             Shapes shapeType fill shape ->
                 viewShape annotationStateAttrs shapeType fill shape

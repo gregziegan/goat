@@ -2,9 +2,9 @@ module Update.DrawingAnnotation exposing (all)
 
 import Array.Hamt as Array
 import Expect exposing (Expectation)
-import Fixtures exposing (end, model, start, aTextArea)
+import Fixtures exposing (end, model, start, aTextArea, firstFreeDrawPosition, secondFreeDrawPosition)
 import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..))
-import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishTextBoxDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing)
+import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishTextBoxDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing, finishFreeDrawing)
 import Goat.Utils exposing (shiftPosition)
 import Test exposing (..)
 import TestUtil exposing (getDrawingStateCurPos, getFirstAnnotation)
@@ -48,6 +48,15 @@ continueDrawingTests =
                     |> .annotationState
                     |> getDrawingStateCurPos
                     |> Expect.equal Nothing
+        , test "should add mouse positions to the free draw path list" <|
+            \() ->
+                model
+                    |> changeDrawing DrawFreeHand
+                    |> startDrawing start
+                    |> continueDrawing firstFreeDrawPosition
+                    |> continueDrawing secondFreeDrawPosition
+                    |> .freeDrawPositions
+                    |> Expect.equalLists [ secondFreeDrawPosition, firstFreeDrawPosition ]
         ]
 
 
@@ -66,6 +75,18 @@ finishDrawingTests =
                     |> finishLineDrawing start end Arrow
                     |> getFirstAnnotation
                     |> Expect.equal (Just (Lines Arrow (Shape start end model.strokeColor model.strokeStyle)))
+        , test "should add a free hand draw annotation to the edit history" <|
+            \() ->
+                model
+                    |> finishFreeDrawing start end [ secondFreeDrawPosition, firstFreeDrawPosition ]
+                    |> getFirstAnnotation
+                    |> Expect.equal (Just (FreeDraw (Shape start end model.strokeColor model.strokeStyle) [ secondFreeDrawPosition, firstFreeDrawPosition ]))
+        , test "should empty free drawing positions list" <|
+            \() ->
+                model
+                    |> finishFreeDrawing start end [ secondFreeDrawPosition, firstFreeDrawPosition ]
+                    |> .freeDrawPositions
+                    |> Expect.equal []
         , test "should add a shape annotation to the edit history" <|
             \() ->
                 model

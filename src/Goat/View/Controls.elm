@@ -3,19 +3,19 @@ module Goat.View.Controls exposing (viewControls, viewDropdownMenu)
 import Array.Hamt exposing (Array)
 import Color exposing (Color)
 import Goat.ControlOptions as ControlOptions exposing (fontSizes)
-import Goat.View.Icons as Icons
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (drawingsAreEqual, isSpotlightDrawing)
+import Goat.View.Icons as Icons
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style, title)
-import Html.Events exposing (onClick, onWithOptions)
+import Html.Events exposing (onClick, onMouseDown, onMouseUp, onWithOptions)
 import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
 
 
 viewControls : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewControls { edits, keyboardState, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
+viewControls { edits, shape, spotlight, keyboardState, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
     div
         [ class "controls" ]
         [ div [ class "columns" ]
@@ -24,13 +24,17 @@ viewControls { edits, keyboardState, drawing, annotationState, operatingSystem }
             ]
         , viewHistoryControls operatingSystem edits
         , div [ class "columns" ]
-            (List.map (viewDrawingButton operatingSystem drawing) ControlOptions.drawings
-                ++ [ viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
-                   , viewFillDropdown toDropdownMenu fill operatingSystem
-                   , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
-                   , viewFontSizeDropdown toDropdownMenu operatingSystem
-                   ]
-            )
+            [ viewDrawingButton operatingSystem drawing (DrawLine Arrow)
+            , viewDrawingButton operatingSystem drawing DrawFreeHand
+            , viewDrawingButton operatingSystem drawing DrawTextBox
+            , viewShapesDropdown toDropdownMenu drawing shape operatingSystem
+            , viewSpotlightsDropdown toDropdownMenu drawing spotlight operatingSystem
+            , viewDrawingButton operatingSystem drawing DrawPixelate
+            , viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
+            , viewFillDropdown toDropdownMenu fill operatingSystem
+            , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
+            , viewFontSizeDropdown toDropdownMenu operatingSystem
+            ]
         ]
 
 
@@ -66,6 +70,57 @@ viewHistoryControls os edits =
         ]
 
 
+viewShapesDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
+viewShapesDropdown toDropdownMenu selectedDrawing curShape os =
+    div [ class "dropdown-things" ]
+        [ button
+            [ onMouseDown (WaitForDropdownToggle ShapesDropdown)
+            , onMouseUp CancelDropdownWait
+            , classList
+                [ "drawing-button" => True
+                , "drawing-button--selected" => List.member selectedDrawing shapes --List.isEmpty (List.filter (drawingsAreEqual drawing) shapes)
+                ]
+            , title <|
+                case os of
+                    MacOS ->
+                        "Font Sizes (N)"
+
+                    Windows ->
+                        "Fon̲t Sizes"
+            ]
+            [ viewShapeSvg curShape
+            , Icons.viewCornerArrow
+            ]
+        , toDropdownMenu ShapesDropdown
+        ]
+
+
+viewSpotlightsDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
+viewSpotlightsDropdown toDropdownMenu selectedDrawing curSpotlight os =
+    div [ class "dropdown-things" ]
+        [ button
+            [ onMouseDown (WaitForDropdownToggle SpotlightsDropdown)
+            , onMouseUp CancelDropdownWait
+            , classList
+                [ "drawing-button" => True
+                , "drawing-button--selected" => List.member selectedDrawing spotlights
+                , "drawing-button--spotlight" => True
+                ]
+            , title <|
+                case os of
+                    MacOS ->
+                        "Font Sizes (N)"
+
+                    Windows ->
+                        "Fon̲t Sizes"
+            ]
+            [ viewShapeSvg curSpotlight
+            , Icons.viewCornerArrow
+            ]
+        , toDropdownMenu SpotlightsDropdown
+        ]
+
+
 viewFontSizeDropdown : (AttributeDropdown -> Html Msg) -> OperatingSystem -> Html Msg
 viewFontSizeDropdown toDropdownMenu os =
     div [ class "dropdown-things" ]
@@ -81,7 +136,6 @@ viewFontSizeDropdown toDropdownMenu os =
                         "Fon̲t Sizes"
             ]
             [ Icons.viewFontSize
-            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Fonts
         ]
@@ -160,7 +214,6 @@ viewStrokeStyleDropdown toDropdownMenu strokeStyle os =
                         "S̲troke Styles"
             ]
             [ Icons.viewStrokeStyle strokeStyle
-            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Strokes
         ]
@@ -182,7 +235,6 @@ viewFillDropdown toDropdownMenu fill os =
                         "F̲ills"
             ]
             [ Icons.viewFill fill
-            , Icons.viewCornerArrow
             ]
         , toDropdownMenu Fills
         ]
@@ -204,7 +256,6 @@ viewStrokeColorDropdown toDropdownMenu strokeColor os =
                         "Strok̲e Colors"
             ]
             [ Icons.viewStrokeColor strokeColor
-            , Icons.viewCornerArrow
             ]
         , toDropdownMenu StrokeColors
         ]
@@ -229,18 +280,24 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         [ Icons.viewStrokeStyle strokeStyle ]
 
 
-viewDropdownMenu : Maybe AttributeDropdown -> AnnotationAttributes -> Model -> AttributeDropdown -> Html Msg
-viewDropdownMenu maybeDropdown annotationAttrs model selectedOption =
-    Maybe.map (viewDropdownOptions model annotationAttrs selectedOption) maybeDropdown
+viewDropdownMenu : Maybe AttributeDropdown -> Drawing -> AnnotationAttributes -> AttributeDropdown -> Html Msg
+viewDropdownMenu maybeDropdown drawing annotationAttrs selectedOption =
+    Maybe.map (viewDropdownOptions drawing annotationAttrs selectedOption) maybeDropdown
         |> Maybe.withDefault (text "")
 
 
-viewDropdownOptions : Model -> AnnotationAttributes -> AttributeDropdown -> AttributeDropdown -> Html Msg
-viewDropdownOptions model { fill, strokeColor, strokeStyle, fontSize } selectedOption editOption =
+viewDropdownOptions : Drawing -> AnnotationAttributes -> AttributeDropdown -> AttributeDropdown -> Html Msg
+viewDropdownOptions drawing { fill, strokeColor, strokeStyle, fontSize } selectedOption editOption =
     if selectedOption /= editOption then
         text ""
     else
         case editOption of
+            ShapesDropdown ->
+                viewShapesOptions drawing
+
+            SpotlightsDropdown ->
+                viewSpotlightsOptions drawing
+
             Fonts ->
                 viewFontSizeOptions fontSize
 
@@ -252,6 +309,33 @@ viewDropdownOptions model { fill, strokeColor, strokeStyle, fontSize } selectedO
 
             Strokes ->
                 viewStrokeStyleOptions strokeStyle
+
+
+viewShapesOptions : Drawing -> Html Msg
+viewShapesOptions drawing =
+    shapes
+        |> List.map (viewDrawingOption drawing)
+        |> div [ class "dropdown-options" ]
+
+
+viewDrawingOption : Drawing -> Drawing -> Html Msg
+viewDrawingOption selectedDrawing drawing =
+    button
+        [ classList
+            [ "dropdown-button" => True
+            , "dropdown-button--selected" => selectedDrawing == drawing
+            , "dropdown-button--spotlight" => List.member drawing spotlights
+            ]
+        , onClick (ChangeDrawing drawing)
+        ]
+        [ viewShapeSvg drawing ]
+
+
+viewSpotlightsOptions : Drawing -> Html Msg
+viewSpotlightsOptions drawing =
+    spotlights
+        |> List.map (viewDrawingOption drawing)
+        |> div [ class "dropdown-options" ]
 
 
 viewDrawingButton : OperatingSystem -> Drawing -> Drawing -> Html Msg
@@ -288,6 +372,9 @@ windowsDrawingToTitle drawing =
 
                 StraightLine ->
                     "L̲ine"
+
+        DrawFreeHand ->
+            "Free H̲and"
 
         DrawShape shapeType ->
             case shapeType of
@@ -329,6 +416,9 @@ macDrawingToTitle drawing =
                 StraightLine ->
                     "Line (L)"
 
+        DrawFreeHand ->
+            "Free Hand (H)"
+
         DrawShape shapeType ->
             case shapeType of
                 Rect ->
@@ -368,6 +458,9 @@ viewShapeSvg drawing =
 
                 Arrow ->
                     Icons.viewArrow
+
+        DrawFreeHand ->
+            Icons.freeHand
 
         DrawShape shapeType ->
             case shapeType of

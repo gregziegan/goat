@@ -5,13 +5,13 @@ import AutoExpand
 import Color exposing (Color)
 import Dom
 import Goat.Flags exposing (Image)
-import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
+import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, drawingsAreEqual, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
 import Html.Attributes as Attr
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp), isPressed)
 import List.Zipper exposing (Zipper)
-import Mouse exposing (Position)
+import Mouse exposing (Position, position)
 import Rocket exposing ((=>))
 import Task exposing (succeed)
 import UndoList exposing (UndoList)
@@ -33,9 +33,12 @@ type Msg
     | SelectStrokeStyle StrokeStyle
     | SelectFontSize Int
       -- Control UI updates
+    | WaitForDropdownToggle AttributeDropdown
+    | CancelDropdownWait
     | ToggleDropdown AttributeDropdown
     | ChangeDrawing Drawing
     | CloseDropdown
+    | CloseOpenDrawingDropdowns
       -- Selection Updates
     | ResetToReadyToDraw
     | SelectAnnotation Int
@@ -76,6 +79,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
         StartDrawing pos ->
             model
                 |> startDrawing pos
+                |> closeDropdown
                 => []
 
         ContinueDrawing pos ->
@@ -98,6 +102,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
         StartEditingText index ->
             model
                 |> startEditingText index
+                |> closeDropdown
                 => []
 
         PreventTextMouseDown ->
@@ -107,6 +112,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
         TextBoxInput index { state, textValue } ->
             model
                 |> editTextBoxAnnotation index state textValue
+                |> closeDropdown
                 => []
 
         FinishEditingText index ->
@@ -136,6 +142,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                     Keyboard.updateWithKeyChange keyMsg model.keyboardState
             in
                 { model | keyboardState = keyboardState }
+                    |> alterToolbarWithKeyboard maybeKeyChange
                     |> alterDrawingsWithKeyboard maybeKeyChange
 
         CloseAllMenus ->
@@ -183,14 +190,31 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
                 |> closeDropdown
                 => []
 
+        WaitForDropdownToggle attributeDropdown ->
+            model
+                |> waitForDropdownToggle attributeDropdown
+                |> closeDropdown
+                => []
+
+        CancelDropdownWait ->
+            model
+                |> cancelWaitForDropdownToggle
+                => []
+
         ToggleDropdown editOption ->
             model
                 |> toggleDropdown editOption
+                |> cancelWaitForDropdownToggle
                 => []
 
         CloseDropdown ->
             model
                 |> closeDropdown
+                => []
+
+        CloseOpenDrawingDropdowns ->
+            model
+                |> closeOpenDrawingDropdowns
                 => []
 
         SelectAnnotation index ->
@@ -213,6 +237,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
             model
                 |> selectAnnotation index
                 |> startMovingAnnotation index start
+                |> closeDropdown
                 => []
 
         MoveAnnotation newPos ->
@@ -230,6 +255,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
             model
                 |> startResizingAnnotation index vertex start
                 |> resizeAnnotation start
+                |> closeDropdown
                 => []
 
         ResizeAnnotation pos ->
@@ -310,14 +336,31 @@ continueDrawing : Position -> Model -> Model
 continueDrawing pos model =
     case model.annotationState of
         DrawingAnnotation start _ ->
-            { model | annotationState = DrawingAnnotation start pos }
+            { model
+                | annotationState = DrawingAnnotation start pos
+                , freeDrawPositions =
+                    case model.drawing of
+                        DrawFreeHand ->
+                            case model.freeDrawPositions of
+                                [] ->
+                                    [ pos ]
+
+                                lastPos :: rest ->
+                                    if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
+                                        model.freeDrawPositions
+                                    else
+                                        pos :: model.freeDrawPositions
+
+                        _ ->
+                            model.freeDrawPositions
+            }
 
         _ ->
             model
 
 
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
-finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
+finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize, freeDrawPositions } as model) =
     case model.annotationState of
         DrawingAnnotation start _ ->
             if isDrawingTooSmall (isSpotlightDrawing model.drawing) start pos then
@@ -328,6 +371,10 @@ finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
                 case model.drawing of
                     DrawLine lineType ->
                         finishLineDrawing start pos lineType model
+                            => []
+
+                    DrawFreeHand ->
+                        finishFreeDrawing start pos freeDrawPositions model
                             => []
 
                     DrawShape shapeType ->
@@ -425,6 +472,13 @@ finishLineDrawing start end lineType model =
         |> addAnnotation (Lines lineType (Shape start (calcLinePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
 
 
+finishFreeDrawing : StartPosition -> EndPosition -> List Position -> Model -> Model
+finishFreeDrawing start end positions model =
+    model
+        |> addAnnotation (FreeDraw (Shape start end model.strokeColor model.strokeStyle) positions)
+        |> clearFreeDrawPositions
+
+
 finishPixelateDrawing : StartPosition -> EndPosition -> Model -> Model
 finishPixelateDrawing start end model =
     model
@@ -471,11 +525,19 @@ editTextBoxAnnotation index autoExpandState autoExpandText model =
         |> skipChange model
 
 
+clearFreeDrawPositions : Model -> Model
+clearFreeDrawPositions model =
+    { model | freeDrawPositions = [] }
+
+
 updateStrokeColor : Color -> Annotation -> Annotation
 updateStrokeColor strokeColor annotation =
     case annotation of
         Lines lineType line ->
             Lines lineType { line | strokeColor = strokeColor }
+
+        FreeDraw shape positions ->
+            FreeDraw { shape | strokeColor = strokeColor } positions
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill { shape | strokeColor = strokeColor }
@@ -496,6 +558,9 @@ updateFill fill annotation =
         Lines _ _ ->
             annotation
 
+        FreeDraw _ _ ->
+            annotation
+
         Shapes shapeType _ shape ->
             Shapes shapeType fill shape
 
@@ -514,6 +579,9 @@ updateStrokeStyle strokeStyle annotation =
     case annotation of
         Lines lineType line ->
             Lines lineType { line | strokeStyle = strokeStyle }
+
+        FreeDraw shape positions ->
+            FreeDraw { shape | strokeStyle = strokeStyle } positions
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill { shape | strokeStyle = strokeStyle }
@@ -665,6 +733,9 @@ resize discretize resizingData annotation =
         Lines lineType shape ->
             Lines lineType (resizeVertices (calcLinePos discretize) resizingData shape)
 
+        FreeDraw _ _ ->
+            annotation
+
         Shapes shapeType fill shape ->
             Shapes shapeType fill (resizeVertices (calcShapePos discretize) resizingData shape)
 
@@ -695,6 +766,9 @@ move translate annotation =
         Lines lineType line ->
             Lines lineType (shift translate line)
 
+        FreeDraw shape positions ->
+            FreeDraw (shift translate shape) (List.map (shiftPosition (Tuple.first translate) (Tuple.second translate)) positions)
+
         Shapes shapeType fill shape ->
             Shapes shapeType fill (shift translate shape)
 
@@ -713,6 +787,39 @@ closeDropdown model =
     { model | currentDropdown = Nothing }
 
 
+closeOpenDrawingDropdowns : Model -> Model
+closeOpenDrawingDropdowns model =
+    { model
+        | currentDropdown =
+            if model.currentDropdown == (Just ShapesDropdown) || model.currentDropdown == (Just SpotlightsDropdown) then
+                Nothing
+            else
+                model.currentDropdown
+    }
+
+
+waitForDropdownToggle : AttributeDropdown -> Model -> Model
+waitForDropdownToggle attributeDropdown model =
+    { model
+        | waitingForDropdownToggle = Just attributeDropdown
+        , drawing =
+            case attributeDropdown of
+                ShapesDropdown ->
+                    model.shape
+
+                SpotlightsDropdown ->
+                    model.spotlight
+
+                _ ->
+                    model.drawing
+    }
+
+
+cancelWaitForDropdownToggle : Model -> Model
+cancelWaitForDropdownToggle model =
+    { model | waitingForDropdownToggle = Nothing }
+
+
 toggleDropdown : AttributeDropdown -> Model -> Model
 toggleDropdown attributeDropdown model =
     { model
@@ -728,6 +835,12 @@ toggleDropdown attributeDropdown model =
                     Just attributeDropdown
         , drawing =
             case attributeDropdown of
+                ShapesDropdown ->
+                    model.shape
+
+                SpotlightsDropdown ->
+                    model.spotlight
+
                 Fonts ->
                     DrawTextBox
 
@@ -749,60 +862,68 @@ finishEditingText index model =
     }
 
 
-handleKeyboardShortcuts : KeyChange -> Model -> Model
-handleKeyboardShortcuts keyChange model =
-    case keyChange of
-        KeyDown key ->
-            case key of
-                CharA ->
-                    { model | drawing = DrawLine Arrow }
+alterToolbarWithKeyboard : Maybe KeyChange -> Model -> Model
+alterToolbarWithKeyboard keyChangeMaybe model =
+    case keyChangeMaybe of
+        Just keyChange ->
+            case keyChange of
+                KeyDown key ->
+                    case key of
+                        Escape ->
+                            closeDropdown model
 
-                CharL ->
-                    { model | drawing = DrawLine StraightLine }
+                        CharA ->
+                            { model | drawing = DrawLine Arrow }
 
-                CharR ->
-                    { model | drawing = DrawShape Rect }
+                        CharL ->
+                            { model | drawing = DrawLine StraightLine }
 
-                CharO ->
-                    { model | drawing = DrawShape RoundedRect }
+                        CharR ->
+                            { model | drawing = DrawShape Rect }
 
-                CharE ->
-                    { model | drawing = DrawShape Ellipse }
+                        CharO ->
+                            { model | drawing = DrawShape RoundedRect }
 
-                CharT ->
-                    { model | drawing = DrawTextBox }
+                        CharE ->
+                            { model | drawing = DrawShape Ellipse }
 
-                CharG ->
-                    { model | drawing = DrawSpotlight Rect }
+                        CharT ->
+                            { model | drawing = DrawTextBox }
 
-                CharC ->
-                    if isPressed Shift model.keyboardState then
-                        model
-                    else
-                        { model | drawing = DrawSpotlight RoundedRect }
+                        CharG ->
+                            { model | drawing = DrawSpotlight Rect }
 
-                CharI ->
-                    { model | drawing = DrawSpotlight Ellipse }
+                        CharC ->
+                            if isPressed Shift model.keyboardState then
+                                model
+                            else
+                                { model | drawing = DrawSpotlight RoundedRect }
 
-                CharP ->
-                    { model | drawing = DrawPixelate }
+                        CharI ->
+                            { model | drawing = DrawSpotlight Ellipse }
 
-                CharN ->
-                    toggleDropdown Fonts model
+                        CharP ->
+                            { model | drawing = DrawPixelate }
 
-                CharK ->
-                    toggleDropdown StrokeColors model
+                        CharN ->
+                            toggleDropdown Fonts model
 
-                CharF ->
-                    toggleDropdown Fills model
+                        CharK ->
+                            toggleDropdown StrokeColors model
 
-                CharS ->
-                    toggleDropdown Strokes model
+                        CharF ->
+                            toggleDropdown Fills model
 
-                _ ->
+                        CharS ->
+                            toggleDropdown Strokes model
+
+                        _ ->
+                            model
+
+                KeyUp _ ->
                     model
 
-        KeyUp key ->
+        Nothing ->
             model
 
 
@@ -876,19 +997,22 @@ shiftForPaste : Annotation -> Annotation
 shiftForPaste annotation =
     case annotation of
         Lines lineType line ->
-            Lines lineType { line | start = positionMap ((+) 10) line.start, end = positionMap ((+) 10) line.end }
+            Lines lineType { line | start = shiftPosition 10 10 line.start, end = shiftPosition 10 10 line.end }
+
+        FreeDraw shape positions ->
+            FreeDraw { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end } (List.map (shiftPosition 10 10) positions)
 
         Shapes shapeType fill shape ->
-            Shapes shapeType fill { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
+            Shapes shapeType fill { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
 
         TextBox textArea ->
-            TextBox { textArea | start = positionMap ((+) 10) textArea.start, end = positionMap ((+) 10) textArea.end }
+            TextBox { textArea | start = shiftPosition 10 10 textArea.start, end = shiftPosition 10 10 textArea.end }
 
         Spotlight shapeType shape ->
-            Spotlight shapeType { shape | start = positionMap ((+) 10) shape.start, end = positionMap ((+) 10) shape.end }
+            Spotlight shapeType { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
 
         Pixelate start end ->
-            Pixelate (positionMap ((+) 10) start) (positionMap ((+) 10) end)
+            Pixelate (shiftPosition 10 10 start) (shiftPosition 10 10 end)
 
 
 pasteAnnotation : Model -> Model
@@ -961,7 +1085,6 @@ alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
                 case model.annotationState of
                     ReadyToDraw ->
                         alterDrawing ctrlPressed keyChange model
-                            |> handleKeyboardShortcuts keyChange
                             |> handlePaste ctrlPressed keyChange
                             => []
 
@@ -1023,9 +1146,37 @@ deleteSelectedDrawing model =
             model
 
 
+changeShapeAndSpotlightDropdowns : Drawing -> Model -> Model
+changeShapeAndSpotlightDropdowns drawing model =
+    case drawing of
+        DrawLine lineType ->
+            case lineType of
+                Arrow ->
+                    model
+
+                StraightLine ->
+                    { model | shape = drawing }
+
+        DrawFreeHand ->
+            model
+
+        DrawShape _ ->
+            { model | shape = drawing }
+
+        DrawTextBox ->
+            model
+
+        DrawSpotlight _ ->
+            { model | spotlight = drawing }
+
+        DrawPixelate ->
+            model
+
+
 changeDrawing : Drawing -> Model -> Model
 changeDrawing drawing model =
     { model | drawing = drawing }
+        |> changeShapeAndSpotlightDropdowns drawing
 
 
 releaseKey : Key -> Model -> Model

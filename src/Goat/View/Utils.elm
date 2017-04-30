@@ -4,6 +4,7 @@ import Goat.Model exposing (Annotation(..), AnnotationState(..), ShapeType(..), 
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import Json.Decode as Json
+import Mouse exposing (Position)
 import Rocket exposing ((=>))
 import Goat.Utils exposing (arrowAngle, shiftPosition)
 
@@ -135,6 +136,26 @@ linePath strokeWidth start end =
             ++ " L"
             ++ posToString ccPt4
             ++ "Z"
+
+
+freeDrawPath : StartPosition -> List Position -> String
+freeDrawPath start positions =
+    freeDrawPathHelper positions ("M " ++ posToString start)
+
+
+freeDrawPathHelper : List Position -> String -> String
+freeDrawPathHelper positions pathString =
+    case positions of
+        [] ->
+            pathString
+
+        pos :: rest ->
+            freeDrawPathHelper rest (pathString ++ " L " ++ posToString pos)
+
+
+posToString : Position -> String
+posToString pos =
+    toString pos.x ++ "," ++ toString pos.y
 
 
 directionToCursor : ResizeDirection -> String

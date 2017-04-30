@@ -10,6 +10,7 @@ import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
 import Goat.Flags exposing (Flags, Image)
 import Goat.Ports as Ports
+import Time exposing (Time)
 
 
 type Context
@@ -27,6 +28,7 @@ type alias EndPosition =
 
 type Drawing
     = DrawLine LineType
+    | DrawFreeHand
     | DrawShape ShapeType
     | DrawTextBox
     | DrawSpotlight ShapeType
@@ -64,7 +66,9 @@ type alias TextArea =
 
 
 type AttributeDropdown
-    = Fonts
+    = ShapesDropdown
+    | SpotlightsDropdown
+    | Fonts
     | Fills
     | StrokeColors
     | Strokes
@@ -88,6 +92,7 @@ type Vertices
 
 type Annotation
     = Lines LineType Shape
+    | FreeDraw Shape (List Position)
     | Shapes ShapeType (Maybe Color) Shape
     | TextBox TextArea
     | Spotlight ShapeType Shape
@@ -181,10 +186,14 @@ type alias Model =
     { -- Annotation Editing State
       edits : UndoList (Array Annotation)
     , annotationState : AnnotationState
+    , freeDrawPositions : List Position
     , clipboard : Maybe Annotation
 
     -- Control UI State
     , drawing : Drawing
+    , shape : Drawing
+    , spotlight : Drawing
+    , waitingForDropdownToggle : Maybe AttributeDropdown
     , fill : Maybe Color
     , strokeColor : Color
     , strokeStyle : StrokeStyle
@@ -208,12 +217,33 @@ type alias Model =
     }
 
 
+shapes : List Drawing
+shapes =
+    [ DrawShape RoundedRect
+    , DrawShape Rect
+    , DrawShape Ellipse
+    , DrawLine StraightLine
+    ]
+
+
+spotlights : List Drawing
+spotlights =
+    [ DrawSpotlight RoundedRect
+    , DrawSpotlight Rect
+    , DrawSpotlight Ellipse
+    ]
+
+
 init : Flags -> ( Model, List (Cmd msg) )
 init { isMac, inZendesk } =
     { edits = UndoList.fresh Array.empty
     , annotationState = ReadyToDraw
+    , freeDrawPositions = []
     , clipboard = Nothing
     , drawing = DrawLine Arrow
+    , shape = DrawShape RoundedRect
+    , spotlight = DrawSpotlight RoundedRect
+    , waitingForDropdownToggle = Nothing
     , fill = Nothing
     , strokeColor = Color.rgb 255 0 212
     , strokeStyle = SolidMedium

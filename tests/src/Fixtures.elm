@@ -26,6 +26,8 @@ goat =
 model : Model
 model =
     { edits = UndoList.fresh Array.empty
+    , waitingForDropdownToggle = Nothing
+    , freeDrawPositions = []
     , fill = Nothing
     , strokeColor = Color.red
     , strokeStyle = SolidMedium
@@ -35,6 +37,8 @@ model =
     , imageSelected = True
     , currentDropdown = Nothing
     , drawing = DrawLine Arrow
+    , shape = DrawShape Rect
+    , spotlight = DrawSpotlight RoundedRect
     , annotationState = ReadyToDraw
     , operatingSystem = MacOS
     , annotationMenu = Nothing
@@ -46,12 +50,22 @@ model =
 
 start : StartPosition
 start =
-    Mouse.Position 50 50
+    Position 50 50
 
 
 end : EndPosition
 end =
-    Mouse.Position 76 88
+    Position 76 88
+
+
+firstFreeDrawPosition : Position
+firstFreeDrawPosition =
+    Position 65 65
+
+
+secondFreeDrawPosition : Position
+secondFreeDrawPosition =
+    Position 80 80
 
 
 line : Color.Color -> StrokeStyle -> Shape

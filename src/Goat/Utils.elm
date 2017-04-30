@@ -144,6 +144,9 @@ drawingsAreEqual drawing drawing2 =
                 _ ->
                     False
 
+        DrawFreeHand ->
+            drawing2 == DrawFreeHand
+
         DrawShape shapeType ->
             case drawing2 of
                 DrawShape shapeType2 ->
@@ -169,12 +172,7 @@ drawingsAreEqual drawing drawing2 =
                     False
 
         DrawPixelate ->
-            case drawing2 of
-                DrawPixelate ->
-                    True
-
-                _ ->
-                    False
+            drawing2 == DrawPixelate
 
 
 isSpotlightShape : Annotation -> Bool
@@ -234,6 +232,9 @@ getPositions annotation =
         Lines lineType line ->
             line.start => line.end
 
+        FreeDraw shape _ ->
+            shape.start => shape.end
+
         Shapes shapeType _ shape ->
             shape.start => shape.end
 
@@ -251,6 +252,9 @@ getAnnotationAttributes : Annotation -> AnnotationAttributes -> AnnotationAttrib
 getAnnotationAttributes annotation existingAttrs =
     case annotation of
         Lines _ shape ->
+            AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
+
+        FreeDraw shape _ ->
             AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
 
         Shapes _ fill shape ->
