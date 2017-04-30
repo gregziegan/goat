@@ -27,6 +27,7 @@ model : Model
 model =
     { edits = UndoList.fresh Array.empty
     , waitingForDropdownToggle = Nothing
+    , freeDrawPositions = []
     , fill = Nothing
     , strokeColor = Color.red
     , strokeStyle = SolidMedium
