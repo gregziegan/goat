@@ -140,10 +140,21 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
             let
                 ( keyboardState, maybeKeyChange ) =
                     Keyboard.updateWithKeyChange keyMsg model.keyboardState
+
+                controlKeys =
+                    case model.operatingSystem of
+                        MacOS ->
+                            [ Super, ContextMenu ]
+
+                        Windows ->
+                            [ Control ]
+
+                ctrlPressed =
+                    List.any (\key -> isPressed key keyboardState) controlKeys
             in
                 { model | keyboardState = keyboardState }
-                    |> alterToolbarWithKeyboard maybeKeyChange
-                    |> alterDrawingsWithKeyboard maybeKeyChange
+                    |> alterToolbarWithKeyboard ctrlPressed maybeKeyChange
+                    |> alterDrawingsWithKeyboard ctrlPressed maybeKeyChange
 
         CloseAllMenus ->
             model
@@ -862,8 +873,8 @@ finishEditingText index model =
     }
 
 
-alterToolbarWithKeyboard : Maybe KeyChange -> Model -> Model
-alterToolbarWithKeyboard keyChangeMaybe model =
+alterToolbarWithKeyboard : Bool -> Maybe KeyChange -> Model -> Model
+alterToolbarWithKeyboard ctrlPressed keyChangeMaybe model =
     case keyChangeMaybe of
         Just keyChange ->
             case keyChange of
@@ -894,7 +905,7 @@ alterToolbarWithKeyboard keyChangeMaybe model =
                             { model | drawing = DrawSpotlight Rect }
 
                         CharC ->
-                            if isPressed Shift model.keyboardState then
+                            if ctrlPressed then
                                 model
                             else
                                 { model | drawing = DrawSpotlight RoundedRect }
@@ -1066,51 +1077,39 @@ handlePaste ctrlPressed keyChange model =
             model
 
 
-alterDrawingsWithKeyboard : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
-alterDrawingsWithKeyboard maybeKeyChange ({ keyboardState } as model) =
-    let
-        controlKeys =
-            case model.operatingSystem of
-                MacOS ->
-                    [ Super, ContextMenu ]
+alterDrawingsWithKeyboard : Bool -> Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
+alterDrawingsWithKeyboard ctrlPressed maybeKeyChange ({ keyboardState } as model) =
+    case maybeKeyChange of
+        Just keyChange ->
+            case model.annotationState of
+                ReadyToDraw ->
+                    alterDrawing ctrlPressed keyChange model
+                        |> handlePaste ctrlPressed keyChange
+                        => []
 
-                Windows ->
-                    [ Control ]
+                DrawingAnnotation _ _ ->
+                    alterDrawing ctrlPressed keyChange model
+                        => []
 
-        ctrlPressed =
-            List.any (\key -> isPressed key model.keyboardState) controlKeys
-    in
-        case maybeKeyChange of
-            Just keyChange ->
-                case model.annotationState of
-                    ReadyToDraw ->
-                        alterDrawing ctrlPressed keyChange model
-                            |> handlePaste ctrlPressed keyChange
-                            => []
+                SelectedAnnotation index _ ->
+                    alterDrawing ctrlPressed keyChange model
+                        |> handleSelectedAnnotationKeyboard index ctrlPressed keyChange
+                        |> handlePaste ctrlPressed keyChange
+                        => []
 
-                    DrawingAnnotation _ _ ->
-                        alterDrawing ctrlPressed keyChange model
-                            => []
+                MovingAnnotation _ _ _ _ ->
+                    alterDrawing ctrlPressed keyChange model
+                        => []
 
-                    SelectedAnnotation index _ ->
-                        alterDrawing ctrlPressed keyChange model
-                            |> handleSelectedAnnotationKeyboard index ctrlPressed keyChange
-                            |> handlePaste ctrlPressed keyChange
-                            => []
+                ResizingAnnotation _ _ ->
+                    alterDrawing ctrlPressed keyChange model
+                        => []
 
-                    MovingAnnotation _ _ _ _ ->
-                        alterDrawing ctrlPressed keyChange model
-                            => []
+                EditingATextBox index _ ->
+                    alterTextBoxDrawing keyChange index model
 
-                    ResizingAnnotation _ _ ->
-                        alterDrawing ctrlPressed keyChange model
-                            => []
-
-                    EditingATextBox index _ ->
-                        alterTextBoxDrawing keyChange index model
-
-            Nothing ->
-                model => []
+        Nothing ->
+            model => []
 
 
 alterTextBoxDrawing : KeyChange -> Int -> Model -> ( Model, List (Cmd Msg) )
