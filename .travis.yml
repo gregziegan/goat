@@ -2,6 +2,7 @@ sudo: false
 
 cache:
   directories:
+    - tests/elm-stuff/build-artifacts
     - sysconfcpus
 
 os:
