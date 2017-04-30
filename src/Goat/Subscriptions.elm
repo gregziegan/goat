@@ -1,11 +1,12 @@
 module Goat.Subscriptions exposing (subscriptions)
 
-import Goat.Utils exposing (toDrawingPosition)
-import Goat.Model exposing (AnnotationState(DrawingAnnotation, ResizingAnnotation, MovingAnnotation), Model)
+import Goat.Model exposing (AnnotationState(..), Model)
 import Goat.Ports as Ports
-import Goat.Update exposing (Msg(KeyboardMsg, ContinueDrawing, ResizeAnnotation, MoveAnnotation, Reset, SetImages, SelectImage))
+import Goat.Update exposing (Msg(..))
+import Goat.Utils exposing (toDrawingPosition)
 import Keyboard.Extra as Keyboard
 import Mouse
+import Time exposing (second)
 
 
 imageAnnotationSubscriptions : Model -> List (Sub Msg)
@@ -38,4 +39,10 @@ subscriptions model =
         , Ports.newImage SelectImage
         , Ports.reset (\_ -> Reset)
         , Sub.batch (imageAnnotationSubscriptions model)
+        , case model.waitingForDropdownToggle of
+            Nothing ->
+                Sub.none
+
+            Just attributeDropdown ->
+                Time.every (0.2 * second) (\_ -> ToggleDropdown attributeDropdown)
         ]
