@@ -30,30 +30,62 @@ stopPropagation =
 
 toLineStyle : StrokeStyle -> ( String, String )
 toLineStyle strokeStyle =
+    let
+        strokeWidth =
+            toStrokeWidth strokeStyle
+    in
+        case strokeStyle of
+            SolidThin ->
+                toString strokeWidth => ""
+
+            SolidMedium ->
+                toString strokeWidth => ""
+
+            SolidThick ->
+                toString strokeWidth => ""
+
+            SolidVeryThick ->
+                toString strokeWidth => ""
+
+            DashedThin ->
+                toString strokeWidth => "10, 5"
+
+            DashedMedium ->
+                toString strokeWidth => "10, 5"
+
+            DashedThick ->
+                toString strokeWidth => "10, 5"
+
+            DashedVeryThick ->
+                toString strokeWidth => "10, 5"
+
+
+toStrokeWidth : StrokeStyle -> number
+toStrokeWidth strokeStyle =
     case strokeStyle of
         SolidThin ->
-            "2" => ""
+            2
 
         SolidMedium ->
-            "4" => ""
+            4
 
         SolidThick ->
-            "6" => ""
+            6
 
         SolidVeryThick ->
-            "8" => ""
+            8
 
         DashedThin ->
-            "2" => "10, 5"
+            2
 
         DashedMedium ->
-            "4" => "10, 5"
+            4
 
         DashedThick ->
-            "6" => "10, 5"
+            6
 
         DashedVeryThick ->
-            "8" => "10, 5"
+            8
 
 
 posToString : { x : number, y : number } -> String
@@ -61,8 +93,8 @@ posToString pos =
     toString pos.x ++ "," ++ toString pos.y
 
 
-linePath : StartPosition -> EndPosition -> String
-linePath start end =
+linePath : Float -> StartPosition -> EndPosition -> String
+linePath strokeWidth start end =
     let
         theta =
             (2 * pi)
@@ -81,13 +113,13 @@ linePath start end =
             { x = toFloat start.x, y = toFloat start.y }
 
         ccPt1 =
-            shiftPosition (5 * cos perpen) (5 * sin perpen) startFloat
+            shiftPosition ((strokeWidth / 2) * cos perpen) ((strokeWidth / 2) * sin perpen) startFloat
 
         ccPt2 =
             shiftPosition dx dy ccPt1
 
         ccPt3 =
-            shiftPosition (-10 * cos perpen) (-10 * sin perpen) ccPt2
+            shiftPosition (-strokeWidth * cos perpen) (-strokeWidth * sin perpen) ccPt2
 
         ccPt4 =
             shiftPosition -dx -dy ccPt3

@@ -84,10 +84,10 @@ strokeAttrs strokeStyle strokeColor =
 
 
 simpleLineAttrs : Shape -> List (Svg.Attribute Msg)
-simpleLineAttrs { start, end, strokeColor } =
+simpleLineAttrs { start, end, strokeColor, strokeStyle } =
     [ Attr.stroke "none"
     , Attr.fill <| Color.Convert.colorToHex strokeColor
-    , Attr.d <| linePath start end
+    , Attr.d <| linePath (toStrokeWidth strokeStyle) start end
     , Attr.filter "url(#dropShadow)"
     ]
 
