@@ -2,8 +2,6 @@ module Goat.View.DrawingArea.Definitions exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
-import Color.Convert
-import Goat.ControlOptions as ControlOptions
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.View.DrawingArea.Annotation as Annotation
@@ -40,23 +38,6 @@ viewPixelates annotationState annotations =
         |> Array.toIndexedList
         |> List.filterMap (uncurry (Annotation.viewPixelate annotationState))
         |> List.concat
-
-
-viewArrowHeadDefinition : Color -> Svg Msg
-viewArrowHeadDefinition color =
-    marker
-        [ Attr.id <| "arrow-head--" ++ Color.Convert.colorToHex color
-        , Attr.orient "auto"
-        , Attr.markerWidth "6"
-        , Attr.markerHeight "6"
-        , Attr.refX "65"
-        , Attr.refY "39"
-        , Attr.class "pointerCursor"
-        , Attr.viewBox "0 0 82 77"
-        , Attr.filter "url(#dropShadow)"
-        ]
-        [ Svg.path [ Attr.d "M20.5,38.5L2.5,-2.5L79.5,38.5L2.5,79.5", Attr.fill <| Color.Convert.colorToHex color ] []
-        ]
 
 
 maskDefinition : Float -> Float -> List (Svg Msg) -> Svg Msg
@@ -117,10 +98,22 @@ viewSvgFilters =
 
 viewDefinitions : Float -> Float -> List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg)
 viewDefinitions width height spotlightCutOuts blurCutOuts =
-    ControlOptions.strokeColors
-        |> List.map viewArrowHeadDefinition
-        |> (::) (maskDefinition width height spotlightCutOuts)
-        |> (::) (pixelateMaskDefinition blurCutOuts)
+    [ Svg.linearGradient [ id "striped", Attr.x1 "50%", Attr.x2 "50%", Attr.y1 "0%", Attr.y2 "100%" ]
+        [ Svg.stop [ Attr.offset "0%", Attr.stopColor "#FFF", Attr.stopOpacity ".5" ] []
+        , Svg.stop [ Attr.offset "100%", Attr.stopOpacity ".5" ] []
+        ]
+    , maskDefinition width height spotlightCutOuts
+    , pixelateMaskDefinition blurCutOuts
+    , Svg.path [ Attr.d "M0 0h28v28H0V0zm6 7v14h16V7H6z", id "rect" ] []
+    , Svg.mask [ Attr.fill "#fff", id "rectMask" ]
+        [ Svg.use [ Attr.xlinkHref "#rect" ] [] ]
+    , Svg.path [ Attr.d "M0 0h28v28H0V0zm14 21c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7 3.582 7 8 7z", id "ellipse" ] []
+    , Svg.mask [ Attr.fill "#fff", id "ellipseMask" ]
+        [ Svg.use [ Attr.xlinkHref "#ellipse" ] [] ]
+    , Svg.path [ Attr.d "M0 0h28v28H0V0zm6 10.993v6.014C6 19.213 7.79 21 9.996 21h8.008C20.21 21 22 19.212 22 17.007v-6.014C22 8.787 20.21 7 18.004 7H9.996C7.79 7 6 8.788 6 10.993z", id "roundedRect" ] []
+    , Svg.mask [ Attr.fill "#fff", id "roundedRectMask" ]
+        [ Svg.use [ Attr.xlinkHref "#roundedRect" ] [] ]
+    ]
         |> flip List.append viewSvgFilters
         |> defs []
         |> List.singleton

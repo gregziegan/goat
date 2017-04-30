@@ -5,7 +5,7 @@ import Color.Convert exposing (colorToHex)
 import Goat.Model exposing (StrokeStyle(..))
 import Html exposing (Html)
 import Html.Attributes
-import Svg exposing (circle, ellipse, defs, g, mask, polygon, rect, svg, path, linearGradient, stop, use)
+import Svg exposing (circle, ellipse, g, mask, polygon, rect, svg, path, linearGradient, stop, use)
 import Svg.Attributes as Attr exposing (id, class, cx, cy, d, fill, fillOpacity, fillRule, height, points, offset, opacity, r, rx, ry, stroke, strokeLinecap, stopColor, stopOpacity, strokeWidth, viewBox, width, x, x1, x2, xlinkHref, y, y1, y2)
 
 
@@ -33,18 +33,8 @@ viewSpotlightRect : Html msg
 viewSpotlightRect =
     svg
         [ width "28", height "28", viewBox "0 0 28 28", Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg", Html.Attributes.attribute "xmlns:xlink" "http://www.w3.org/1999/xlink" ]
-        [ defs []
-            [ path [ d "M0 0h28v28H0V0zm6 7v14h16V7H6z", id "rect" ]
-                []
-            , linearGradient [ id "striped", x1 "50%", x2 "50%", y1 "0%", y2 "100%" ]
-                [ stop [ offset "0%", stopColor "#FFF", stopOpacity ".5" ] []
-                , stop [ offset "100%", stopOpacity ".5" ] []
-                ]
-            ]
-        , g [ fill "none", fillRule "evenodd" ]
-            [ mask [ fill "#fff", id "rectMask" ]
-                [ use [ xlinkHref "#rect" ] [] ]
-            , g [ fill "url(#striped)", Attr.mask "url(#rectMask)", opacity ".504", stroke "currentColor", strokeLinecap "square" ]
+        [ g [ fill "none", fillRule "evenodd" ]
+            [ g [ fill "url(#striped)", Attr.mask "url(#rectMask)", opacity ".504", stroke "currentColor", strokeLinecap "square" ]
                 [ path [ d "M-3 5l34-30M-3 8l34-30M-3 11l34-30M-3 14l34-30M-3 17l34-30M-3 20l34-30M-3 23L31-7M-3 32L31 2M-3 26L31-4M-3 29L31-1M-3 38L31 8M-3 41l34-30M-3 44l34-30M-3 47l34-30M-3 50l34-30M-3 35L31 5M-3 53l34-30M-3 56l34-30" ] [] ]
             , path
                 [ stroke "currentColor", strokeWidth "2", d "M7 8h14v12H7z" ]
@@ -57,13 +47,8 @@ viewSpotlightEllipse : Html msg
 viewSpotlightEllipse =
     svg
         [ width "28", height "28", viewBox "0 0 28 28", Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg", Html.Attributes.attribute "xmlns:xlink" "http://www.w3.org/1999/xlink" ]
-        [ defs []
-            [ path [ d "M0 0h28v28H0V0zm14 21c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7 3.582 7 8 7z", id "ellipse" ] []
-            ]
-        , g [ fill "none", fillRule "evenodd" ]
-            [ mask [ fill "#fff", id "ellipseMask" ]
-                [ use [ xlinkHref "#ellipse" ] [] ]
-            , g [ fill "url(#striped)", Attr.mask "url(#ellipseMask)", opacity ".504", stroke "currentColor", strokeLinecap "square" ]
+        [ g [ fill "none", fillRule "evenodd" ]
+            [ g [ fill "url(#striped)", Attr.mask "url(#ellipseMask)", opacity ".504", stroke "currentColor", strokeLinecap "square" ]
                 [ path [ d "M-3 5l34-30M-3 8l34-30M-3 11l34-30M-3 14l34-30M-3 17l34-30M-3 20l34-30M-3 23L31-7M-3 32L31 2M-3 26L31-4M-3 29L31-1M-3 38L31 8M-3 41l34-30M-3 44l34-30M-3 47l34-30M-3 50l34-30M-3 35L31 5M-3 53l34-30M-3 56l34-30" ] [] ]
             , ellipse [ cx "14", cy "14", rx "7", ry "6", stroke "currentColor", strokeWidth "2" ] []
             ]
@@ -74,13 +59,8 @@ viewSpotlightRoundedRect : Html msg
 viewSpotlightRoundedRect =
     svg
         [ width "28", height "28", viewBox "0 0 28 28", Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg", Html.Attributes.attribute "xmlns:xlink" "http://www.w3.org/1999/xlink" ]
-        [ defs []
-            [ path [ d "M0 0h28v28H0V0zm6 10.993v6.014C6 19.213 7.79 21 9.996 21h8.008C20.21 21 22 19.212 22 17.007v-6.014C22 8.787 20.21 7 18.004 7H9.996C7.79 7 6 8.788 6 10.993z", id "roundedRect" ] []
-            ]
-        , g [ fill "none", fillRule "evenodd" ]
-            [ mask [ fill "#fff", id "roundedRectMask" ]
-                [ use [ xlinkHref "#roundedRect" ] [] ]
-            , g [ fill "url(#striped)", Attr.mask "url(#roundedRectMask)", opacity ".504", stroke "currentColor", strokeLinecap "square" ]
+        [ g [ fill "none", fillRule "evenodd" ]
+            [ g [ fill "url(#striped)", Attr.mask "url(#roundedRectMask)", opacity ".504", stroke "currentColor", strokeLinecap "square" ]
                 [ path [ d "M-3 5l34-30M-3 8l34-30M-3 11l34-30M-3 14l34-30M-3 17l34-30M-3 20l34-30M-3 23L31-7M-3 32L31 2M-3 26L31-4M-3 29L31-1M-3 38L31 8M-3 41l34-30M-3 44l34-30M-3 47l34-30M-3 50l34-30M-3 35L31 5M-3 53l34-30M-3 56l34-30" ] [] ]
             , rect [ width "14", height "12", x "7", y "8", stroke "currentColor", strokeWidth "2", rx "4" ] []
             ]
