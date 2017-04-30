@@ -84,11 +84,11 @@ strokeAttrs strokeStyle strokeColor =
 
 
 simpleLineAttrs : Shape -> List (Svg.Attribute Msg)
-simpleLineAttrs { start, end } =
-    [ Attr.fill "none"
+simpleLineAttrs { start, end, strokeColor } =
+    [ Attr.stroke "none"
+    , Attr.fill <| Color.Convert.colorToHex strokeColor
     , Attr.d <| linePath start end
-
-    --  , Attr.filter "url(#dropShadow)"
+    , Attr.filter "url(#dropShadow)"
     ]
 
 
@@ -132,7 +132,7 @@ lineAttributes lineType shape =
             strokeAttrs shape.strokeStyle shape.strokeColor ++ arrowAttributes shape
 
         StraightLine ->
-            simpleLineAttrs shape ++ strokeAttrs shape.strokeStyle shape.strokeColor
+            strokeAttrs shape.strokeStyle shape.strokeColor ++ simpleLineAttrs shape
 
 
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg

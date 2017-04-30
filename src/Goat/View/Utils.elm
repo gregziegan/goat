@@ -5,7 +5,7 @@ import Html exposing (Attribute)
 import Html.Events exposing (on)
 import Json.Decode as Json
 import Rocket exposing ((=>))
-import Goat.Utils exposing (arrowAngle)
+import Goat.Utils exposing (arrowAngle, shiftPosition)
 
 
 onMouseDown : Json.Decoder msg -> Attribute msg
@@ -56,9 +56,53 @@ toLineStyle strokeStyle =
             "8" => "10, 5"
 
 
+posToString : { x : number, y : number } -> String
+posToString pos =
+    toString pos.x ++ "," ++ toString pos.y
+
+
 linePath : StartPosition -> EndPosition -> String
 linePath start end =
-    "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+    let
+        theta =
+            (2 * pi)
+                - (arrowAngle start end)
+
+        perpen =
+            (pi / 2) - theta
+
+        dx =
+            toFloat (end.x - start.x)
+
+        dy =
+            toFloat (end.y - start.y)
+
+        startFloat =
+            { x = toFloat start.x, y = toFloat start.y }
+
+        ccPt1 =
+            shiftPosition (5 * cos perpen) (5 * sin perpen) startFloat
+
+        ccPt2 =
+            shiftPosition dx dy ccPt1
+
+        ccPt3 =
+            shiftPosition (-10 * cos perpen) (-10 * sin perpen) ccPt2
+
+        ccPt4 =
+            shiftPosition -dx -dy ccPt3
+    in
+        "M"
+            ++ posToString start
+            ++ " L"
+            ++ posToString ccPt1
+            ++ " L"
+            ++ posToString ccPt2
+            ++ " L"
+            ++ posToString ccPt3
+            ++ " L"
+            ++ posToString ccPt4
+            ++ "Z"
 
 
 directionToCursor : ResizeDirection -> String
