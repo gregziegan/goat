@@ -6,7 +6,7 @@ import Html.Events exposing (on)
 import Json.Decode as Json
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
-import Goat.Utils exposing (arrowAngle)
+import Goat.Utils exposing (arrowAngle, shiftPosition)
 
 
 onMouseDown : Json.Decoder msg -> Attribute msg
@@ -31,35 +31,111 @@ stopPropagation =
 
 toLineStyle : StrokeStyle -> ( String, String )
 toLineStyle strokeStyle =
+    let
+        strokeWidth =
+            toStrokeWidth strokeStyle
+    in
+        case strokeStyle of
+            SolidThin ->
+                toString strokeWidth => ""
+
+            SolidMedium ->
+                toString strokeWidth => ""
+
+            SolidThick ->
+                toString strokeWidth => ""
+
+            SolidVeryThick ->
+                toString strokeWidth => ""
+
+            DashedThin ->
+                toString strokeWidth => "10, 5"
+
+            DashedMedium ->
+                toString strokeWidth => "10, 5"
+
+            DashedThick ->
+                toString strokeWidth => "10, 5"
+
+            DashedVeryThick ->
+                toString strokeWidth => "10, 5"
+
+
+toStrokeWidth : StrokeStyle -> number
+toStrokeWidth strokeStyle =
     case strokeStyle of
         SolidThin ->
-            "2" => ""
+            2
 
         SolidMedium ->
-            "4" => ""
+            4
 
         SolidThick ->
-            "6" => ""
+            6
 
         SolidVeryThick ->
-            "8" => ""
+            8
 
         DashedThin ->
-            "2" => "10, 5"
+            2
 
         DashedMedium ->
-            "4" => "10, 5"
+            4
 
         DashedThick ->
-            "6" => "10, 5"
+            6
 
         DashedVeryThick ->
-            "8" => "10, 5"
+            8
 
 
-linePath : StartPosition -> EndPosition -> String
-linePath start end =
-    "M" ++ toString start.x ++ "," ++ toString start.y ++ " l" ++ toString (end.x - start.x) ++ "," ++ toString (end.y - start.y)
+posToString : { x : number, y : number } -> String
+posToString pos =
+    toString pos.x ++ "," ++ toString pos.y
+
+
+linePath : Float -> StartPosition -> EndPosition -> String
+linePath strokeWidth start end =
+    let
+        theta =
+            (2 * pi)
+                - (arrowAngle start end)
+
+        perpen =
+            (pi / 2) - theta
+
+        dx =
+            toFloat (end.x - start.x)
+
+        dy =
+            toFloat (end.y - start.y)
+
+        startFloat =
+            { x = toFloat start.x, y = toFloat start.y }
+
+        ccPt1 =
+            shiftPosition ((strokeWidth / 2) * cos perpen) ((strokeWidth / 2) * sin perpen) startFloat
+
+        ccPt2 =
+            shiftPosition dx dy ccPt1
+
+        ccPt3 =
+            shiftPosition (-strokeWidth * cos perpen) (-strokeWidth * sin perpen) ccPt2
+
+        ccPt4 =
+            shiftPosition -dx -dy ccPt3
+    in
+        "M"
+            ++ posToString start
+            ++ " L"
+            ++ posToString ccPt1
+            ++ " L"
+            ++ posToString ccPt2
+            ++ " L"
+            ++ posToString ccPt3
+            ++ " L"
+            ++ posToString ccPt4
+            ++ "Z"
 
 
 freeDrawPath : StartPosition -> List Position -> String

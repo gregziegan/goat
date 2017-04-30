@@ -221,7 +221,7 @@ getFirstSpotlightIndex annotations =
         |> Maybe.withDefault 0
 
 
-shiftPosition : Int -> Int -> Mouse.Position -> Mouse.Position
+shiftPosition : number -> number -> { x : number, y : number } -> { x : number, y : number }
 shiftPosition dx dy pos =
     { pos | x = pos.x + dx, y = pos.y + dy }
 

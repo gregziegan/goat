@@ -18,7 +18,7 @@ import Goat.Model
 import Goat.Utils exposing (arrowAngle)
 import Goat.View.DrawingArea.Annotation exposing (viewAnnotation)
 import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
-import Goat.View.Utils exposing (arrowPath, arrowHeadPath, linePath, toLineStyle, fontSizeToLineHeight)
+import Goat.View.Utils exposing (arrowPath, arrowHeadPath, linePath, toLineStyle, fontSizeToLineHeight, toStrokeWidth)
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
@@ -36,10 +36,10 @@ all =
 
 lineSelector : Shape -> List Selector
 lineSelector shape =
-    [ attribute "fill" "none"
-    , attribute "d" (linePath shape.start shape.end)
+    [ attribute "stroke" "none"
+    , attribute "fill" (Color.Convert.colorToHex shape.strokeColor)
+    , attribute "d" (linePath (toStrokeWidth shape.strokeStyle) shape.start shape.end)
     ]
-        ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
 
 
 arrowSelector : Shape -> List Selector
