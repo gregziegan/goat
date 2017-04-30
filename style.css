@@ -264,6 +264,7 @@ button:active, button:focus, button:hover {
 .info-text {
   position: absolute;
   z-index: 2;
+  padding: 10px;
 }
 
 .goat-time {
@@ -355,4 +356,8 @@ button:active, button:focus, button:hover {
   display: inline-block;
   vertical-align: top;
   color: green;
+}
+
+.image-selector-page {
+  padding: 10px;
 }

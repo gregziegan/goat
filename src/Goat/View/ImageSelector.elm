@@ -11,7 +11,7 @@ import List.Zipper exposing (Zipper)
 
 view : Zipper Image -> Html Msg
 view images =
-    div []
+    div [ class "image-selector-page" ]
         [ h3 [] [ text "Please select an image to annotate:" ]
         , viewGallery images
         ]
