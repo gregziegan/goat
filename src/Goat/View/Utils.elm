@@ -153,11 +153,6 @@ freeDrawPathHelper positions pathString =
             freeDrawPathHelper rest (pathString ++ " L " ++ posToString pos)
 
 
-posToString : Position -> String
-posToString pos =
-    toString pos.x ++ "," ++ toString pos.y
-
-
 directionToCursor : ResizeDirection -> String
 directionToCursor direction =
     case direction of
