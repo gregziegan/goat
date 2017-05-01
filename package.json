@@ -1,8 +1,8 @@
 {
-  "name": "annotation-app",
+  "name": "G.O.A.T.",
   "version": "1.0.0",
   "repository": "https://github.com/thebritican/goat",
-  "description": "Minimal image annotation tool",
+  "description": "Graphics Ornamentation and Annotation Tool",
   "author": "greg.ziegan@gmail.com",
   "license": "MIT",
   "config": {
@@ -24,9 +24,9 @@
     "./images/logo-small.png",
     "./images/goat.jpg",
     "./images/goat2.jpg",
+    "./images/icon_ticket_editor.svg",
     "./elm.js",
     "./index.html",
-    "./style.css",
-    "./icon_ticket_editor.svg"
+    "./style.css"
   ]
 }

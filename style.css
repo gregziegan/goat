@@ -6,6 +6,7 @@ body {
 * {
   user-drag: none;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 button:active, button:focus, button:hover {
@@ -63,7 +64,8 @@ button:active, button:focus, button:hover {
   border-right: 1px solid rgb(230, 230, 230);
 }
 
-.image-to-annotate {
+image {
+  pointer-events: none;
 }
 
 .dropdown-things {
