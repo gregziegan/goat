@@ -303,19 +303,20 @@ annotationStateVertexEvents index annotationState vertex direction =
                 []
 
 
-viewLine : ( Int, Int ) -> List (Svg.Attribute Msg) -> LineType -> Shape -> List (Svg Msg)
+viewLine : ( Int, Int ) -> List (Svg.Attribute Msg) -> LineType -> Shape -> Svg Msg
 viewLine offset attrs lineType shape =
     case lineType of
         StraightLine ->
-            [ Svg.path (lineAttributes lineType shape ++ attrs) [] ]
+            Svg.path (lineAttributes lineType shape ++ attrs) []
 
         Arrow ->
-            [ Svg.path (lineAttributes lineType shape ++ attrs) []
-            , viewArrowHead attrs offset shape.start shape.end shape.strokeColor
-            ]
+            Svg.g []
+                [ Svg.path (lineAttributes lineType shape ++ attrs) []
+                , viewArrowHead attrs offset shape.start shape.end shape.strokeColor
+                ]
 
 
-viewFreeDraw : SelectState -> List (Svg.Attribute Msg) -> Shape -> List Position -> List (Svg Msg)
+viewFreeDraw : SelectState -> List (Svg.Attribute Msg) -> Shape -> List Position -> Svg Msg
 viewFreeDraw selectState attrs shape positions =
     let
         leftMostX =
@@ -338,7 +339,7 @@ viewFreeDraw selectState attrs shape positions =
                 |> Maybe.map .y
                 |> Maybe.withDefault 0
     in
-        [ Svg.g attrs
+        Svg.g attrs
             ([ Svg.path (freeDrawAttributes shape positions) []
              ]
                 ++ if selectState == Selected then
@@ -359,20 +360,19 @@ viewFreeDraw selectState attrs shape positions =
                    else
                     []
             )
-        ]
 
 
-viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> List (Svg Msg)
+viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> Svg Msg
 viewShape attrs shapeType fill shape =
     case shapeType of
         Rect ->
-            [ Svg.rect (shapeAttributes shapeType shape fill ++ attrs) [] ]
+            Svg.rect (shapeAttributes shapeType shape fill ++ attrs) []
 
         RoundedRect ->
-            [ Svg.rect (shapeAttributes shapeType shape fill ++ attrs) [] ]
+            Svg.rect (shapeAttributes shapeType shape fill ++ attrs) []
 
         Ellipse ->
-            [ Svg.ellipse (shapeAttributes shapeType shape fill ++ attrs) [] ]
+            Svg.ellipse (shapeAttributes shapeType shape fill ++ attrs) []
 
 
 viewTextArea : Int -> TextArea -> Svg Msg
@@ -395,19 +395,17 @@ viewTextArea index ({ start, end, fill, fontSize, autoexpand } as textArea) =
         ]
 
 
-viewTextBox : List (Svg.Attribute Msg) -> SelectState -> Int -> TextArea -> List (Svg Msg)
+viewTextBox : List (Svg.Attribute Msg) -> SelectState -> Int -> TextArea -> Svg Msg
 viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) =
     case selectState of
         Selected ->
             viewTextArea index textBox
-                |> List.singleton
 
         NotSelected ->
             textBox.text
                 |> String.split "\n"
                 |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
                 |> Svg.text_ ([ Attr.y <| toString <| Basics.min start.y end.y, Attr.fontFamily "sans-serif" ] ++ attrs)
-                |> List.singleton
 
         SelectedWithVertices ->
             textBox.text
@@ -428,7 +426,6 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
                      ]
                         ++ attrs
                     )
-                |> List.singleton
 
 
 viewPixelate : AnnotationState -> Int -> Annotation -> Maybe (List (Svg Msg))
@@ -441,7 +438,7 @@ viewPixelate annotationState index annotation =
             Nothing
 
 
-viewAnnotation : AnnotationState -> Int -> Annotation -> List (Svg Msg)
+viewAnnotation : AnnotationState -> Int -> Annotation -> ( Svg Msg, Maybe (Svg Msg) )
 viewAnnotation annotationState index annotation =
     let
         selectState =
@@ -470,22 +467,24 @@ viewAnnotation annotationState index annotation =
         case annotation of
             Lines lineType shape ->
                 viewLine offset annotationStateAttrs lineType shape
-                    |> flip List.append (vertices Linear shape)
+                    => vertices Linear shape
 
             FreeDraw shape positions ->
                 viewFreeDraw selectState annotationStateAttrs shape positions
+                    => Nothing
 
             Shapes shapeType fill shape ->
                 viewShape annotationStateAttrs shapeType fill shape
-                    |> flip List.append (vertices Rectangular shape)
+                    => vertices Rectangular shape
 
             TextBox textBox ->
                 viewTextBox annotationStateAttrs selectState index textBox
+                    => Nothing
 
             Spotlight shapeType shape ->
                 viewShape annotationStateAttrs shapeType Nothing shape
-                    |> flip List.append (vertices Rectangular shape)
+                    => vertices Rectangular shape
 
             Pixelate start end ->
-                [ Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ annotationStateAttrs) [] ]
-                    |> flip List.append (vertices Rectangular { start = start, end = end })
+                Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ annotationStateAttrs) []
+                    => vertices Rectangular { start = start, end = end }

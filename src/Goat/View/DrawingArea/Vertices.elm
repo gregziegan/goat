@@ -24,7 +24,7 @@ viewVertex vertexEvents x y =
         []
 
 
-shapeVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
+shapeVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> Svg Msg
 shapeVertices toVertexEvents start end =
     let
         ( resizeDir1, resizeDir2, resizeDir3, resizeDir4 ) =
@@ -37,21 +37,23 @@ shapeVertices toVertexEvents start end =
             else
                 ( NESW, NWSE, NWSE, NESW )
     in
-        [ viewVertex (toVertexEvents Start resizeDir1) start.x start.y
-        , viewVertex (toVertexEvents StartPlusX resizeDir2) end.x start.y
-        , viewVertex (toVertexEvents StartPlusY resizeDir3) start.x end.y
-        , viewVertex (toVertexEvents End resizeDir4) end.x end.y
+        Svg.g []
+            [ viewVertex (toVertexEvents Start resizeDir1) start.x start.y
+            , viewVertex (toVertexEvents StartPlusX resizeDir2) end.x start.y
+            , viewVertex (toVertexEvents StartPlusY resizeDir3) start.x end.y
+            , viewVertex (toVertexEvents End resizeDir4) end.x end.y
+            ]
+
+
+lineVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> Svg Msg
+lineVertices toVertexEvents start end =
+    Svg.g []
+        [ viewVertex (toVertexEvents Start Move) start.x start.y
+        , viewVertex (toVertexEvents End Move) end.x end.y
         ]
 
 
-lineVertices : (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> StartPosition -> EndPosition -> List (Svg Msg)
-lineVertices toVertexEvents start end =
-    [ viewVertex (toVertexEvents Start Move) start.x start.y
-    , viewVertex (toVertexEvents End Move) end.x end.y
-    ]
-
-
-viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> SelectState -> List (Svg Msg)
+viewVertices : Vertices -> StartPosition -> EndPosition -> (Vertex -> ResizeDirection -> List (Svg.Attribute Msg)) -> SelectState -> Maybe (Svg Msg)
 viewVertices vertices start end toVertexEvents selectState =
     let
         toVertices =
@@ -63,6 +65,6 @@ viewVertices vertices start end toVertexEvents selectState =
                     lineVertices
     in
         if selectState == SelectedWithVertices then
-            toVertices toVertexEvents start end
+            Just (toVertices toVertexEvents start end)
         else
-            []
+            Nothing

@@ -4,6 +4,7 @@ import Color exposing (Color)
 import Color.Convert
 import Expect exposing (Expectation)
 import Fixtures exposing (end, goat, model, start, aShape, aTextArea, testColor)
+import Html exposing (Html)
 import Goat.Flags exposing (Image)
 import Goat.Model
     exposing
@@ -15,6 +16,7 @@ import Goat.Model
         , ShapeType(..)
         , TextArea
         )
+import Goat.Update exposing (Msg)
 import Goat.Utils exposing (arrowAngle)
 import Goat.View.DrawingArea.Annotation exposing (viewAnnotation)
 import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
@@ -146,6 +148,15 @@ imageTests =
         ]
 
 
+viewFirstAnnotation : Annotation -> Html Msg
+viewFirstAnnotation annotation =
+    annotation
+        |> viewAnnotation ReadyToDraw 0
+        |> Tuple.first
+        |> List.singleton
+        |> svgDrawspace
+
+
 pixelatedImageTests : Test
 pixelatedImageTests =
     describe "viewPixelatedImage"
@@ -165,8 +176,7 @@ viewAnnotationTests =
             \() ->
                 aShape
                     |> Lines StraightLine
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.find [ tag "path" ]
                     |> Query.has (lineSelector aShape)
@@ -174,8 +184,7 @@ viewAnnotationTests =
             \() ->
                 aShape
                     |> Lines Arrow
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.findAll [ tag "path" ]
                     |> Query.first
@@ -184,8 +193,7 @@ viewAnnotationTests =
             \() ->
                 aShape
                     |> Lines Arrow
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.findAll [ tag "path" ]
                     |> Query.index 1
@@ -194,8 +202,7 @@ viewAnnotationTests =
             \() ->
                 aShape
                     |> Shapes Rect (Just testColor)
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.find [ tag "rect" ]
                     |> Query.has (rectSelector aShape)
@@ -203,8 +210,7 @@ viewAnnotationTests =
             \() ->
                 aShape
                     |> Shapes RoundedRect (Just testColor)
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.find [ tag "rect" ]
                     |> Query.has (roundedRectSelector aShape)
@@ -212,8 +218,7 @@ viewAnnotationTests =
             \() ->
                 aShape
                     |> Shapes Ellipse (Just testColor)
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.find [ tag "ellipse" ]
                     |> Query.has (ellipseSelector aShape)
@@ -221,8 +226,7 @@ viewAnnotationTests =
             \() ->
                 aTextArea
                     |> TextBox
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.find [ tag "text" ]
                     |> Query.has (svgTextSelector aTextArea)
@@ -230,8 +234,7 @@ viewAnnotationTests =
             \() ->
                 aTextArea
                     |> TextBox
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.findAll [ tag "tspan" ]
                     |> Query.each
@@ -242,8 +245,7 @@ viewAnnotationTests =
             \() ->
                 aShape
                     |> Spotlight Rect
-                    |> viewAnnotation ReadyToDraw 0
-                    |> svgDrawspace
+                    |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.find [ tag "rect" ]
                     |> Query.has (rectSelector aShape)

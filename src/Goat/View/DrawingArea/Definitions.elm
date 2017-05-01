@@ -13,13 +13,17 @@ import Svg.Attributes as Attr
 
 viewNonSpotlightAnnotations : AnnotationState -> Array Annotation -> List (Svg Msg)
 viewNonSpotlightAnnotations annotationState annotations =
-    annotations
-        |> Array.toList
-        |> List.indexedMap (Annotation.viewAnnotation annotationState)
-        |> List.concat
+    let
+        annotationsAndVertices =
+            annotations
+                |> Array.toList
+                |> List.indexedMap (Annotation.viewAnnotation annotationState)
+    in
+        List.map Tuple.first annotationsAndVertices
+            ++ List.filterMap Tuple.second annotationsAndVertices
 
 
-viewMaskCutOut : AnnotationState -> ( Int, ShapeType, Shape ) -> List (Svg Msg)
+viewMaskCutOut : AnnotationState -> ( Int, ShapeType, Shape ) -> Svg Msg
 viewMaskCutOut annotationState ( index, shapeType, shape ) =
     Annotation.viewShape (Annotation.annotationStateEvents index annotationState) shapeType (Just Color.black) shape
 
@@ -29,7 +33,6 @@ viewSpotlights annotationState annotations =
     annotations
         |> Array.toIndexedList
         |> List.filterMap (Maybe.map (viewMaskCutOut annotationState) << spotlightToMaskCutout)
-        |> List.concat
 
 
 viewPixelates : AnnotationState -> Array Annotation -> List (Svg Msg)
