@@ -11,8 +11,6 @@ import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
 import List.Zipper exposing (Zipper)
-import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
-import Svg.Attributes as Attr
 
 
 {-
@@ -55,7 +53,7 @@ view model =
         Nothing ->
             case model.context of
                 Zendesk ->
-                    viewLoadingScreen
+                    viewEmptyImagesScreen
 
                 Web ->
                     viewInfoScreen
@@ -67,19 +65,12 @@ view model =
                 ImageSelector.view images
 
 
-viewLoadingScreen : Html Msg
-viewLoadingScreen =
+viewEmptyImagesScreen : Html Msg
+viewEmptyImagesScreen =
     div
-        [ class "loader" ]
-        [ svg
-            [ Attr.width "40px", Attr.height "40px", Attr.viewBox "0 0 50 50" ]
-            [ Svg.path
-                [ Attr.fill "currentColor", Attr.d "M25.251,6.461c-10.318,0-18.683,8.365-18.683,18.683h4.068c0-8.071,6.543-14.615,14.615-14.615V6.461z" ]
-                []
-            , Svg.animateTransform
-                [ Attr.attributeType "xml", Attr.attributeName "transform", Attr.type_ "rotate", Attr.from "0 25 25", Attr.to "360 25 25", Attr.dur "0.6s", Attr.repeatCount "indefinite" ]
-                []
-            ]
+        [ class "no-images-page" ]
+        [ h2 [] [ text "Welcome to G.O.A.T.!" ]
+        , p [] [ text "Please upload an image to the comment editor. The image will show up here for annotating." ]
         ]
 
 

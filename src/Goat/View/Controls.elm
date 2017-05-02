@@ -18,10 +18,7 @@ viewControls : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) 
 viewControls { edits, shape, spotlight, keyboardState, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
     div
         [ class "controls" ]
-        [ div [ class "columns" ]
-            [ button [ onClick ReturnToImageSelection, class "cancel-button" ] [ text "Cancel" ]
-            , button [ onClick Save, class "save-button" ] [ text "Save" ]
-            ]
+        [ viewNavigationControls
         , viewHistoryControls operatingSystem edits
         , div [ class "columns" ]
             [ viewDrawingButton operatingSystem drawing (DrawLine Arrow)
@@ -35,6 +32,14 @@ viewControls { edits, shape, spotlight, keyboardState, drawing, annotationState,
             , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
             , viewFontSizeDropdown toDropdownMenu operatingSystem
             ]
+        ]
+
+
+viewNavigationControls : Html Msg
+viewNavigationControls =
+    div [ class "navigation-controls" ]
+        [ button [ onClick ReturnToImageSelection, class "cancel-button" ] [ text "Back" ]
+        , button [ onClick Save, class "save-button" ] [ text "Save" ]
         ]
 
 

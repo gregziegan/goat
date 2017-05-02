@@ -10,7 +10,6 @@ import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
 import Goat.Flags exposing (Flags, Image)
 import Goat.Ports as Ports
-import Time exposing (Time)
 
 
 type Context

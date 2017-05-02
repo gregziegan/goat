@@ -126,8 +126,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
 
         Reset ->
             { model
-                | images = List.Zipper.fromList []
-                , imageSelected = False
+                | imageSelected = False
             }
                 => []
 

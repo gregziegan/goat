@@ -119,6 +119,13 @@ image {
   border: 1px solid rgb(230, 230, 230);
 }
 
+.navigation-controls {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 100%;
+}
+
 .history-controls {
   display: flex;
   justify-content: space-around;
@@ -129,7 +136,6 @@ image {
   background-color: rgb(230, 230, 230);
   color: #555;
   border: none;
-  border-radius: 4px;
   padding: 10px 5px;
   font-size: 8px;
 }
@@ -348,18 +354,10 @@ image {
   visibility: hidden;
 }
 
-.loader {
-  margin: 0 0 2em;
-  height: 100px;
-  width: 20%;
-  text-align: center;
-  padding: 1em;
-  margin: 0 auto 1em;
-  display: inline-block;
-  vertical-align: top;
-  color: green;
+.image-selector-page {
+  padding: 10px;
 }
 
-.image-selector-page {
+.no-images-page {
   padding: 10px;
 }
