@@ -51,7 +51,7 @@ view : Model -> Html Msg
 view model =
     case model.images of
         Nothing ->
-            case model.context of
+            case model.platform of
                 Zendesk ->
                     viewEmptyImagesScreen
 
