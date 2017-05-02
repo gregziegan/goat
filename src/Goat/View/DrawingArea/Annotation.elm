@@ -141,29 +141,29 @@ lineAttributes lineType shape =
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
 viewDrawing { drawing, keyboardState, freeDrawPositions } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
     let
-        discretize =
+        constrain =
             isPressed Shift keyboardState
 
         lineAttrs lineType =
-            lineAttributes lineType <| Shape start (calcLinePos discretize start curPos) strokeColor strokeStyle
+            lineAttributes lineType <| Shape start (calcLinePos constrain start curPos) strokeColor strokeStyle
 
         shapeAttrs shapeType =
-            shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) fill
+            shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) fill
 
         spotlightAttrs shapeType =
             if isInMask then
-                shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) (Just Color.black)
+                shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) (Just Color.black)
             else
-                shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) Nothing
+                shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) Nothing
     in
         case drawing of
             DrawLine lineType ->
                 case lineType of
                     Arrow ->
                         Svg.g []
-                            [ viewArrowHead [ Attr.filter "url(#dropShadow)" ] ( 0, 0 ) start (calcLinePos discretize start curPos) strokeColor
+                            [ viewArrowHead [ Attr.filter "url(#dropShadow)" ] ( 0, 0 ) start (calcLinePos constrain start curPos) strokeColor
                             , Svg.path (lineAttrs lineType) []
-                            , viewArrowHead [] ( 0, 0 ) start (calcLinePos discretize start curPos) strokeColor
+                            , viewArrowHead [] ( 0, 0 ) start (calcLinePos constrain start curPos) strokeColor
                             ]
 
                     StraightLine ->
