@@ -3,7 +3,7 @@ module Goat.Model exposing (..)
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
-import Keyboard.Extra as Keyboard
+import Keyboard.Extra as Keyboard exposing (Key)
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
@@ -208,7 +208,7 @@ type alias Model =
     , imageSelected : Bool
 
     -- Keys pressed
-    , keyboardState : Keyboard.State
+    , pressedKeys : List Key
 
     -- System/Environment State
     , operatingSystem : OperatingSystem
@@ -252,7 +252,7 @@ init { isMac, inZendesk } =
     , showingAnyMenu = False
     , images = List.Zipper.fromList []
     , imageSelected = False
-    , keyboardState = Keyboard.initialState
+    , pressedKeys = []
     , operatingSystem =
         if isMac then
             MacOS

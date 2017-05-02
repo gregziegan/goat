@@ -74,7 +74,7 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, List (Cmd Msg) )
-update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, drawing } as model) =
+update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, drawing } as model) =
     case msg of
         StartDrawing pos ->
             model
@@ -137,10 +137,10 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, keyboardState, d
 
         KeyboardMsg keyMsg ->
             let
-                ( keyboardState, maybeKeyChange ) =
-                    Keyboard.updateWithKeyChange keyMsg model.keyboardState
+                ( newPressedKeys, maybeKeyChange ) =
+                    Keyboard.updateWithKeyChange keyMsg pressedKeys
             in
-                { model | keyboardState = keyboardState }
+                { model | pressedKeys = newPressedKeys }
                     |> handleKeyboardInteractions maybeKeyChange
 
         CloseAllMenus ->
@@ -467,7 +467,7 @@ addAnnotation annotation model =
 finishLineDrawing : StartPosition -> EndPosition -> LineType -> Model -> Model
 finishLineDrawing start end lineType model =
     model
-        |> addAnnotation (Lines lineType (Shape start (calcLinePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
+        |> addAnnotation (Lines lineType (Shape start (calcLinePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
 
 
 finishFreeDrawing : StartPosition -> EndPosition -> List Position -> Model -> Model
@@ -486,7 +486,7 @@ finishPixelateDrawing start end model =
 finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
 finishShapeDrawing start end shapeType model =
     model
-        |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
+        |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
 
 
 finishTextBoxDrawing : StartPosition -> EndPosition -> Model -> Model
@@ -503,7 +503,7 @@ finishTextBoxDrawing start end model =
 finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
 finishSpotlightDrawing start end shapeType model =
     model
-        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos (isPressed Shift model.keyboardState) start end) model.strokeColor model.strokeStyle))
+        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
 
 
 startEditingText : Int -> Model -> Model
@@ -687,7 +687,7 @@ resizeAnnotation curPos model =
     case model.annotationState of
         ResizingAnnotation resizingData annotationAttrs ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize (isPressed Shift model.keyboardState) { resizingData | curPos = curPos })) model.edits
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize (List.member Shift model.pressedKeys) { resizingData | curPos = curPos })) model.edits
                 , annotationState = ResizingAnnotation { resizingData | curPos = curPos } annotationAttrs
             }
 
@@ -952,7 +952,7 @@ handleCopyKey : Int -> OperatingSystem -> Model -> Model
 handleCopyKey index osToIgnore model =
     if model.operatingSystem == osToIgnore then
         model
-    else if isPressed CharC model.keyboardState then
+    else if (List.member CharC model.pressedKeys) then
         copySelectedAnnotation index model
     else
         model
@@ -1042,7 +1042,7 @@ handlePaste ctrlPressed keyChange model =
                 Control ->
                     if model.operatingSystem == MacOS then
                         model
-                    else if isPressed CharV model.keyboardState then
+                    else if List.member CharV model.pressedKeys then
                         pasteAnnotation model
                             |> releaseKey CharV
                     else
@@ -1051,7 +1051,7 @@ handlePaste ctrlPressed keyChange model =
                 Super ->
                     if model.operatingSystem == Windows then
                         model
-                    else if isPressed CharV model.keyboardState then
+                    else if List.member CharV model.pressedKeys then
                         pasteAnnotation model
                             |> releaseKey CharV
                     else
@@ -1065,7 +1065,7 @@ handlePaste ctrlPressed keyChange model =
 
 
 handleKeyboardInteractions : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
-handleKeyboardInteractions maybeKeyChange ({ keyboardState } as model) =
+handleKeyboardInteractions maybeKeyChange ({ pressedKeys } as model) =
     let
         controlKeys =
             case model.operatingSystem of
@@ -1076,7 +1076,7 @@ handleKeyboardInteractions maybeKeyChange ({ keyboardState } as model) =
                     [ Control ]
 
         ctrlPressed =
-            List.any (\key -> isPressed key keyboardState) controlKeys
+            List.any (\key -> List.member key pressedKeys) controlKeys
     in
         case maybeKeyChange of
             Just keyChange ->
@@ -1184,7 +1184,7 @@ changeDrawing drawing model =
 
 releaseKey : Key -> Model -> Model
 releaseKey key model =
-    { model | keyboardState = Keyboard.forceRelease [ key ] model.keyboardState }
+    { model | pressedKeys = List.filter ((/=) key) model.pressedKeys }
 
 
 undoEdit : Model -> Model
@@ -1198,7 +1198,7 @@ redoEdit model =
 
 
 alterDrawing : Bool -> KeyChange -> Model -> Model
-alterDrawing ctrlPressed keyChange ({ keyboardState } as model) =
+alterDrawing ctrlPressed keyChange ({ pressedKeys } as model) =
     case keyChange of
         KeyDown key ->
             case key of
@@ -1212,7 +1212,7 @@ alterDrawing ctrlPressed keyChange ({ keyboardState } as model) =
                     deleteSelectedDrawing model
 
                 CharZ ->
-                    if isPressed Shift keyboardState && ctrlPressed then
+                    if List.member Shift pressedKeys && ctrlPressed then
                         redoEdit model
                             |> releaseKey CharZ
                     else if ctrlPressed then
@@ -1224,10 +1224,10 @@ alterDrawing ctrlPressed keyChange ({ keyboardState } as model) =
                 Control ->
                     if model.operatingSystem == MacOS then
                         model
-                    else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
+                    else if List.member Shift pressedKeys && List.member CharZ pressedKeys then
                         redoEdit model
                             |> releaseKey CharZ
-                    else if isPressed CharZ keyboardState then
+                    else if List.member CharZ pressedKeys then
                         undoEdit model
                             |> releaseKey CharZ
                     else
@@ -1236,10 +1236,10 @@ alterDrawing ctrlPressed keyChange ({ keyboardState } as model) =
                 Super ->
                     if model.operatingSystem == Windows then
                         model
-                    else if isPressed Shift keyboardState && isPressed CharZ keyboardState then
+                    else if List.member Shift pressedKeys && List.member CharZ pressedKeys then
                         redoEdit model
                             |> releaseKey CharZ
-                    else if isPressed CharZ keyboardState then
+                    else if List.member CharZ pressedKeys then
                         undoEdit model
                             |> releaseKey CharZ
                     else

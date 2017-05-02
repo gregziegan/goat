@@ -15,7 +15,7 @@ import UndoList exposing (UndoList)
 
 
 viewControls : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewControls { edits, shape, spotlight, keyboardState, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
+viewControls { edits, shape, spotlight, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
     div
         [ class "controls" ]
         [ viewNavigationControls

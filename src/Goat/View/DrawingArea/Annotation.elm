@@ -139,10 +139,10 @@ lineAttributes lineType shape =
 
 
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
-viewDrawing { drawing, keyboardState, freeDrawPositions } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
+viewDrawing { drawing, pressedKeys, freeDrawPositions } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
     let
         discretize =
-            isPressed Shift keyboardState
+            List.member Shift pressedKeys
 
         lineAttrs lineType =
             lineAttributes lineType <| Shape start (calcLinePos discretize start curPos) strokeColor strokeStyle
