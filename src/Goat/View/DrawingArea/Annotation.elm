@@ -34,12 +34,19 @@ rectAttrs start end =
 
 ellipseAttributes : Shape -> List (Svg.Attribute Msg)
 ellipseAttributes { start, end } =
-    [ Attr.rx <| toString <| abs <| (end.x - start.x) // 2
-    , Attr.ry <| toString <| abs <| (end.y - start.y) // 2
-    , Attr.cx <| toString <| start.x + ((end.x - start.x) // 2)
-    , Attr.cy <| toString <| start.y + ((end.y - start.y) // 2)
-    , Attr.filter "url(#dropShadow)"
-    ]
+    let
+        dx =
+            toFloat (end.x - start.x)
+
+        dy =
+            toFloat (end.y - start.y)
+    in
+        [ Attr.rx (toString (abs dx / 2))
+        , Attr.ry (toString (abs dy / 2))
+        , Attr.cx (toString (toFloat start.x + dx / 2))
+        , Attr.cy (toString (toFloat start.y + dy / 2))
+        , Attr.filter "url(#dropShadow)"
+        ]
 
 
 fillAttrs : Maybe Color -> List (Svg.Attribute Msg)
