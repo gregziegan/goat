@@ -37,6 +37,7 @@ button:active, button:focus, button:hover {
   justify-content: center;
   align-items: center;
   padding: 5px;
+  padding: 4px;
   border: 1px solid rgb(230, 230, 230);
   background-color: white;
   margin: 3px;
