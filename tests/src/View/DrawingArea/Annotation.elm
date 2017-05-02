@@ -187,7 +187,7 @@ viewAnnotationTests =
                     |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.findAll [ tag "path" ]
-                    |> Query.first
+                    |> Query.index 1
                     |> Query.has (arrowSelector aShape)
         , test "An arrow head has the appropriate view attributes" <|
             \() ->
@@ -196,7 +196,7 @@ viewAnnotationTests =
                     |> viewFirstAnnotation
                     |> Query.fromHtml
                     |> Query.findAll [ tag "path" ]
-                    |> Query.index 1
+                    |> Query.first
                     |> Query.has (arrowHeadSelector ( 0, 0 ) aShape)
         , test "A rectangle has the appropriate view attributes" <|
             \() ->

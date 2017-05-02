@@ -123,7 +123,6 @@ viewArrowHead attrs ( dx, dy ) start end strokeColor =
                    , Attr.fill <| Color.Convert.colorToHex strokeColor
                    , Attr.stroke "none"
                    , Attr.transform ("translate(" ++ toString dx ++ "," ++ toString dy ++ ") rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
-                   , Attr.filter "url(#dropShadow)"
                    ]
             )
             []
@@ -162,7 +161,8 @@ viewDrawing { drawing, keyboardState, freeDrawPositions } { strokeColor, fill, s
                 case lineType of
                     Arrow ->
                         Svg.g []
-                            [ Svg.path (lineAttrs lineType) []
+                            [ viewArrowHead [ Attr.filter "url(#dropShadow)" ] ( 0, 0 ) start (calcLinePos discretize start curPos) strokeColor
+                            , Svg.path (lineAttrs lineType) []
                             , viewArrowHead [] ( 0, 0 ) start (calcLinePos discretize start curPos) strokeColor
                             ]
 
@@ -311,7 +311,8 @@ viewLine offset attrs lineType shape =
 
         Arrow ->
             Svg.g []
-                [ Svg.path (lineAttributes lineType shape ++ attrs) []
+                [ viewArrowHead (Attr.filter "url(#dropShadow)" :: attrs) offset shape.start shape.end shape.strokeColor
+                , Svg.path (lineAttributes lineType shape ++ attrs) []
                 , viewArrowHead attrs offset shape.start shape.end shape.strokeColor
                 ]
 
