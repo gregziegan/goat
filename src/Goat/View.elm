@@ -16,12 +16,13 @@ import List.Zipper exposing (Zipper)
 {-
    Current Structure:
 
-   Context: Zendesk
-     1. Loading Icon while waiting for images from the editor
-     2. Receive Selected Image -> Annotator
-     3. Receive list of images -> Image Selector
+   Platform: Zendesk
+     1. Welcome screen that asks for images in the comment editor
+     2. If image is selected in editor, go to 3. else 4.
+     3. Receive Selected Image -> Annotator
+     4. Receive list of images -> Image Selector
 
-   Context: Web
+   Platform: Web
      1. Wait for image upload or select default goats
      2. Upload brings you to the image annotator
 

@@ -15,23 +15,12 @@ import UndoList exposing (UndoList)
 
 
 viewControls : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewControls { edits, shape, spotlight, keyboardState, drawing, annotationState, operatingSystem } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
+viewControls model annotationAttrs toDropdownMenu =
     div
         [ class "controls" ]
         [ viewNavigationControls
-        , viewHistoryControls operatingSystem edits
-        , div [ class "columns" ]
-            [ viewDrawingButton operatingSystem drawing (DrawLine Arrow)
-            , viewDrawingButton operatingSystem drawing DrawFreeHand
-            , viewDrawingButton operatingSystem drawing DrawTextBox
-            , viewShapesDropdown toDropdownMenu drawing shape operatingSystem
-            , viewSpotlightsDropdown toDropdownMenu drawing spotlight operatingSystem
-            , viewDrawingButton operatingSystem drawing DrawPixelate
-            , viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
-            , viewFillDropdown toDropdownMenu fill operatingSystem
-            , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
-            , viewFontSizeDropdown toDropdownMenu operatingSystem
-            ]
+        , viewHistoryControls model.operatingSystem model.edits
+        , viewDrawingButtons model annotationAttrs toDropdownMenu
         ]
 
 
@@ -72,6 +61,22 @@ viewHistoryControls os edits =
                         "Redo (Ctrl + ⇧ Shift + Z)"
             ]
             [ Icons.viewUndoArrow ]
+        ]
+
+
+viewDrawingButtons : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
+viewDrawingButtons { operatingSystem, drawing, shape, spotlight } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
+    div [ class "columns" ]
+        [ viewDrawingButton operatingSystem drawing (DrawLine Arrow)
+        , viewDrawingButton operatingSystem drawing DrawFreeHand
+        , viewDrawingButton operatingSystem drawing DrawTextBox
+        , viewShapesDropdown toDropdownMenu drawing shape operatingSystem
+        , viewSpotlightsDropdown toDropdownMenu drawing spotlight operatingSystem
+        , viewDrawingButton operatingSystem drawing DrawPixelate
+        , viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
+        , viewFillDropdown toDropdownMenu fill operatingSystem
+        , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
+        , viewFontSizeDropdown toDropdownMenu operatingSystem
         ]
 
 
