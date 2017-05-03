@@ -79,12 +79,12 @@ aShape =
 
 aTextArea : TextArea
 aTextArea =
-    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig 0))
+    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig 0 model.fontSize))
 
 
 autoExpand : AutoExpand.State
 autoExpand =
-    AutoExpand.initState (autoExpandConfig 0)
+    AutoExpand.initState (autoExpandConfig 0 14)
 
 
 testColor : Color.Color
