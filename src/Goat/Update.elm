@@ -9,7 +9,7 @@ import Goat.Model exposing (..)
 import Goat.Ports as Ports
 import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, drawingsAreEqual, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
 import Html.Attributes as Attr
-import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp), isPressed)
+import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp))
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position, position)
 import Rocket exposing ((=>))
@@ -872,6 +872,9 @@ alterToolbarWithKeyboard ctrlPressed keyChangeMaybe model =
 
                         CharA ->
                             { model | drawing = DrawLine Arrow }
+
+                        CharH ->
+                            { model | drawing = DrawFreeHand }
 
                         CharL ->
                             { model | drawing = DrawLine StraightLine }

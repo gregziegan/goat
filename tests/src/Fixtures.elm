@@ -6,7 +6,6 @@ import Color
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Update exposing (..)
-import Keyboard.Extra as Keyboard
 import List.Zipper
 import Mouse exposing (Position)
 import UndoList
@@ -32,7 +31,7 @@ model =
     , strokeColor = Color.red
     , strokeStyle = SolidMedium
     , fontSize = 14
-    , keyboardState = Keyboard.initialState
+    , pressedKeys = []
     , images = List.Zipper.fromList [ goat ]
     , imageSelected = True
     , currentDropdown = Nothing

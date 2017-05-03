@@ -12,7 +12,7 @@ import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
 import Json.Decode as Json
-import Keyboard.Extra exposing (Key(Shift), KeyChange, isPressed)
+import Keyboard.Extra exposing (Key(Shift), KeyChange)
 import List.Extra
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
