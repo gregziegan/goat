@@ -187,7 +187,7 @@ annotationStateToCursor annotationState =
         ReadyToDraw ->
             "crosshair"
 
-        DrawingAnnotation _ _ ->
+        DrawingAnnotation _ _ _ ->
             "crosshair"
 
         MovingAnnotation _ _ _ _ ->

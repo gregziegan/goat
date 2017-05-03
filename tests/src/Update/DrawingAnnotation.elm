@@ -27,7 +27,7 @@ startDrawingTests =
                 model
                     |> startDrawing start
                     |> .annotationState
-                    |> Expect.equal (DrawingAnnotation start start)
+                    |> Expect.equal (DrawingAnnotation start start [])
         ]
 
 
@@ -40,7 +40,7 @@ continueDrawingTests =
                     |> startDrawing start
                     |> continueDrawing end
                     |> .annotationState
-                    |> Expect.equal (DrawingAnnotation start end)
+                    |> Expect.equal (DrawingAnnotation start end [])
         , test "should not update the mouse position if not drawing an annotation" <|
             \() ->
                 model
@@ -55,8 +55,8 @@ continueDrawingTests =
                     |> startDrawing start
                     |> continueDrawing firstFreeDrawPosition
                     |> continueDrawing secondFreeDrawPosition
-                    |> .freeDrawPositions
-                    |> Expect.equalLists [ secondFreeDrawPosition, firstFreeDrawPosition ]
+                    |> .annotationState
+                    |> Expect.equal (DrawingAnnotation start secondFreeDrawPosition [ secondFreeDrawPosition, firstFreeDrawPosition ])
         ]
 
 
@@ -81,12 +81,6 @@ finishDrawingTests =
                     |> finishFreeDrawing start end [ secondFreeDrawPosition, firstFreeDrawPosition ]
                     |> getFirstAnnotation
                     |> Expect.equal (Just (FreeDraw (Shape start end model.strokeColor model.strokeStyle) [ secondFreeDrawPosition, firstFreeDrawPosition ]))
-        , test "should empty free drawing positions list" <|
-            \() ->
-                model
-                    |> finishFreeDrawing start end [ secondFreeDrawPosition, firstFreeDrawPosition ]
-                    |> .freeDrawPositions
-                    |> Expect.equal []
         , test "should add a shape annotation to the edit history" <|
             \() ->
                 model

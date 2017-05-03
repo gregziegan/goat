@@ -325,31 +325,31 @@ skipChange model annotations =
 startDrawing : StartPosition -> Model -> Model
 startDrawing start model =
     { model
-        | annotationState = DrawingAnnotation start start
+        | annotationState = DrawingAnnotation start start []
     }
 
 
 continueDrawing : Position -> Model -> Model
 continueDrawing pos model =
     case model.annotationState of
-        DrawingAnnotation start _ ->
+        DrawingAnnotation start _ freeDrawPositions ->
             { model
-                | annotationState = DrawingAnnotation start pos
-                , freeDrawPositions =
+                | annotationState =
                     case model.drawing of
                         DrawFreeHand ->
-                            case model.freeDrawPositions of
-                                [] ->
-                                    [ pos ]
+                            DrawingAnnotation start pos <|
+                                case freeDrawPositions of
+                                    [] ->
+                                        [ pos ]
 
-                                lastPos :: rest ->
-                                    if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
-                                        model.freeDrawPositions
-                                    else
-                                        pos :: model.freeDrawPositions
+                                    lastPos :: rest ->
+                                        if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
+                                            freeDrawPositions
+                                        else
+                                            pos :: freeDrawPositions
 
                         _ ->
-                            model.freeDrawPositions
+                            DrawingAnnotation start pos []
             }
 
         _ ->
@@ -357,9 +357,9 @@ continueDrawing pos model =
 
 
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
-finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize, freeDrawPositions } as model) =
+finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
     case model.annotationState of
-        DrawingAnnotation start _ ->
+        DrawingAnnotation start _ freeDrawPositions ->
             if isDrawingTooSmall (isSpotlightDrawing model.drawing) start pos then
                 model
                     |> cancelDrawing
@@ -473,7 +473,6 @@ finishFreeDrawing : StartPosition -> EndPosition -> List Position -> Model -> Mo
 finishFreeDrawing start end positions model =
     model
         |> addAnnotation (FreeDraw (Shape start end model.strokeColor model.strokeStyle) positions)
-        |> clearFreeDrawPositions
 
 
 finishPixelateDrawing : StartPosition -> EndPosition -> Model -> Model
@@ -520,11 +519,6 @@ editTextBoxAnnotation index autoExpandState autoExpandText model =
     model.edits.present
         |> mapAtIndex index (autoExpandAnnotation autoExpandState autoExpandText)
         |> skipChange model
-
-
-clearFreeDrawPositions : Model -> Model
-clearFreeDrawPositions model =
-    { model | freeDrawPositions = [] }
 
 
 updateStrokeColor : Color -> Annotation -> Annotation
@@ -1089,7 +1083,7 @@ handleKeyboardInteractions maybeKeyChange ({ pressedKeys } as model) =
                             |> handlePaste ctrlPressed keyChange
                             => []
 
-                    DrawingAnnotation _ _ ->
+                    DrawingAnnotation _ _ _ ->
                         alterDrawing ctrlPressed keyChange model
                             |> alterToolbarWithKeyboard ctrlPressed maybeKeyChange
                             => []

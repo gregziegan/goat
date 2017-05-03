@@ -53,7 +53,7 @@ drawingStateEvents annotationState =
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
-        DrawingAnnotation _ _ ->
+        DrawingAnnotation _ _ _ ->
             [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
@@ -124,32 +124,27 @@ viewDrawingAndAnnotations :
     -> List (Svg Msg)
     -> List (Svg Msg)
     -> (Bool -> List (Svg Msg))
-    -> (StartPosition -> Position -> Bool -> Svg Msg)
+    -> (Bool -> Svg Msg)
     -> Drawing
     -> AnnotationState
     -> List (Svg Msg)
 viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDrawing drawing annotationState =
-    case annotationState of
-        DrawingAnnotation start curPos ->
-            let
-                nonSpotlightDrawingAndAnnotations =
-                    definitions spotlights blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: toAnnotations False) ++ [ toDrawing start curPos False ]
+    let
+        nonSpotlightDrawingAndAnnotations =
+            definitions spotlights blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: toAnnotations False) ++ [ toDrawing False ]
 
-                spotlightDrawingAndAnnotations =
-                    definitions (spotlights ++ [ toDrawing start curPos True ]) blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: Svg.Lazy.lazy viewImage image :: toAnnotations True) ++ [ toDrawing start curPos False ]
-            in
-                case drawing of
-                    DrawShape _ ->
-                        nonSpotlightDrawingAndAnnotations
+        spotlightDrawingAndAnnotations =
+            definitions (spotlights ++ [ toDrawing True ]) blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: Svg.Lazy.lazy viewImage image :: toAnnotations True) ++ [ toDrawing False ]
+    in
+        case drawing of
+            DrawShape _ ->
+                nonSpotlightDrawingAndAnnotations
 
-                    DrawSpotlight _ ->
-                        spotlightDrawingAndAnnotations
+            DrawSpotlight _ ->
+                spotlightDrawingAndAnnotations
 
-                    _ ->
-                        nonSpotlightDrawingAndAnnotations
-
-        _ ->
-            definitions spotlights blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: toAnnotations False)
+            _ ->
+                nonSpotlightDrawingAndAnnotations
 
 
 viewDrawingArea : Model -> AnnotationAttributes -> Image -> Html Msg
@@ -159,7 +154,7 @@ viewDrawingArea model annotationAttrs image =
             model.edits.present
 
         toDrawing =
-            Annotation.viewDrawing model annotationAttrs
+            Annotation.viewDrawing model annotationAttrs model.annotationState
 
         spotlights =
             Definitions.viewSpotlights model.annotationState annotations
@@ -167,7 +162,7 @@ viewDrawingArea model annotationAttrs image =
         blurs =
             Definitions.viewPixelates model.annotationState <|
                 case model.annotationState of
-                    DrawingAnnotation start curPos ->
+                    DrawingAnnotation start curPos _ ->
                         case model.drawing of
                             DrawPixelate ->
                                 Array.push (Pixelate start curPos) annotations

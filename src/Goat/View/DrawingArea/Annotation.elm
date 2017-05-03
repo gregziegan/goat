@@ -145,8 +145,18 @@ lineAttributes lineType shape =
             strokeAttrs shape.strokeStyle shape.strokeColor ++ simpleLineAttrs shape
 
 
-viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
-viewDrawing { drawing, pressedKeys, freeDrawPositions } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
+viewDrawing : Model -> AnnotationAttributes -> AnnotationState -> Bool -> Svg Msg
+viewDrawing model annotationAttrs annotationState isInMask =
+    case annotationState of
+        DrawingAnnotation start curPos freeDrawPositions ->
+            viewDrawingHelper model annotationAttrs start curPos freeDrawPositions isInMask
+
+        _ ->
+            Svg.text ""
+
+
+viewDrawingHelper : Model -> AnnotationAttributes -> StartPosition -> Position -> List Position -> Bool -> Svg Msg
+viewDrawingHelper { drawing, pressedKeys } { strokeColor, fill, strokeStyle, fontSize } start curPos freeDrawPositions isInMask =
     let
         constrain =
             List.member Shift pressedKeys
@@ -263,7 +273,7 @@ annotationStateEvents annIndex annotationState =
             , onWithOptions "contextmenu" (Html.Events.Options True True) (Json.map (ToggleSelectedAnnotationMenu annIndex) Mouse.position)
             ]
 
-        DrawingAnnotation _ _ ->
+        DrawingAnnotation _ _ _ ->
             [ Attr.class "crosshairCursor" ]
 
         SelectedAnnotation _ _ ->
