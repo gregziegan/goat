@@ -171,11 +171,6 @@ toPx number =
     toString number ++ "px"
 
 
-fontSizeToLineHeight : Int -> Float
-fontSizeToLineHeight fontSize =
-    toFloat fontSize * 1.2
-
-
 spotlightToMaskCutout : ( Int, Annotation ) -> Maybe ( Int, ShapeType, Shape )
 spotlightToMaskCutout ( index, annotation ) =
     case annotation of

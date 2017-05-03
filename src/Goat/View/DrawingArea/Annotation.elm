@@ -5,7 +5,7 @@ import Color exposing (Color)
 import Color.Convert
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.Utils exposing (arrowAngle, calcLinePos, shiftPosition, calcShapePos, toDrawingPosition, toPosition)
+import Goat.Utils exposing (arrowAngle, calcLinePos, calcShapePos, fontSizeToLineHeight, shiftPosition, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Vertices as Vertices
 import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
@@ -398,7 +398,7 @@ viewTextArea index ({ start, end, fill, fontSize, autoexpand } as textArea) =
                 ]
             , Html.Events.onWithOptions "mousedown" stopPropagation (Json.succeed PreventTextMouseDown)
             ]
-            [ AutoExpand.view (autoExpandConfig index) (fontSizeToLineHeight fontSize) autoexpand textArea.text
+            [ AutoExpand.view (autoExpandConfig index fontSize) autoexpand textArea.text
             ]
         ]
 

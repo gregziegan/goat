@@ -7,8 +7,7 @@ import Dom
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
-import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, drawingsAreEqual, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
-import Html.Attributes as Attr
+import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, drawingsAreEqual, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition, fontSizeToLineHeight)
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp))
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position, position)
@@ -496,7 +495,7 @@ finishTextBoxDrawing start end model =
             Array.length model.edits.present
     in
         model
-            |> addAnnotation (TextBox (TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations))))
+            |> addAnnotation (TextBox (TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations model.fontSize))))
             |> startEditingText numAnnotations
 
 
@@ -1371,16 +1370,14 @@ returnToImageSelection model =
     { model | imageSelected = False, edits = UndoList.reset model.edits }
 
 
-autoExpandConfig : Int -> AutoExpand.Config Msg
-autoExpandConfig index =
+autoExpandConfig : Int -> Int -> AutoExpand.Config Msg
+autoExpandConfig index fontSize =
     AutoExpand.config
         { onInput = TextBoxInput index
         , padding = 2
         , minRows = 1
         , maxRows = 4
-        , attributes =
-            [ Attr.id <| "text-box-edit--" ++ toString index
-            , Attr.class "text-box-textarea"
-            , Attr.attribute "onfocus" "this.select();"
-            ]
+        , lineHeight = fontSizeToLineHeight fontSize
         }
+        |> AutoExpand.withId ("text-box-edit--" ++ toString index)
+        |> AutoExpand.withClass "text-box-textarea"

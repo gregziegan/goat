@@ -75,6 +75,16 @@
         }
       });
 
+      document.addEventListener('focusin', function(e) {
+        // TODO: remove this JS code
+        // Background: API for AutoExpand doesn't allow adding attributes as of 5/2/17.
+        // This is a temporary workaround while discussing next steps with the author.
+        if (hasClass(e.target, 'text-box-textarea')) {
+          e.target.select();
+          e.setSelectionRange(0, e.value.length);
+        }
+      });
+
       // zendesk listeners
       if (isInZendeskAppContext) {
         client.invoke('resize', { height: 320, width: 800 });
@@ -87,6 +97,10 @@
       var DOMURL = window.URL || window.webkitURL || window;
 
       // helper functions
+      function hasClass(element, cls) {
+          return (' ' + element.className + ' ').indexOf(' ' + cls + ' ') > -1;
+      }
+
       function loadImageDataIntoCache(imageObject) {
         var newImg = new Image();
         newImg.width = imageObject.width;

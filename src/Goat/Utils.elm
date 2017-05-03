@@ -1,4 +1,4 @@
-module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, drawingsAreEqual, toDrawingPosition, toPosition, getFirstSpotlightIndex, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, annotationStateAttributes)
+module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, drawingsAreEqual, toDrawingPosition, toPosition, getFirstSpotlightIndex, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, annotationStateAttributes, fontSizeToLineHeight)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
@@ -292,3 +292,8 @@ annotationStateAttributes model =
 
         _ ->
             currentAnnotationAttributes model
+
+
+fontSizeToLineHeight : Int -> Float
+fontSizeToLineHeight fontSize =
+    toFloat fontSize * 1.2
