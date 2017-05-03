@@ -43,7 +43,7 @@ model =
     , annotationMenu = Nothing
     , showingAnyMenu = False
     , clipboard = Nothing
-    , context = Web
+    , platform = Web
     }
 
 

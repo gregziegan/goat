@@ -12,7 +12,7 @@ import Goat.Flags exposing (Flags, Image)
 import Goat.Ports as Ports
 
 
-type Context
+type Platform
     = Zendesk
     | Web
 
@@ -212,7 +212,7 @@ type alias Model =
 
     -- System/Environment State
     , operatingSystem : OperatingSystem
-    , context : Context
+    , platform : Platform
     }
 
 
@@ -258,7 +258,7 @@ init { isMac, inZendesk } =
             MacOS
         else
             Windows
-    , context =
+    , platform =
         if inZendesk then
             Zendesk
         else

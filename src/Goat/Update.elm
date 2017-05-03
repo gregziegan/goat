@@ -706,45 +706,45 @@ finishResizingAnnotation model =
 
 
 resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingData -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeVertices discretize { curPos, vertex, originalCoords } annotation =
+resizeVertices constrain { curPos, vertex, originalCoords } annotation =
     let
         ( start, end ) =
             originalCoords
     in
         case vertex of
             Start ->
-                { annotation | start = discretize annotation.end curPos }
+                { annotation | start = constrain annotation.end curPos }
 
             Goat.Model.End ->
-                { annotation | end = discretize annotation.start curPos }
+                { annotation | end = constrain annotation.start curPos }
 
             StartPlusX ->
-                { annotation | start = discretize annotation.end curPos, end = Position start.x end.y }
+                { annotation | start = constrain annotation.end curPos, end = Position start.x end.y }
 
             StartPlusY ->
-                { annotation | start = discretize annotation.end curPos, end = Position end.x start.y }
+                { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
 
 
 resize : Bool -> ResizingData -> Annotation -> Annotation
-resize discretize resizingData annotation =
+resize constrain resizingData annotation =
     case annotation of
         Lines lineType shape ->
-            Lines lineType (resizeVertices (calcLinePos discretize) resizingData shape)
+            Lines lineType (resizeVertices (calcLinePos constrain) resizingData shape)
 
         FreeDraw _ _ ->
             annotation
 
         Shapes shapeType fill shape ->
-            Shapes shapeType fill (resizeVertices (calcShapePos discretize) resizingData shape)
+            Shapes shapeType fill (resizeVertices (calcShapePos constrain) resizingData shape)
 
         TextBox textArea ->
             TextBox (resizeVertices (calcShapePos False) resizingData textArea)
 
         Spotlight shapeType shape ->
-            Spotlight shapeType (resizeVertices (calcShapePos discretize) resizingData shape)
+            Spotlight shapeType (resizeVertices (calcShapePos constrain) resizingData shape)
 
         Pixelate start end ->
-            Pixelate (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos discretize) resizingData { start = start, end = end }).end
+            Pixelate (resizeVertices (calcShapePos constrain) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos constrain) resizingData { start = start, end = end }).end
 
 
 shift :

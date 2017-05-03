@@ -34,12 +34,19 @@ rectAttrs start end =
 
 ellipseAttributes : Shape -> List (Svg.Attribute Msg)
 ellipseAttributes { start, end } =
-    [ Attr.rx <| toString <| abs <| (end.x - start.x) // 2
-    , Attr.ry <| toString <| abs <| (end.y - start.y) // 2
-    , Attr.cx <| toString <| start.x + ((end.x - start.x) // 2)
-    , Attr.cy <| toString <| start.y + ((end.y - start.y) // 2)
-    , Attr.filter "url(#dropShadow)"
-    ]
+    let
+        dx =
+            toFloat (end.x - start.x)
+
+        dy =
+            toFloat (end.y - start.y)
+    in
+        [ Attr.rx (toString (abs dx / 2))
+        , Attr.ry (toString (abs dy / 2))
+        , Attr.cx (toString (toFloat start.x + dx / 2))
+        , Attr.cy (toString (toFloat start.y + dy / 2))
+        , Attr.filter "url(#dropShadow)"
+        ]
 
 
 fillAttrs : Maybe Color -> List (Svg.Attribute Msg)
@@ -141,29 +148,29 @@ lineAttributes lineType shape =
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
 viewDrawing { drawing, pressedKeys, freeDrawPositions } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
     let
-        discretize =
+        constrain =
             List.member Shift pressedKeys
 
         lineAttrs lineType =
-            lineAttributes lineType <| Shape start (calcLinePos discretize start curPos) strokeColor strokeStyle
+            lineAttributes lineType <| Shape start (calcLinePos constrain start curPos) strokeColor strokeStyle
 
         shapeAttrs shapeType =
-            shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) fill
+            shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) fill
 
         spotlightAttrs shapeType =
             if isInMask then
-                shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) (Just Color.black)
+                shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) (Just Color.black)
             else
-                shapeAttributes shapeType (Shape start (calcShapePos discretize start curPos) strokeColor strokeStyle) Nothing
+                shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) Nothing
     in
         case drawing of
             DrawLine lineType ->
                 case lineType of
                     Arrow ->
                         Svg.g []
-                            [ viewArrowHead [ Attr.filter "url(#dropShadow)" ] ( 0, 0 ) start (calcLinePos discretize start curPos) strokeColor
+                            [ viewArrowHead [ Attr.filter "url(#dropShadow)" ] ( 0, 0 ) start (calcLinePos constrain start curPos) strokeColor
                             , Svg.path (lineAttrs lineType) []
-                            , viewArrowHead [] ( 0, 0 ) start (calcLinePos discretize start curPos) strokeColor
+                            , viewArrowHead [] ( 0, 0 ) start (calcLinePos constrain start curPos) strokeColor
                             ]
 
                     StraightLine ->
