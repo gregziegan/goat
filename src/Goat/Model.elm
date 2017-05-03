@@ -154,7 +154,7 @@ See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-Sta
 -}
 type AnnotationState
     = ReadyToDraw
-    | DrawingAnnotation StartPosition Position
+    | DrawingAnnotation StartPosition Position (List Position)
     | SelectedAnnotation Int AnnotationAttributes
     | MovingAnnotation Int StartPosition ( Int, Int ) AnnotationAttributes
     | ResizingAnnotation ResizingData AnnotationAttributes
@@ -185,7 +185,6 @@ type alias Model =
     { -- Annotation Editing State
       edits : UndoList (Array Annotation)
     , annotationState : AnnotationState
-    , freeDrawPositions : List Position
     , clipboard : Maybe Annotation
 
     -- Control UI State
@@ -237,7 +236,6 @@ init : Flags -> ( Model, List (Cmd msg) )
 init { isMac, inZendesk } =
     { edits = UndoList.fresh Array.empty
     , annotationState = ReadyToDraw
-    , freeDrawPositions = []
     , clipboard = Nothing
     , drawing = DrawLine Arrow
     , shape = DrawShape RoundedRect

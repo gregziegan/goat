@@ -4,7 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.Utils exposing (getFirstSpotlightIndex, toDrawingPosition, toPosition)
+import Goat.Utils exposing (getFirstSpotlightIndex, isSpotlightDrawing, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Annotation as Annotation exposing (viewAnnotation)
 import Goat.View.DrawingArea.Definitions as Definitions
 import Goat.View.Utils exposing (..)
@@ -53,7 +53,7 @@ drawingStateEvents annotationState =
             , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
             ]
 
-        DrawingAnnotation _ _ ->
+        DrawingAnnotation _ _ _ ->
             [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
             , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
             , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
@@ -123,33 +123,24 @@ viewDrawingAndAnnotations :
     -> (List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg))
     -> List (Svg Msg)
     -> List (Svg Msg)
-    -> (Bool -> List (Svg Msg))
-    -> (StartPosition -> Position -> Bool -> Svg Msg)
-    -> Drawing
-    -> AnnotationState
     -> List (Svg Msg)
-viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDrawing drawing annotationState =
-    case annotationState of
-        DrawingAnnotation start curPos ->
-            let
-                nonSpotlightDrawingAndAnnotations =
-                    definitions spotlights blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: toAnnotations False) ++ [ toDrawing start curPos False ]
+    -> (Bool -> Svg Msg)
+    -> Drawing
+    -> List (Svg Msg)
+viewDrawingAndAnnotations image definitions spotlights pixelates annotations toDrawing drawing =
+    let
+        nonSpotlightDrawingAndAnnotations =
+            definitions spotlights pixelates ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: annotations) ++ [ toDrawing False ]
 
-                spotlightDrawingAndAnnotations =
-                    definitions (spotlights ++ [ toDrawing start curPos True ]) blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: Svg.Lazy.lazy viewImage image :: toAnnotations True) ++ [ toDrawing start curPos False ]
-            in
-                case drawing of
-                    DrawShape _ ->
-                        nonSpotlightDrawingAndAnnotations
+        spotlightDrawingAndAnnotations =
+            definitions (spotlights ++ [ toDrawing True ]) pixelates ++ (Svg.Lazy.lazy viewPixelatedImage image :: Svg.Lazy.lazy viewImage image :: annotations) ++ [ toDrawing False ]
+    in
+        case drawing of
+            DrawSpotlight _ ->
+                spotlightDrawingAndAnnotations
 
-                    DrawSpotlight _ ->
-                        spotlightDrawingAndAnnotations
-
-                    _ ->
-                        nonSpotlightDrawingAndAnnotations
-
-        _ ->
-            definitions spotlights blurs ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: toAnnotations False)
+            _ ->
+                nonSpotlightDrawingAndAnnotations
 
 
 viewDrawingArea : Model -> AnnotationAttributes -> Image -> Html Msg
@@ -159,15 +150,15 @@ viewDrawingArea model annotationAttrs image =
             model.edits.present
 
         toDrawing =
-            Annotation.viewDrawing model annotationAttrs
+            Annotation.viewDrawing model annotationAttrs model.annotationState
 
         spotlights =
             Definitions.viewSpotlights model.annotationState annotations
 
-        blurs =
+        pixelates =
             Definitions.viewPixelates model.annotationState <|
                 case model.annotationState of
-                    DrawingAnnotation start curPos ->
+                    DrawingAnnotation start curPos _ ->
                         case model.drawing of
                             DrawPixelate ->
                                 Array.push (Pixelate start curPos) annotations
@@ -184,8 +175,13 @@ viewDrawingArea model annotationAttrs image =
         definitions =
             Definitions.viewDefinitions image.width image.height
 
-        toAnnotations =
-            getAnnotations image annotations spotlights nonSpotlights
+        svgAnnotations =
+            case model.annotationState of
+                DrawingAnnotation startPosition position positionList ->
+                    getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing model.drawing)
+
+                _ ->
+                    getAnnotations image annotations spotlights nonSpotlights False
     in
         div
             (canvasAttributes image model.drawing model.annotationState)
@@ -196,7 +192,7 @@ viewDrawingArea model annotationAttrs image =
                 , Attr.height <| toString <| round image.height
                 , Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg"
                 ]
-                (viewDrawingAndAnnotations image definitions spotlights blurs toAnnotations toDrawing model.drawing model.annotationState)
+                (viewDrawingAndAnnotations image definitions spotlights pixelates svgAnnotations toDrawing model.drawing)
             ]
 
 

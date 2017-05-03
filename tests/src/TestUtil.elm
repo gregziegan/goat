@@ -37,7 +37,7 @@ position =
 getDrawingStateCurPos : AnnotationState -> Maybe Position
 getDrawingStateCurPos annotationState =
     case annotationState of
-        DrawingAnnotation _ curPos ->
+        DrawingAnnotation _ curPos _ ->
             Just curPos
 
         _ ->

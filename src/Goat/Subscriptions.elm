@@ -13,7 +13,7 @@ imageAnnotationSubscriptions : Model -> List (Sub Msg)
 imageAnnotationSubscriptions model =
     if model.imageSelected then
         case model.annotationState of
-            DrawingAnnotation _ _ ->
+            DrawingAnnotation _ _ _ ->
                 [ Mouse.moves (ContinueDrawing << toDrawingPosition)
                 , Sub.map KeyboardMsg Keyboard.subscriptions
                 ]
