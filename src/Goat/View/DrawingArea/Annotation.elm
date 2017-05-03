@@ -12,7 +12,7 @@ import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
 import Json.Decode as Json
-import Keyboard.Extra exposing (Key(Shift), KeyChange, isPressed)
+import Keyboard.Extra exposing (Key(Shift), KeyChange)
 import List.Extra
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
@@ -146,10 +146,10 @@ lineAttributes lineType shape =
 
 
 viewDrawing : Model -> AnnotationAttributes -> StartPosition -> Position -> Bool -> Svg Msg
-viewDrawing { drawing, keyboardState, freeDrawPositions } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
+viewDrawing { drawing, pressedKeys, freeDrawPositions } { strokeColor, fill, strokeStyle, fontSize } start curPos isInMask =
     let
         constrain =
-            isPressed Shift keyboardState
+            List.member Shift pressedKeys
 
         lineAttrs lineType =
             lineAttributes lineType <| Shape start (calcLinePos constrain start curPos) strokeColor strokeStyle
