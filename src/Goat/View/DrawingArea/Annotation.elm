@@ -3,9 +3,12 @@ module Goat.View.DrawingArea.Annotation exposing (..)
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
+import Goat.AnnotationAttributes exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), SelectState(..), StrokeStyle(SolidThin), TextArea, arrowAngle, arrowPath, toLineStyle, toStrokeWidth)
+import Goat.EditState as EditState exposing (EditState, Vertex)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.Utils exposing (arrowAngle, calcLinePos, calcShapePos, fontSizeToLineHeight, shiftPosition, toDrawingPosition, toPosition)
+import Goat.Utils exposing (calcLinePos, calcShapePos, fontSizeToLineHeight, shiftPosition, toDrawingPosition, toPosition)
+import Goat.View.EventUtils exposing (defaultPrevented, stopPropagation)
 import Goat.View.DrawingArea.Vertices as Vertices
 import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
@@ -145,13 +148,13 @@ lineAttributes lineType shape =
             strokeAttrs shape.strokeStyle shape.strokeColor ++ simpleLineAttrs shape
 
 
-viewDrawing : Model -> AnnotationAttributes -> AnnotationState -> Bool -> Svg Msg
-viewDrawing model annotationAttrs annotationState isInMask =
-    case annotationState of
-        DrawingAnnotation start curPos freeDrawPositions ->
+viewDrawing : Model -> AnnotationAttributes -> EditState -> Bool -> Svg Msg
+viewDrawing model annotationAttrs editState isInMask =
+    case EditState.getDrawingAttributes editState of
+        Just ( start, curPos, freeDrawPositions ) ->
             viewDrawingHelper model annotationAttrs start curPos freeDrawPositions isInMask
 
-        _ ->
+        Nothing ->
             Svg.text ""
 
 
@@ -216,108 +219,6 @@ viewDrawingHelper { drawing, pressedKeys } { strokeColor, fill, strokeStyle, fon
 
             DrawPixelate ->
                 Svg.text ""
-
-
-getSelectState : Int -> Annotation -> AnnotationState -> SelectState
-getSelectState annIndex annotation annotationState =
-    case annotationState of
-        SelectedAnnotation index _ ->
-            if index == annIndex then
-                case annotation of
-                    FreeDraw _ _ ->
-                        Selected
-
-                    _ ->
-                        SelectedWithVertices
-            else
-                NotSelected
-
-        MovingAnnotation index _ _ _ ->
-            if index == annIndex then
-                case annotation of
-                    FreeDraw _ _ ->
-                        Selected
-
-                    _ ->
-                        SelectedWithVertices
-            else
-                NotSelected
-
-        ResizingAnnotation { index } _ ->
-            if index == annIndex then
-                case annotation of
-                    FreeDraw _ _ ->
-                        Selected
-
-                    _ ->
-                        SelectedWithVertices
-            else
-                NotSelected
-
-        EditingATextBox index _ ->
-            if index == annIndex then
-                Selected
-            else
-                NotSelected
-
-        _ ->
-            NotSelected
-
-
-annotationStateEvents : Int -> AnnotationState -> List (Svg.Attribute Msg)
-annotationStateEvents annIndex annotationState =
-    case annotationState of
-        ReadyToDraw ->
-            [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (SelectAndMoveAnnotation annIndex << toDrawingPosition) Mouse.position
-            , Attr.class "pointerCursor"
-            , onWithOptions "contextmenu" (Html.Events.Options True True) (Json.map (ToggleSelectedAnnotationMenu annIndex) Mouse.position)
-            ]
-
-        DrawingAnnotation _ _ _ ->
-            [ Attr.class "crosshairCursor" ]
-
-        SelectedAnnotation _ _ ->
-            [ Attr.class "moveCursor"
-            , Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartMovingAnnotation annIndex << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation annIndex << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleSelectedAnnotationMenu annIndex) Mouse.position)
-            ]
-
-        MovingAnnotation index _ ( dx, dy ) _ ->
-            [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
-            , Attr.class "moveCursor"
-            ]
-                ++ if index == annIndex then
-                    [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
-                   else
-                    []
-
-        ResizingAnnotation _ _ ->
-            [ Attr.class "resizeCursor"
-            ]
-
-        EditingATextBox index _ ->
-            [ Attr.class "crosshairCursor" ]
-
-
-annotationStateVertexEvents : Int -> AnnotationState -> Vertex -> ResizeDirection -> List (Svg.Attribute Msg)
-annotationStateVertexEvents index annotationState vertex direction =
-    [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartResizingAnnotation index vertex << toDrawingPosition) Mouse.position
-    , ST.onSingleTouch T.TouchStart T.preventAndStop (StartResizingAnnotation index vertex << toDrawingPosition << toPosition)
-    , Attr.class (directionToCursor direction)
-    ]
-        ++ case annotationState of
-            MovingAnnotation _ _ ( dx, dy ) _ ->
-                [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
-
-            ResizingAnnotation _ _ ->
-                [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
-                , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
-                ]
-
-            _ ->
-                []
 
 
 viewLine : ( Int, Int ) -> List (Svg.Attribute Msg) -> LineType -> Shape -> Svg Msg
@@ -446,63 +347,164 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
                     )
 
 
-viewPixelate : AnnotationState -> Int -> Annotation -> Maybe (List (Svg Msg))
-viewPixelate annotationState index annotation =
+viewPixelate : EditState -> Int -> Annotation -> Maybe (List (Svg Msg))
+viewPixelate editState index annotation =
     case annotation of
         Pixelate start end ->
-            Just [ Svg.rect (rectAttrs start end ++ [ Attr.fill "black", Attr.style "all" ] ++ (annotationStateEvents index annotationState)) [] ]
+            Just [ Svg.rect (editStateAttributes index editState (rectAttrs start end ++ [ Attr.fill "black", Attr.style "all" ])) [] ]
 
         _ ->
             Nothing
 
 
-viewAnnotation : AnnotationState -> Int -> Annotation -> ( Svg Msg, Maybe (Svg Msg) )
-viewAnnotation annotationState index annotation =
+isFreeHand annotation =
+    case annotation of
+        FreeDraw _ _ ->
+            True
+
+        _ ->
+            False
+
+
+viewAnnotation : EditState -> Int -> Annotation -> ( Svg Msg, Maybe (Svg Msg) )
+viewAnnotation editState index annotation =
     let
         selectState =
-            getSelectState index annotation annotationState
+            EditState.getSelectState index (isFreeHand annotation) editState
 
-        annotationStateAttrs =
-            annotationStateEvents index annotationState
+        editStateAttrs =
+            editStateAttributes index editState []
 
         offset =
-            case annotationState of
-                MovingAnnotation annIndex _ offset _ ->
-                    if annIndex == index then
-                        offset
-                    else
-                        ( 0, 0 )
-
-                _ ->
-                    ( 0, 0 )
+            -- case editState of
+            --     MovingAnnotation annIndex _ offset _ ->
+            --         if annIndex == index then
+            --             offset
+            --         else
+            --             ( 0, 0 )
+            --
+            --     _ ->
+            ( 0, 0 )
 
         toVertexEvents =
-            annotationStateVertexEvents index annotationState
+            editStateVertexEvents index editState
 
         vertices verticesType { start, end } =
             Vertices.viewVertices verticesType start end toVertexEvents selectState
     in
         case annotation of
             Lines lineType shape ->
-                viewLine offset annotationStateAttrs lineType shape
+                viewLine offset editStateAttrs lineType shape
                     => vertices Linear shape
 
             FreeDraw shape positions ->
-                viewFreeDraw selectState annotationStateAttrs shape positions
+                viewFreeDraw selectState editStateAttrs shape positions
                     => Nothing
 
             Shapes shapeType fill shape ->
-                viewShape annotationStateAttrs shapeType fill shape
+                viewShape editStateAttrs shapeType fill shape
                     => vertices Rectangular shape
 
             TextBox textBox ->
-                viewTextBox annotationStateAttrs selectState index textBox
+                viewTextBox editStateAttrs selectState index textBox
                     => Nothing
 
             Spotlight shapeType shape ->
-                viewShape annotationStateAttrs shapeType Nothing shape
+                viewShape editStateAttrs shapeType Nothing shape
                     => vertices Rectangular shape
 
             Pixelate start end ->
-                Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ annotationStateAttrs) []
+                Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ editStateAttrs) []
                     => vertices Rectangular { start = start, end = end }
+
+
+editStateViewConfig : Int -> EditState.Config Msg (List (Svg.Attribute Msg))
+editStateViewConfig annIndex =
+    { drawToMsg = ContinueDrawing << toDrawingPosition
+    , resizeToMsg = ResizeAnnotation << toDrawingPosition
+    , moveToMsg = MoveAnnotation << toDrawingPosition
+    , keyboardToMsg = KeyboardMsg
+    , whenNotSelecting = annAttrsWhenNotSelecting annIndex
+    , whenDrawing = annAttrsWhenDrawing annIndex
+    , whenSelecting = annAttrsWhenSelecting annIndex
+    , whenMoving = annAttrsWhenMoving annIndex
+    , whenResizing = annAttrsWhenResizing annIndex
+    , whenEditingText = annAttrsWhenEditingText annIndex
+    }
+
+
+editStateAttributes index editState attrs =
+    EditState.map (editStateViewConfig index) editState attrs
+
+
+annAttrsWhenNotSelecting annIndex attrs =
+    attrs
+        ++ [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (SelectAndMoveAnnotation annIndex << toDrawingPosition) Mouse.position
+           , Attr.class "pointerCursor"
+           , onWithOptions "contextmenu" (Html.Events.Options True True) (Json.map (ToggleSelectedAnnotationMenu annIndex) Mouse.position)
+           ]
+
+
+annAttrsWhenDrawing annIndex attrs =
+    attrs ++ [ Attr.class "crosshairCursor" ]
+
+
+annAttrsWhenSelecting annIndex id attrs =
+    attrs
+        ++ [ Attr.class "moveCursor"
+           , Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartMovingAnnotation annIndex << toDrawingPosition) Mouse.position
+           , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation annIndex << toDrawingPosition << toPosition)
+           , onWithOptions "contextmenu" defaultPrevented (Json.map (ToggleSelectedAnnotationMenu annIndex) Mouse.position)
+           ]
+
+
+annAttrsWhenMoving annIndex attrs =
+    attrs
+        ++ [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
+           , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
+           , Attr.class "moveCursor"
+           ]
+
+
+
+-- ++ if index == annIndex then
+--     [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
+--    else
+--     []
+
+
+annAttrsWhenResizing annIndex attrs =
+    attrs
+        ++ [ Attr.class "resizeCursor"
+           ]
+
+
+annAttrsWhenEditingText annIndex id attrs =
+    attrs ++ [ Attr.class "crosshairCursor" ]
+
+
+editStateVertexEvents : Int -> EditState -> Vertex -> ResizeDirection -> List (Svg.Attribute Msg)
+editStateVertexEvents index editState vertex direction =
+    [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartResizingAnnotation index vertex << toDrawingPosition) Mouse.position
+    , ST.onSingleTouch T.TouchStart T.preventAndStop (StartResizingAnnotation index vertex << toDrawingPosition << toPosition)
+    , Attr.class (directionToCursor direction)
+    ]
+
+
+
+-- vertexAttrsWhenNotSelecting =
+-- vertexAttrsWhenDrawing =
+-- vertexAttrsWhenSelecting =
+-- vertexAttrsWhenMoving =
+-- vertexAttrsWhenResizing =
+-- vertexAttrsWhenEditingText =
+--             MovingAnnotation _ _ ( dx, dy ) _ ->
+--                 [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
+--
+--             ResizingAnnotation _ _ ->
+--                 [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
+--                 , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
+--                 ]
+--
+--             _ ->
+--                 []

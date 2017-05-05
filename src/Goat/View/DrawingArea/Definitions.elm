@@ -2,6 +2,8 @@ module Goat.View.DrawingArea.Definitions exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
+import Goat.AnnotationAttributes exposing (Annotation, ShapeType, Shape, spotlightToMaskCutout)
+import Goat.EditState exposing (EditState)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.View.DrawingArea.Annotation as Annotation
@@ -11,35 +13,35 @@ import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
 
 
-viewNonSpotlightAnnotations : AnnotationState -> Array Annotation -> List (Svg Msg)
-viewNonSpotlightAnnotations annotationState annotations =
+viewNonSpotlightAnnotations : EditState -> Array Annotation -> List (Svg Msg)
+viewNonSpotlightAnnotations editState annotations =
     let
         annotationsAndVertices =
             annotations
                 |> Array.toList
-                |> List.indexedMap (Annotation.viewAnnotation annotationState)
+                |> List.indexedMap (Annotation.viewAnnotation editState)
     in
         List.map Tuple.first annotationsAndVertices
             ++ List.filterMap Tuple.second annotationsAndVertices
 
 
-viewMaskCutOut : AnnotationState -> ( Int, ShapeType, Shape ) -> Svg Msg
-viewMaskCutOut annotationState ( index, shapeType, shape ) =
-    Annotation.viewShape (Annotation.annotationStateEvents index annotationState) shapeType (Just Color.black) shape
+viewMaskCutOut : EditState -> ( Int, ShapeType, Shape ) -> Svg Msg
+viewMaskCutOut editState ( index, shapeType, shape ) =
+    Annotation.viewShape (Annotation.editStateAttributes index editState []) shapeType (Just Color.black) shape
 
 
-viewSpotlights : AnnotationState -> Array Annotation -> List (Svg Msg)
-viewSpotlights annotationState annotations =
+viewSpotlights : EditState -> Array Annotation -> List (Svg Msg)
+viewSpotlights editState annotations =
     annotations
         |> Array.toIndexedList
-        |> List.filterMap (Maybe.map (viewMaskCutOut annotationState) << spotlightToMaskCutout)
+        |> List.filterMap (Maybe.map (viewMaskCutOut editState) << spotlightToMaskCutout)
 
 
-viewPixelates : AnnotationState -> Array Annotation -> List (Svg Msg)
-viewPixelates annotationState annotations =
+viewPixelates : EditState -> Array Annotation -> List (Svg Msg)
+viewPixelates editState annotations =
     annotations
         |> Array.toIndexedList
-        |> List.filterMap (uncurry (Annotation.viewPixelate annotationState))
+        |> List.filterMap (uncurry (Annotation.viewPixelate editState))
         |> List.concat
 
 

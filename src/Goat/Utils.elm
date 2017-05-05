@@ -1,11 +1,11 @@
-module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, isEmptyTextBox, drawingsAreEqual, toDrawingPosition, toPosition, getFirstSpotlightIndex, shiftPosition, getPositions, stepMouse, arrowAngle, getAnnotationAttributes, currentAnnotationAttributes, annotationStateAttributes, fontSizeToLineHeight)
+module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, drawingsAreEqual, toDrawingPosition, toPosition, getFirstSpotlightIndex, shiftPosition, stepMouse, fontSizeToLineHeight)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
-import Goat.Model exposing (Annotation(..), AnnotationAttributes, AnnotationState(..), Drawing(..), EndPosition, LineType(..), Model, ResizeDirection(..), Shape, ShapeType(..), StartPosition, StrokeStyle(..))
+import Goat.AnnotationAttributes exposing (Annotation, AnnotationAttributes, isSpotlightShape, arrowAngle)
+import Goat.Model exposing (Drawing(..), EndPosition, Model, ResizeDirection(..), StartPosition)
 import List.Extra
 import Mouse exposing (Position)
-import Rocket exposing ((=>))
 import SingleTouch as ST
 
 
@@ -93,21 +93,6 @@ toDrawingPosition mouse =
     { mouse | x = mouse.x - ControlOptions.controlUIWidth, y = mouse.y - 10 }
 
 
-arrowAngle : StartPosition -> EndPosition -> Float
-arrowAngle a b =
-    let
-        theta =
-            atan2 (toFloat (b.y - a.y)) (toFloat (b.x - a.x))
-
-        radians =
-            if theta < 0.0 then
-                (2 * pi) + theta
-            else
-                theta
-    in
-        radians
-
-
 toDeltas : Float -> Float -> Position
 toDeltas h theta =
     Position (round (cos theta * h)) (round (sin theta * h))
@@ -175,16 +160,6 @@ drawingsAreEqual drawing drawing2 =
             drawing2 == DrawPixelate
 
 
-isSpotlightShape : Annotation -> Bool
-isSpotlightShape annotation =
-    case annotation of
-        Spotlight _ _ ->
-            True
-
-        _ ->
-            False
-
-
 removeItem : Int -> Array a -> Array a
 removeItem index arr =
     Array.append (Array.slice 0 index arr) (Array.slice (index + 1) (Array.length arr) arr)
@@ -203,16 +178,6 @@ removeItemIf fn index xs =
             xs
 
 
-isEmptyTextBox : Annotation -> Bool
-isEmptyTextBox annotation =
-    case annotation of
-        TextBox textArea ->
-            textArea.text == ""
-
-        _ ->
-            False
-
-
 getFirstSpotlightIndex : Array Annotation -> Int
 getFirstSpotlightIndex annotations =
     annotations
@@ -224,74 +189,6 @@ getFirstSpotlightIndex annotations =
 shiftPosition : number -> number -> { x : number, y : number } -> { x : number, y : number }
 shiftPosition dx dy pos =
     { pos | x = pos.x + dx, y = pos.y + dy }
-
-
-getPositions : Annotation -> ( StartPosition, EndPosition )
-getPositions annotation =
-    case annotation of
-        Lines lineType line ->
-            line.start => line.end
-
-        FreeDraw shape _ ->
-            shape.start => shape.end
-
-        Shapes shapeType _ shape ->
-            shape.start => shape.end
-
-        TextBox textArea ->
-            textArea.start => textArea.end
-
-        Spotlight shapeType shape ->
-            shape.start => shape.end
-
-        Pixelate start end ->
-            start => end
-
-
-getAnnotationAttributes : Annotation -> AnnotationAttributes -> AnnotationAttributes
-getAnnotationAttributes annotation existingAttrs =
-    case annotation of
-        Lines _ shape ->
-            AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
-
-        FreeDraw shape _ ->
-            AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
-
-        Shapes _ fill shape ->
-            AnnotationAttributes shape.strokeColor fill shape.strokeStyle existingAttrs.fontSize
-
-        TextBox textArea ->
-            AnnotationAttributes textArea.fill existingAttrs.fill existingAttrs.strokeStyle textArea.fontSize
-
-        Spotlight _ shape ->
-            AnnotationAttributes shape.strokeColor existingAttrs.fill shape.strokeStyle existingAttrs.fontSize
-
-        Pixelate _ _ ->
-            existingAttrs
-
-
-currentAnnotationAttributes : Model -> AnnotationAttributes
-currentAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
-    AnnotationAttributes strokeColor fill strokeStyle fontSize
-
-
-annotationStateAttributes : Model -> AnnotationAttributes
-annotationStateAttributes model =
-    case model.annotationState of
-        SelectedAnnotation _ annotationAttrs ->
-            annotationAttrs
-
-        MovingAnnotation _ _ _ annotationAttrs ->
-            annotationAttrs
-
-        ResizingAnnotation _ annotationAttrs ->
-            annotationAttrs
-
-        EditingATextBox _ annotationAttrs ->
-            annotationAttrs
-
-        _ ->
-            currentAnnotationAttributes model
 
 
 fontSizeToLineHeight : Int -> Float

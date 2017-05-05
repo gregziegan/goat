@@ -1,12 +1,15 @@
 module Goat.View.DrawingArea exposing (..)
 
 import Array.Hamt as Array exposing (Array)
+import Goat.AnnotationAttributes exposing (Annotation(..), AnnotationAttributes)
+import Goat.EditState as EditState exposing (EditState)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (getFirstSpotlightIndex, isSpotlightDrawing, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Annotation as Annotation exposing (viewAnnotation)
 import Goat.View.DrawingArea.Definitions as Definitions
+import Goat.View.EventUtils exposing (defaultPrevented, stopPropagation)
 import Goat.View.Utils exposing (..)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
@@ -44,61 +47,89 @@ viewImage { url, width, height } =
         []
 
 
-drawingStateEvents : AnnotationState -> List (Attribute Msg)
-drawingStateEvents annotationState =
-    case annotationState of
-        ReadyToDraw ->
-            [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-            ]
-
-        DrawingAnnotation _ _ _ ->
-            [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-            ]
-
-        MovingAnnotation _ _ _ _ ->
-            [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-            ]
-
-        ResizingAnnotation _ _ ->
-            [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-            ]
-
-        SelectedAnnotation _ _ ->
-            [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
-            ]
-
-        EditingATextBox index _ ->
-            [ Html.Events.onMouseDown <| FinishEditingText index
-            , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-            ]
+editStateDrawingAreaConfig : EditState.Config Msg (List (Attribute Msg))
+editStateDrawingAreaConfig =
+    { drawToMsg = ContinueDrawing << toDrawingPosition
+    , resizeToMsg = ResizeAnnotation << toDrawingPosition
+    , moveToMsg = MoveAnnotation << toDrawingPosition
+    , keyboardToMsg = KeyboardMsg
+    , whenNotSelecting = drawingAreaAttrsWhenNotSelecting
+    , whenDrawing = drawingAreaAttrsWhenDrawing
+    , whenSelecting = drawingAreaAttrsWhenSelecting
+    , whenMoving = drawingAreaAttrsWhenMoving
+    , whenResizing = drawingAreaAttrsWhenResizing
+    , whenEditingText = drawingAreaAttrsWhenEditingText
+    }
 
 
-canvasAttributes : Image -> Drawing -> AnnotationState -> List (Svg.Attribute Msg)
-canvasAttributes image drawing annotationState =
+drawingStateEvents : EditState -> List (Attribute Msg)
+drawingStateEvents editState =
+    EditState.map editStateDrawingAreaConfig editState []
+
+
+drawingAreaAttrsWhenNotSelecting attrs =
+    attrs
+        ++ [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
+           , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
+           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+           ]
+
+
+drawingAreaAttrsWhenDrawing attrs =
+    attrs
+        ++ [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
+           , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
+           , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
+           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+           ]
+
+
+drawingAreaAttrsWhenSelecting index attrs =
+    attrs
+        ++ [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
+           , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
+           ]
+
+
+drawingAreaAttrsWhenMoving attrs =
+    attrs
+        ++ [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
+           , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
+           , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
+           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+           ]
+
+
+drawingAreaAttrsWhenResizing attrs =
+    attrs
+        ++ [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
+           , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
+           , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
+           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+           ]
+
+
+drawingAreaAttrsWhenEditingText index attrs =
+    attrs
+        ++ [ Html.Events.onMouseDown <| FinishEditingText index
+           , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
+           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+           ]
+
+
+canvasAttributes : Image -> Drawing -> EditState -> List (Svg.Attribute Msg)
+canvasAttributes image drawing editState =
     [ id "canvas"
     , class "image-edit"
     , style
         [ "width" => toString (round image.width) ++ "px"
         , "height" => toString (round image.height) ++ "px"
-        , "cursor" => annotationStateToCursor annotationState
+        , "cursor" => EditState.toDrawingAreaCursor editState
         ]
     , Html.Events.onMouseDown CloseDropdown
     , Html.Attributes.contextmenu "annotation-menu"
     ]
-        ++ drawingStateEvents annotationState
+        ++ drawingStateEvents editState
 
 
 getAnnotations : Image -> Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Bool -> List (Svg Msg)
@@ -150,41 +181,35 @@ viewDrawingArea model annotationAttrs image =
             model.edits.present
 
         toDrawing =
-            Annotation.viewDrawing model annotationAttrs model.annotationState
+            Annotation.viewDrawing model annotationAttrs model.editState
 
         spotlights =
-            Definitions.viewSpotlights model.annotationState annotations
+            Definitions.viewSpotlights model.editState annotations
 
-        pixelates =
-            Definitions.viewPixelates model.annotationState <|
-                case model.annotationState of
-                    DrawingAnnotation start curPos _ ->
+        ( pixelates, svgAnnotations ) =
+            Tuple.mapFirst (Definitions.viewPixelates model.editState) <|
+                case EditState.getDrawingAttributes model.editState of
+                    Just ( start, curPos, _ ) ->
                         case model.drawing of
                             DrawPixelate ->
-                                Array.push (Pixelate start curPos) annotations
+                                ( Array.push (Pixelate start curPos) annotations
+                                , getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing model.drawing)
+                                )
 
                             _ ->
-                                annotations
+                                ( annotations, getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing model.drawing) )
 
-                    _ ->
-                        annotations
+                    Nothing ->
+                        ( annotations, getAnnotations image annotations spotlights nonSpotlights False )
 
         nonSpotlights =
-            Definitions.viewNonSpotlightAnnotations model.annotationState annotations
+            Definitions.viewNonSpotlightAnnotations model.editState annotations
 
         definitions =
             Definitions.viewDefinitions image.width image.height
-
-        svgAnnotations =
-            case model.annotationState of
-                DrawingAnnotation startPosition position positionList ->
-                    getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing model.drawing)
-
-                _ ->
-                    getAnnotations image annotations spotlights nonSpotlights False
     in
         div
-            (canvasAttributes image model.drawing model.annotationState)
+            (canvasAttributes image model.drawing model.editState)
             [ svg
                 [ Attr.id "drawing"
                 , Attr.class "drawing"
