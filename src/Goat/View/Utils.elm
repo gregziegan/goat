@@ -1,4 +1,4 @@
-module Goat.View.Utils exposing (..)
+module Goat.View.Utils exposing (posToString, directionToCursor, toPx)
 
 import Goat.Model exposing (EndPosition, ResizeDirection(..), StartPosition)
 

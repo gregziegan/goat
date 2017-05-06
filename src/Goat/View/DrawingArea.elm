@@ -1,10 +1,10 @@
-module Goat.View.DrawingArea exposing (..)
+module Goat.View.DrawingArea exposing (viewDrawingArea, viewAnnotationMenu)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.Annotation exposing (Annotation(..), AnnotationAttributes)
 import Goat.EditState as EditState exposing (EditState)
 import Goat.Flags exposing (Image)
-import Goat.Model exposing (..)
+import Goat.Model exposing (Drawing(..))
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (getFirstSpotlightIndex, isSpotlightDrawing, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Annotation as Annotation exposing (viewAnnotation)
@@ -114,15 +114,11 @@ toDrawingAreaCursor editState =
         |> EditState.whenEditingText (\_ -> "default") editState
 
 
-canvasAttributes : Image -> Drawing -> EditState -> List (Svg.Attribute Msg)
-canvasAttributes image drawing editState =
+canvasAttributes : Drawing -> EditState -> List (Svg.Attribute Msg)
+canvasAttributes drawing editState =
     [ id "canvas"
     , class "image-edit"
-    , style
-        [ "width" => toString (round image.width) ++ "px"
-        , "height" => toString (round image.height) ++ "px"
-        , "cursor" => toDrawingAreaCursor editState
-        ]
+    , style [ "cursor" => toDrawingAreaCursor editState ]
     , Html.Events.onMouseDown CloseDropdown
     , Html.Attributes.contextmenu "annotation-menu"
     ]
@@ -171,50 +167,47 @@ viewDrawingAndAnnotations image definitions spotlights pixelates annotations toD
                 nonSpotlightDrawingAndAnnotations
 
 
-viewDrawingArea : Model -> AnnotationAttributes -> Image -> Html Msg
-viewDrawingArea model annotationAttrs image =
+viewDrawingArea : Annotation.DrawingModifiers -> Array Annotation -> AnnotationAttributes -> Image -> Html Msg
+viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotations annotationAttrs image =
     let
-        annotations =
-            model.edits.present
-
         toDrawing =
-            Annotation.viewDrawing model annotationAttrs model.editState
+            Annotation.viewDrawing drawingModifiers annotationAttrs editState
 
         spotlights =
-            Definitions.viewSpotlights model.editState annotations
+            Definitions.viewSpotlights editState annotations
 
         ( pixelates, svgAnnotations ) =
-            Tuple.mapFirst (Definitions.viewPixelates model.editState) <|
+            Tuple.mapFirst (Definitions.viewPixelates editState) <|
                 EditState.whenDrawing
                     (\{ start, curPos } ->
-                        case model.drawing of
+                        case drawing of
                             DrawPixelate ->
                                 ( Array.push (Pixelate start curPos) annotations
-                                , getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing model.drawing)
+                                , getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing drawing)
                                 )
 
                             _ ->
-                                ( annotations, getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing model.drawing) )
+                                ( annotations, getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing drawing) )
                     )
-                    model.editState
+                    editState
                     ( annotations, getAnnotations image annotations spotlights nonSpotlights False )
 
         nonSpotlights =
-            Definitions.viewNonSpotlightAnnotations model.editState annotations
+            Definitions.viewNonSpotlightAnnotations editState annotations
 
         definitions =
             Definitions.viewDefinitions image.width image.height
     in
         div
-            (canvasAttributes image model.drawing model.editState)
+            (canvasAttributes drawing editState)
             [ svg
                 [ Attr.id "drawing"
                 , Attr.class "drawing"
-                , Attr.width <| toString <| round image.width
-                , Attr.height <| toString <| round image.height
-                , Html.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg"
+                , Attr.width (toString (round image.width))
+                , Attr.height (toString (round image.height))
+                , attribute "xmlns" "http://www.w3.org/2000/svg"
                 ]
-                (viewDrawingAndAnnotations image definitions spotlights pixelates svgAnnotations toDrawing model.drawing)
+                (viewDrawingAndAnnotations image definitions spotlights pixelates svgAnnotations toDrawing drawing)
             ]
 
 

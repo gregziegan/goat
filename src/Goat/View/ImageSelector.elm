@@ -1,4 +1,4 @@
-module Goat.View.ImageSelector exposing (..)
+module Goat.View.ImageSelector exposing (view)
 
 import Goat.Flags exposing (Image)
 import Goat.View.Icons as Icons

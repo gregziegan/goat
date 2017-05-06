@@ -1,11 +1,11 @@
-module Goat.View.DrawingArea.Annotation exposing (..)
+module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, editStateAttributes, viewAnnotation, viewShape, viewPixelate, viewDrawing)
 
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
 import Goat.Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), SelectState(..), Shape, ShapeType(..), StrokeStyle(SolidThin), TextArea, Vertex, arrowAngle, arrowPath, toLineStyle, toStrokeWidth, isFreeHand)
 import Goat.EditState as EditState exposing (EditState, MovingInfo, ResizingInfo, whenMoving)
-import Goat.Model exposing (..)
+import Goat.Model exposing (StartPosition, EndPosition, Vertices(..), ResizeDirection(..), Drawing(..))
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (calcLinePos, calcShapePos, fontSizeToLineHeight, shiftPosition, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Vertices as Vertices
@@ -15,7 +15,6 @@ import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
 import Json.Decode as Json
-import Keyboard.Extra exposing (Key(Shift), KeyChange)
 import List.Extra
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
@@ -259,24 +258,28 @@ lineAttributes lineType shape =
             strokeAttrs shape.strokeStyle shape.strokeColor ++ simpleLineAttrs shape
 
 
-viewDrawing : Model -> AnnotationAttributes -> EditState -> Bool -> Svg Msg
-viewDrawing model annotationAttrs editState isInMask =
+type alias DrawingModifiers =
+    { drawing : Drawing
+    , constrain : Bool
+    , editState : EditState
+    }
+
+
+viewDrawing : DrawingModifiers -> AnnotationAttributes -> EditState -> Bool -> Svg Msg
+viewDrawing drawingModifiers annotationAttrs editState isInMask =
     EditState.whenDrawing
         (\{ start, curPos, positions } ->
-            viewDrawingHelper model annotationAttrs start curPos positions isInMask
+            viewDrawingHelper drawingModifiers annotationAttrs start curPos positions isInMask
         )
-        model.editState
+        drawingModifiers.editState
         (Svg.text "")
 
 
-viewDrawingHelper : Model -> AnnotationAttributes -> StartPosition -> Position -> List Position -> Bool -> Svg Msg
-viewDrawingHelper { drawing, pressedKeys, editState } { strokeColor, fill, strokeStyle, fontSize } start curPos freeDrawPositions isInMask =
+viewDrawingHelper : DrawingModifiers -> AnnotationAttributes -> StartPosition -> Position -> List Position -> Bool -> Svg Msg
+viewDrawingHelper { drawing, constrain, editState } { strokeColor, fill, strokeStyle, fontSize } start curPos freeDrawPositions isInMask =
     let
-        constrain =
-            List.member Shift pressedKeys
-
         lineAttrs lineType =
-            lineAttributes lineType <| Shape start (calcLinePos constrain start curPos) strokeColor strokeStyle
+            lineAttributes lineType (Shape start (calcLinePos constrain start curPos) strokeColor strokeStyle)
 
         shapeAttrs shapeType =
             shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) fill

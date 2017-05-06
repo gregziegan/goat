@@ -4,7 +4,7 @@ import Array.Hamt exposing (Array)
 import Color exposing (Color)
 import Goat.ControlOptions as ControlOptions exposing (fontSizes)
 import Goat.Annotation exposing (Annotation, AnnotationAttributes, LineType(..), ShapeType(..), StrokeStyle)
-import Goat.Model exposing (..)
+import Goat.Model exposing (AttributeDropdown(..), OperatingSystem(..), Model, Drawing(..), shapes, spotlights)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (drawingsAreEqual, isSpotlightDrawing)
 import Goat.View.Icons as Icons
