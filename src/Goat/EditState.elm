@@ -40,7 +40,7 @@ type alias Config msg =
 type alias DrawingInfo =
     { start : Position
     , curPos : Position
-    , freeDrawPositions : List Position
+    , positions : List Position
     }
 
 
@@ -123,21 +123,21 @@ startDrawing start editState =
 
 
 continueDrawing : Position -> Bool -> EditState -> EditState
-continueDrawing pos isFreeHand editState =
+continueDrawing pos trackPositions editState =
     case editState of
-        DrawingAnnotation { start, freeDrawPositions } ->
-            if isFreeHand then
+        DrawingAnnotation { start, positions } ->
+            if trackPositions then
                 DrawingAnnotation
                     (DrawingInfo start pos <|
-                        case freeDrawPositions of
+                        case positions of
                             [] ->
                                 [ pos ]
 
                             lastPos :: rest ->
                                 if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
-                                    freeDrawPositions
+                                    positions
                                 else
-                                    pos :: freeDrawPositions
+                                    pos :: positions
                     )
             else
                 DrawingAnnotation (DrawingInfo start pos [])
@@ -149,7 +149,7 @@ continueDrawing pos isFreeHand editState =
 finishDrawing : EditState -> EditState
 finishDrawing editState =
     case editState of
-        DrawingAnnotation { start, freeDrawPositions } ->
+        DrawingAnnotation _ ->
             ReadyToDraw
 
         _ ->

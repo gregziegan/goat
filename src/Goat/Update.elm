@@ -337,7 +337,7 @@ continueDrawing pos model =
 
 
 finishValidDrawing : Model -> DrawingInfo -> ( Model, List (Cmd Msg) )
-finishValidDrawing ({ fill, strokeColor, strokeStyle, fontSize } as model) { start, curPos, freeDrawPositions } =
+finishValidDrawing ({ fill, strokeColor, strokeStyle, fontSize } as model) { start, curPos, positions } =
     case model.drawing of
         DrawLine lineType ->
             model
@@ -346,7 +346,7 @@ finishValidDrawing ({ fill, strokeColor, strokeStyle, fontSize } as model) { sta
 
         DrawFreeHand ->
             model
-                |> finishFreeDrawing start curPos freeDrawPositions
+                |> finishFreeDrawing start curPos positions
                 => []
 
         DrawShape shapeType ->
@@ -379,7 +379,7 @@ finishValidDrawing ({ fill, strokeColor, strokeStyle, fontSize } as model) { sta
 
 
 finishDrawingHelper : Model -> DrawingInfo -> ( Model, List (Cmd Msg) )
-finishDrawingHelper model ({ start, curPos, freeDrawPositions } as drawingInfo) =
+finishDrawingHelper model ({ start, curPos } as drawingInfo) =
     if isDrawingTooSmall (isSpotlightDrawing model.drawing) start curPos then
         model
             |> resetEditState

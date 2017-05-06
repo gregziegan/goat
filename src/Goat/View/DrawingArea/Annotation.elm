@@ -194,8 +194,8 @@ lineAttributes lineType shape =
 viewDrawing : Model -> AnnotationAttributes -> EditState -> Bool -> Svg Msg
 viewDrawing model annotationAttrs editState isInMask =
     EditState.whenDrawing
-        (\{ start, curPos, freeDrawPositions } ->
-            viewDrawingHelper model annotationAttrs start curPos freeDrawPositions isInMask
+        (\{ start, curPos, positions } ->
+            viewDrawingHelper model annotationAttrs start curPos positions isInMask
         )
         model.editState
         (Svg.text "")
