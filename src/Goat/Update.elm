@@ -639,7 +639,7 @@ startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
 startResizingAnnotation index vertex start model =
     case Array.get index model.edits.present of
         Just annotation ->
-            { model | editState = EditState.startResizing start vertex annotation model.editState }
+            { model | editState = EditState.startResizing start vertex (Annotation.positions annotation) model.editState }
 
         Nothing ->
             model

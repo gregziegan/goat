@@ -146,6 +146,7 @@ continueDrawing pos isFreeHand editState =
             editState
 
 
+finishDrawing : EditState -> EditState
 finishDrawing editState =
     case editState of
         DrawingAnnotation { start, freeDrawPositions } ->
@@ -155,10 +156,12 @@ finishDrawing editState =
             editState
 
 
+selectAnnotation : Int -> AnnotationAttributes -> EditState -> EditState
 selectAnnotation id annotationAttrs editState =
     SelectedAnnotation (SelectingInfo id annotationAttrs)
 
 
+startMoving : Position -> EditState -> EditState
 startMoving start editState =
     case editState of
         SelectedAnnotation { id, attributes } ->
@@ -168,6 +171,7 @@ startMoving start editState =
             editState
 
 
+continueMoving : Position -> EditState -> EditState
 continueMoving newPos editState =
     case editState of
         MovingAnnotation moveInfo ->
@@ -177,6 +181,7 @@ continueMoving newPos editState =
             editState
 
 
+finishMoving : EditState -> EditState
 finishMoving editState =
     case editState of
         MovingAnnotation { id, attributes } ->
@@ -186,15 +191,17 @@ finishMoving editState =
             editState
 
 
-startResizing start vertex annotation editState =
+startResizing : Position -> Vertex -> ( Position, Position ) -> EditState -> EditState
+startResizing start vertex originalCoords editState =
     case editState of
         SelectedAnnotation { id, attributes } ->
-            ResizingAnnotation (ResizingInfo id start start vertex (Annotation.positions annotation) attributes)
+            ResizingAnnotation (ResizingInfo id start start vertex originalCoords attributes)
 
         _ ->
             editState
 
 
+continueResizing : Position -> EditState -> EditState
 continueResizing curPos editState =
     case editState of
         ResizingAnnotation resizingData ->
@@ -204,6 +211,7 @@ continueResizing curPos editState =
             editState
 
 
+finishResizing : EditState -> EditState
 finishResizing editState =
     case editState of
         ResizingAnnotation { id, attributes } ->
@@ -213,10 +221,12 @@ finishResizing editState =
             editState
 
 
+startEditingText : Int -> AnnotationAttributes -> EditState -> EditState
 startEditingText id attrs editState =
     EditingATextBox (EditingTextInfo id attrs)
 
 
+finishEditingText : EditState -> EditState
 finishEditingText editState =
     case editState of
         EditingATextBox _ ->
@@ -226,6 +236,7 @@ finishEditingText editState =
             editState
 
 
+updateSelectedAttributes : (AnnotationAttributes -> AnnotationAttributes) -> EditState -> EditState
 updateSelectedAttributes updateAttrs editState =
     case editState of
         SelectedAnnotation selectingInfo ->
