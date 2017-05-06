@@ -3,8 +3,8 @@ module Goat.View.DrawingArea.Annotation exposing (..)
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
-import Goat.Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), SelectState(..), Shape, ShapeType(..), StrokeStyle(SolidThin), TextArea, arrowAngle, arrowPath, toLineStyle, toStrokeWidth, isFreeHand)
-import Goat.EditState as EditState exposing (EditState, MovingInfo, ResizingInfo, Vertex, whenMoving)
+import Goat.Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), SelectState(..), Shape, ShapeType(..), StrokeStyle(SolidThin), TextArea, Vertex, arrowAngle, arrowPath, toLineStyle, toStrokeWidth, isFreeHand)
+import Goat.EditState as EditState exposing (EditState, MovingInfo, ResizingInfo, whenMoving)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (calcLinePos, calcShapePos, fontSizeToLineHeight, shiftPosition, toDrawingPosition, toPosition)

@@ -1,4 +1,4 @@
-module Goat.Annotation exposing (Annotation(..), SelectState(..), StrokeStyle(..), LineType(..), Shape, ShapeType(..), TextArea, AnnotationAttributes, defaultStroke, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, arrowPath, spotlightToMaskCutout)
+module Goat.Annotation exposing (Annotation(..), SelectState(..), StrokeStyle(..), LineType(..), Shape, ShapeType(..), TextArea, AnnotationAttributes, Vertex(..), defaultStroke, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, arrowPath, spotlightToMaskCutout)
 
 import AutoExpand
 import Color exposing (Color)
@@ -62,6 +62,29 @@ type alias AnnotationAttributes =
     , strokeStyle : StrokeStyle
     , fontSize : Int
     }
+
+
+{-| Vertices are classified by their relationship to the `start` and `end`
+mouse positions that created the annotation.
+
+e.g: (assume a top-left to bottom-right draw)
+
+Start StartPlusX
++----------+
+|**********|
+|**********|
+|**********|
+|**********|
+|**********|
++----------+
+StartPlusY End
+
+-}
+type Vertex
+    = Start
+    | End
+    | StartPlusX
+    | StartPlusY
 
 
 {-| Annotations are viewed differently based on the kind of selection.

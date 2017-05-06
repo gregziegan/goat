@@ -4,8 +4,8 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
-import Goat.Annotation as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea)
-import Goat.EditState as EditState exposing (EditState, Vertex(..), DrawingInfo, ResizingInfo)
+import Goat.Annotation as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea, Vertex(..))
+import Goat.EditState as EditState exposing (EditState, DrawingInfo, ResizingInfo)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
@@ -690,7 +690,7 @@ resizeVertices constrain { curPos, vertex, originalCoords } annotation =
             Start ->
                 { annotation | start = constrain annotation.end curPos }
 
-            EditState.End ->
+            Annotation.End ->
                 { annotation | end = constrain annotation.start curPos }
 
             StartPlusX ->

@@ -1,31 +1,8 @@
-module Goat.EditState exposing (EditState, Config, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
+module Goat.EditState exposing (EditState, Config, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
 
-import Goat.Annotation exposing (AnnotationAttributes, SelectState, StrokeStyle, SelectState(..))
+import Goat.Annotation exposing (AnnotationAttributes, SelectState, StrokeStyle, SelectState(..), Vertex)
 import Keyboard.Extra as Keyboard exposing (KeyChange)
 import Mouse exposing (Position)
-
-
-{-| Vertices are classified by their relationship to the `start` and `end`
-mouse positions that created the annotation.
-
-e.g: (assume a top-left to bottom-right draw)
-
-Start StartPlusX
-+----------+
-|**********|
-|**********|
-|**********|
-|**********|
-|**********|
-+----------+
-StartPlusY End
-
--}
-type Vertex
-    = Start
-    | End
-    | StartPlusX
-    | StartPlusY
 
 
 type alias Config msg =
