@@ -5,7 +5,7 @@ import AutoExpand
 import Color exposing (Color)
 import Dom
 import Goat.AnnotationAttributes as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea)
-import Goat.EditState as EditState exposing (EditState, Vertex(..), ResizingInfo)
+import Goat.EditState as EditState exposing (EditState, Vertex(..), DrawingInfo, ResizingInfo)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
@@ -313,7 +313,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
                 => [ Ports.requestImages () ]
 
 
-{-| Do not add this annotations array change change to undo history
+{-| Do not add this annotations array change to undo history
 -}
 skipChange : Model -> Array Annotation -> Model
 skipChange model annotations =
@@ -327,7 +327,6 @@ skipChange model annotations =
 startDrawing : StartPosition -> Model -> Model
 startDrawing start model =
     { model
-      -- | editState = DrawingAnnotation start start []
         | editState = EditState.startDrawing start model.editState
     }
 
@@ -337,62 +336,61 @@ continueDrawing pos model =
     { model | editState = EditState.continueDrawing pos (model.drawing == DrawFreeHand) model.editState }
 
 
-finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
-finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
-    case EditState.finishDrawing model.editState of
-        Just ( newEditState, start, freeDrawPositions ) ->
-            if isDrawingTooSmall (isSpotlightDrawing model.drawing) start pos then
+finishValidDrawing : Model -> DrawingInfo -> ( Model, List (Cmd Msg) )
+finishValidDrawing ({ fill, strokeColor, strokeStyle, fontSize } as model) { start, curPos, freeDrawPositions } =
+    case model.drawing of
+        DrawLine lineType ->
+            model
+                |> finishLineDrawing start curPos lineType
+                => []
+
+        DrawFreeHand ->
+            model
+                |> finishFreeDrawing start curPos freeDrawPositions
+                => []
+
+        DrawShape shapeType ->
+            model
+                |> finishShapeDrawing start curPos shapeType
+                => []
+
+        DrawTextBox ->
+            let
+                numAnnotations =
+                    Array.length model.edits.present
+            in
                 model
-                    |> resetEditState
-                    => []
-            else
-                case model.drawing of
-                    DrawLine lineType ->
-                        model
-                            |> setEditState newEditState
-                            |> finishLineDrawing start pos lineType
-                            => []
+                    |> finishTextBoxDrawing start curPos
+                    => [ "text-box-edit--"
+                            ++ toString numAnnotations
+                            |> Dom.focus
+                            |> Task.attempt (tryToEdit numAnnotations)
+                       ]
 
-                    DrawFreeHand ->
-                        model
-                            |> setEditState newEditState
-                            |> finishFreeDrawing start pos freeDrawPositions
-                            => []
+        DrawSpotlight shapeType ->
+            model
+                |> finishSpotlightDrawing start curPos shapeType
+                => []
 
-                    DrawShape shapeType ->
-                        model
-                            |> setEditState newEditState
-                            |> finishShapeDrawing start pos shapeType
-                            => []
+        DrawPixelate ->
+            model
+                |> finishPixelateDrawing start curPos
+                => []
 
-                    DrawTextBox ->
-                        let
-                            numAnnotations =
-                                Array.length model.edits.present
-                        in
-                            model
-                                |> setEditState newEditState
-                                |> finishTextBoxDrawing start pos
-                                => [ "text-box-edit--"
-                                        ++ toString numAnnotations
-                                        |> Dom.focus
-                                        |> Task.attempt (tryToEdit numAnnotations)
-                                   ]
 
-                    DrawSpotlight shapeType ->
-                        model
-                            |> setEditState newEditState
-                            |> finishSpotlightDrawing start pos shapeType
-                            => []
+finishDrawingHelper : Model -> DrawingInfo -> ( Model, List (Cmd Msg) )
+finishDrawingHelper model ({ start, curPos, freeDrawPositions } as drawingInfo) =
+    if isDrawingTooSmall (isSpotlightDrawing model.drawing) start curPos then
+        model
+            |> resetEditState
+            => []
+    else
+        finishValidDrawing { model | editState = EditState.finishDrawing model.editState } drawingInfo
 
-                    DrawPixelate ->
-                        model
-                            |> setEditState newEditState
-                            |> finishPixelateDrawing start pos
-                            => []
 
-        Nothing ->
-            model => []
+finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
+finishDrawing pos model =
+    EditState.whenDrawing (finishDrawingHelper model) model.editState ( model, [] )
 
 
 setEditState : EditState -> Model -> Model
@@ -407,28 +405,29 @@ resetEditState model =
 
 finishMovingAnnotation : Model -> Model
 finishMovingAnnotation model =
-    case EditState.finishMoving model.editState of
-        Just ( newEditState, annotationId, translateAmt ) ->
+    EditState.whenMoving
+        (\{ id, translate } ->
             { model
-                | editState = newEditState
-                , edits = UndoList.new (mapAtIndex annotationId (move translateAmt) model.edits.present) model.edits
+                | edits = UndoList.new (mapAtIndex id (move translate) model.edits.present) model.edits
+                , editState = EditState.finishMoving model.editState
             }
-                |> selectAnnotation annotationId
+        )
+        model.editState
+        model
 
-        Nothing ->
-            model
+
+updateAnySelectedAnnotationsHelper : (Annotation -> Annotation) -> Model -> Int -> Model
+updateAnySelectedAnnotationsHelper fn model index =
+    { model
+        | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
+    }
 
 
 updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
 updateAnySelectedAnnotations fn model =
-    case EditState.selectedId model.editState of
-        Just index ->
-            { model
-                | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
-            }
-
-        Nothing ->
-            model
+    model
+        |> EditState.whenSelecting (updateAnySelectedAnnotationsHelper fn model) model.editState
+        |> EditState.whenEditingText (updateAnySelectedAnnotationsHelper fn model) model.editState
 
 
 currentAnnotationAttributes : Model -> AnnotationAttributes
@@ -648,20 +647,28 @@ startResizingAnnotation index vertex start model =
 
 resizeAnnotation : Position -> Model -> Model
 resizeAnnotation curPos model =
-    case EditState.continueResizing curPos model.editState of
-        Just ( newEditState, resizingData ) ->
+    EditState.whenResizing
+        (\resizingData ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (resize (List.member Shift model.pressedKeys) { resizingData | curPos = curPos })) model.edits
-                , editState = newEditState
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (resize (List.member Shift model.pressedKeys) resizingData)) model.edits
+                , editState = EditState.continueResizing curPos model.editState
             }
-
-        Nothing ->
-            model
+        )
+        model.editState
+        model
 
 
 finishResizingAnnotation : Model -> Model
 finishResizingAnnotation model =
-    { model | editState = EditState.finishResizing model.editState }
+    EditState.whenResizing
+        (\resizingData ->
+            { model
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (resize (List.member Shift model.pressedKeys) resizingData)) model.edits
+                , editState = EditState.finishResizing model.editState
+            }
+        )
+        model.editState
+        model
 
 
 resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingInfo -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }

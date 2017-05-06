@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, Config, MoveInfo, ResizingInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, selectedId, updateSelectedAttributes, subscriptions, getDrawingAttributes, getSelectState, toDrawingAreaCursor, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
+module Goat.EditState exposing (EditState, Config, DrawingInfo, MovingInfo, ResizingInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, getSelectState, toDrawingAreaCursor, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
 
 import Color exposing (Color)
 import Goat.AnnotationAttributes as Annotation exposing (AnnotationAttributes, SelectState, StrokeStyle, SelectState(..))
@@ -50,7 +50,7 @@ type alias SelectingInfo =
     }
 
 
-type alias MoveInfo =
+type alias MovingInfo =
     { id : Int
     , start : Position
     , translate : ( Int, Int )
@@ -81,7 +81,7 @@ type EditState
     = ReadyToDraw
     | DrawingAnnotation DrawingInfo
     | SelectedAnnotation SelectingInfo
-    | MovingAnnotation MoveInfo
+    | MovingAnnotation MovingInfo
     | ResizingAnnotation ResizingInfo
     | EditingATextBox EditingTextInfo
 
@@ -149,10 +149,10 @@ continueDrawing pos isFreeHand editState =
 finishDrawing editState =
     case editState of
         DrawingAnnotation { start, freeDrawPositions } ->
-            Just ( ReadyToDraw, start, freeDrawPositions )
+            ReadyToDraw
 
         _ ->
-            Nothing
+            editState
 
 
 selectAnnotation id annotationAttrs editState =
@@ -162,7 +162,7 @@ selectAnnotation id annotationAttrs editState =
 startMoving start editState =
     case editState of
         SelectedAnnotation { id, attributes } ->
-            MovingAnnotation (MoveInfo id start ( 0, 0 ) attributes)
+            MovingAnnotation (MovingInfo id start ( 0, 0 ) attributes)
 
         _ ->
             editState
@@ -179,11 +179,11 @@ continueMoving newPos editState =
 
 finishMoving editState =
     case editState of
-        MovingAnnotation { id, translate } ->
-            Just ( ReadyToDraw, id, translate )
+        MovingAnnotation { id, attributes } ->
+            SelectedAnnotation (SelectingInfo id attributes)
 
         _ ->
-            Nothing
+            editState
 
 
 startResizing start vertex annotation editState =
@@ -198,13 +198,10 @@ startResizing start vertex annotation editState =
 continueResizing curPos editState =
     case editState of
         ResizingAnnotation resizingData ->
-            Just
-                ( ResizingAnnotation { resizingData | curPos = curPos }
-                , resizingData
-                )
+            ResizingAnnotation { resizingData | curPos = curPos }
 
         _ ->
-            Nothing
+            editState
 
 
 finishResizing editState =
@@ -260,25 +257,6 @@ subscriptions config editState =
 
             _ ->
                 [ Sub.map config.keyboardToMsg Keyboard.subscriptions ]
-
-
-selectedId editState =
-    case editState of
-        SelectedAnnotation { id } ->
-            Just id
-
-        EditingATextBox { id } ->
-            Just id
-
-        _ ->
-            Nothing
-
-
-
--- EditingATextBox index _ ->
---     { model
---         | edits = UndoList.mapPresent (mapAtIndex index fn) model.edits
---     }
 
 
 toDrawingAreaCursor : EditState -> String
@@ -343,29 +321,6 @@ getSelectState candidateId isFreeHand editState =
             NotSelected
 
 
-
--- map : Config msg a -> EditState -> a -> a
--- map config editState someModel =
---     case editState of
---         ReadyToDraw ->
---             config.whenNotSelecting someModel
---
---         DrawingAnnotation _ _ _ ->
---             config.whenDrawing someModel
---
---         SelectedAnnotation id _ ->
---             config.whenSelecting id someModel
---
---         MovingAnnotation moveInfo ->
---             config.whenMoving moveInfo someModel
---
---         ResizingAnnotation _ _ ->
---             config.whenResizing someModel
---
---         EditingATextBox id _ ->
---             config.whenEditingText id someModel
-
-
 whenNotSelecting : a -> EditState -> a -> a
 whenNotSelecting notSelectingVal editState a =
     case editState of
@@ -396,7 +351,7 @@ whenSelecting f editState a =
             a
 
 
-whenMoving : (MoveInfo -> a) -> EditState -> a -> a
+whenMoving : (MovingInfo -> a) -> EditState -> a -> a
 whenMoving f editState a =
     case editState of
         MovingAnnotation moveInfo ->
@@ -424,12 +379,3 @@ whenEditingText f editState a =
 
         _ ->
             a
-
-
-getDrawingAttributes editState =
-    case editState of
-        DrawingAnnotation { start, curPos, freeDrawPositions } ->
-            Just ( start, curPos, freeDrawPositions )
-
-        _ ->
-            Nothing

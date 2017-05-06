@@ -3,8 +3,8 @@ module Goat.View.DrawingArea.Annotation exposing (..)
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
-import Goat.AnnotationAttributes exposing (Annotation(..), AnnotationAttributes, LineType(..), SelectState(..), Shape, ShapeType(..), StrokeStyle(SolidThin), TextArea, arrowAngle, arrowPath, toLineStyle, toStrokeWidth)
-import Goat.EditState as EditState exposing (EditState, MoveInfo, Vertex, whenMoving)
+import Goat.AnnotationAttributes exposing (Annotation(..), AnnotationAttributes, LineType(..), SelectState(..), Shape, ShapeType(..), StrokeStyle(SolidThin), TextArea, arrowAngle, arrowPath, toLineStyle, toStrokeWidth, isFreeHand)
+import Goat.EditState as EditState exposing (EditState, MovingInfo, ResizingInfo, Vertex, whenMoving)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (calcLinePos, calcShapePos, fontSizeToLineHeight, shiftPosition, toDrawingPosition, toPosition)
@@ -120,6 +120,7 @@ arrowAttributes shape =
     ]
 
 
+moveArrowHead : Int -> StartPosition -> EndPosition -> MovingInfo -> List (Svg.Attribute Msg)
 moveArrowHead index start end { translate, id } =
     let
         theta =
@@ -135,24 +136,30 @@ moveArrowHead index start end { translate, id } =
             []
 
 
-viewArrowHeadDrawing showDropShadow start end strokeColor =
+arrowHeadAttrs : StartPosition -> EndPosition -> Color -> List (Svg.Attribute Msg)
+arrowHeadAttrs start end strokeColor =
     let
         theta =
             (2 * pi)
                 - (arrowAngle start end)
     in
-        Svg.path
-            ([ Attr.d (arrowHeadPath end)
-             , Attr.fill <| Color.Convert.colorToHex strokeColor
-             , Attr.stroke "none"
-             , Attr.transform ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
-             ]
-                ++ if showDropShadow then
-                    [ Attr.filter "url(#dropShadow)" ]
-                   else
-                    []
-            )
-            []
+        [ Attr.d (arrowHeadPath end)
+        , Attr.fill <| Color.Convert.colorToHex strokeColor
+        , Attr.stroke "none"
+        , Attr.transform ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
+        ]
+
+
+viewArrowHeadDrawing : Bool -> StartPosition -> Position -> Color -> Svg Msg
+viewArrowHeadDrawing showDropShadow start end strokeColor =
+    Svg.path
+        (arrowHeadAttrs start end strokeColor
+            ++ if showDropShadow then
+                [ Attr.filter "url(#dropShadow)" ]
+               else
+                []
+        )
+        []
 
 
 viewArrowHead : Int -> EditState -> List (Svg.Attribute Msg) -> Bool -> StartPosition -> EndPosition -> Color -> Svg Msg
@@ -163,11 +170,7 @@ viewArrowHead index editState attrs showDropShadow start end strokeColor =
                 - (arrowAngle start end)
     in
         Svg.path
-            ([ Attr.d (arrowHeadPath end)
-             , Attr.fill <| Color.Convert.colorToHex strokeColor
-             , Attr.stroke "none"
-             , Attr.transform ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
-             ]
+            (arrowHeadAttrs start end strokeColor
                 ++ attrs
                 ++ EditState.whenMoving (moveArrowHead index start end) editState []
                 ++ if showDropShadow then
@@ -190,12 +193,12 @@ lineAttributes lineType shape =
 
 viewDrawing : Model -> AnnotationAttributes -> EditState -> Bool -> Svg Msg
 viewDrawing model annotationAttrs editState isInMask =
-    case EditState.getDrawingAttributes editState of
-        Just ( start, curPos, freeDrawPositions ) ->
+    EditState.whenDrawing
+        (\{ start, curPos, freeDrawPositions } ->
             viewDrawingHelper model annotationAttrs start curPos freeDrawPositions isInMask
-
-        Nothing ->
-            Svg.text ""
+        )
+        model.editState
+        (Svg.text "")
 
 
 viewDrawingHelper : Model -> AnnotationAttributes -> StartPosition -> Position -> List Position -> Bool -> Svg Msg
@@ -397,15 +400,6 @@ viewPixelate editState index annotation =
             Nothing
 
 
-isFreeHand annotation =
-    case annotation of
-        FreeDraw _ _ ->
-            True
-
-        _ ->
-            False
-
-
 viewAnnotation : EditState -> Int -> Annotation -> ( Svg Msg, Maybe (Svg Msg) )
 viewAnnotation editState index annotation =
     let
@@ -447,31 +441,18 @@ viewAnnotation editState index annotation =
                     => vertices Rectangular { start = start, end = end }
 
 
-
--- editStateViewConfig : Int -> EditState.Config Msg (List (Svg.Attribute Msg))
--- editStateViewConfig annIndex =
---     { drawToMsg = ContinueDrawing << toDrawingPosition
---     , resizeToMsg = ResizeAnnotation << toDrawingPosition
---     , moveToMsg = MoveAnnotation << toDrawingPosition
---     , keyboardToMsg = KeyboardMsg
---     , whenNotSelecting = annAttrsWhenNotSelecting annIndex
---     , whenDrawing = annAttrsWhenDrawing annIndex
---     , whenSelecting = annAttrsWhenSelecting annIndex
---     , whenMoving = annAttrsWhenMoving annIndex
---     , whenResizing = annAttrsWhenResizing annIndex
---     , whenEditingText = annAttrsWhenEditingText annIndex
---     }
-
-
+editStateAttributes : Int -> EditState -> List (Svg.Attribute Msg)
 editStateAttributes index editState =
-    EditState.whenNotSelecting (annAttrsWhenNotSelecting index) editState []
-        ++ EditState.whenDrawing (annAttrsWhenDrawing index) editState []
-        ++ EditState.whenSelecting (annAttrsWhenSelecting index) editState []
-        ++ EditState.whenMoving (annAttrsWhenMoving index) editState []
-        ++ EditState.whenResizing (annAttrsWhenResizing index) editState []
-        ++ EditState.whenEditingText (annAttrsWhenEditingText index) editState []
+    []
+        |> EditState.whenNotSelecting (annAttrsWhenNotSelecting index) editState
+        |> EditState.whenDrawing (annAttrsWhenDrawing index) editState
+        |> EditState.whenSelecting (annAttrsWhenSelecting index) editState
+        |> EditState.whenMoving (annAttrsWhenMoving index) editState
+        |> EditState.whenResizing (annAttrsWhenResizing index) editState
+        |> EditState.whenEditingText (annAttrsWhenEditingText) editState
 
 
+annAttrsWhenNotSelecting : Int -> List (Svg.Attribute Msg)
 annAttrsWhenNotSelecting annIndex =
     [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (SelectAndMoveAnnotation annIndex << toDrawingPosition) Mouse.position
     , Attr.class "pointerCursor"
@@ -479,11 +460,13 @@ annAttrsWhenNotSelecting annIndex =
     ]
 
 
+annAttrsWhenDrawing : Int -> a -> List (Svg.Attribute Msg)
 annAttrsWhenDrawing annIndex _ =
     [ Attr.class "crosshairCursor" ]
 
 
-annAttrsWhenSelecting annIndex id =
+annAttrsWhenSelecting : Int -> a -> List (Svg.Attribute Msg)
+annAttrsWhenSelecting annIndex _ =
     [ Attr.class "moveCursor"
     , Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (StartMovingAnnotation annIndex << toDrawingPosition) Mouse.position
     , ST.onSingleTouch T.TouchStart T.preventAndStop (StartMovingAnnotation annIndex << toDrawingPosition << toPosition)
@@ -491,6 +474,7 @@ annAttrsWhenSelecting annIndex id =
     ]
 
 
+annAttrsWhenMoving : Int -> MovingInfo -> List (Svg.Attribute Msg)
 annAttrsWhenMoving annIndex { id, translate } =
     let
         ( dx, dy ) =
@@ -506,12 +490,13 @@ annAttrsWhenMoving annIndex { id, translate } =
                 []
 
 
+annAttrsWhenResizing : Int -> a -> List (Svg.Attribute Msg)
 annAttrsWhenResizing annIndex _ =
-    [ Attr.class "resizeCursor"
-    ]
+    [ Attr.class "resizeCursor" ]
 
 
-annAttrsWhenEditingText annIndex id =
+annAttrsWhenEditingText : a -> List (Svg.Attribute Msg)
+annAttrsWhenEditingText _ =
     [ Attr.class "crosshairCursor" ]
 
 
@@ -524,29 +509,10 @@ editStateVertexEvents index editState vertex direction =
         ++ whenMoving vertexAttrsWhenMoving editState []
 
 
-vertexAttrsWhenMoving : MoveInfo -> List (Svg.Attribute Msg)
+vertexAttrsWhenMoving : MovingInfo -> List (Svg.Attribute Msg)
 vertexAttrsWhenMoving { translate } =
     let
         ( dx, dy ) =
             translate
     in
         [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
-
-
-
--- vertexAttrsWhenNotSelecting =
--- vertexAttrsWhenDrawing =
--- vertexAttrsWhenSelecting =
--- vertexAttrsWhenMoving =
--- vertexAttrsWhenResizing =
--- vertexAttrsWhenEditingText =
---             MovingAnnotation _ _ ( dx, dy ) _ ->
---                 [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
---
---             ResizingAnnotation _ _ ->
---                 [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
---                 , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
---                 ]
---
---             _ ->
---                 []

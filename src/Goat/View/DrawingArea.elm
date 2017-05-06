@@ -179,8 +179,8 @@ viewDrawingArea model annotationAttrs image =
 
         ( pixelates, svgAnnotations ) =
             Tuple.mapFirst (Definitions.viewPixelates model.editState) <|
-                case EditState.getDrawingAttributes model.editState of
-                    Just ( start, curPos, _ ) ->
+                EditState.whenDrawing
+                    (\{ start, curPos } ->
                         case model.drawing of
                             DrawPixelate ->
                                 ( Array.push (Pixelate start curPos) annotations
@@ -189,9 +189,9 @@ viewDrawingArea model annotationAttrs image =
 
                             _ ->
                                 ( annotations, getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing model.drawing) )
-
-                    Nothing ->
-                        ( annotations, getAnnotations image annotations spotlights nonSpotlights False )
+                    )
+                    model.editState
+                    ( annotations, getAnnotations image annotations spotlights nonSpotlights False )
 
         nonSpotlights =
             Definitions.viewNonSpotlightAnnotations model.editState annotations

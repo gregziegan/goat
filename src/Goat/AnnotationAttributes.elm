@@ -1,4 +1,4 @@
-module Goat.AnnotationAttributes exposing (Annotation(..), SelectState(..), StrokeStyle(..), LineType(..), Shape, ShapeType(..), TextArea, AnnotationAttributes, defaultStroke, strokeStyles, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, arrowPath, spotlightToMaskCutout)
+module Goat.AnnotationAttributes exposing (Annotation(..), SelectState(..), StrokeStyle(..), LineType(..), Shape, ShapeType(..), TextArea, AnnotationAttributes, defaultStroke, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, arrowPath, spotlightToMaskCutout)
 
 import AutoExpand
 import Color exposing (Color)
@@ -94,6 +94,16 @@ strokeStyles =
     , DashedThick
     , DashedVeryThick
     ]
+
+
+isFreeHand : Annotation -> Bool
+isFreeHand annotation =
+    case annotation of
+        FreeDraw _ _ ->
+            True
+
+        _ ->
+            False
 
 
 isSpotlightShape : Annotation -> Bool
