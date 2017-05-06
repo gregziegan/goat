@@ -55,7 +55,7 @@ drawingStateEvents editState =
         |> EditState.whenSelecting drawingAreaAttrsWhenSelecting editState
         |> EditState.whenMoving drawingAreaAttrsWhenMoving editState
         |> EditState.whenResizing drawingAreaAttrsWhenResizing editState
-        |> EditState.whenEditingText drawingAreaAttrsWhenEditingText editState
+        |> EditState.whenEditingText (drawingAreaAttrsWhenEditingText << .id) editState
 
 
 drawingAreaAttrsWhenNotSelecting : List (Svg.Attribute Msg)
@@ -100,10 +100,10 @@ drawingAreaAttrsWhenResizing _ =
     ]
 
 
-drawingAreaAttrsWhenEditingText : { a | id : Int } -> List (Attribute Msg)
-drawingAreaAttrsWhenEditingText { id } =
-    [ Html.Events.onMouseDown <| FinishEditingText id
-    , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText id)
+drawingAreaAttrsWhenEditingText : Int -> List (Attribute Msg)
+drawingAreaAttrsWhenEditingText index =
+    [ Html.Events.onMouseDown <| FinishEditingText index
+    , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
     , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
     ]
 

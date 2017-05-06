@@ -416,18 +416,18 @@ finishMovingAnnotation model =
         model
 
 
-updateAnySelectedAnnotationsHelper : (Annotation -> Annotation) -> Model -> { a | id : Int } -> Model
-updateAnySelectedAnnotationsHelper fn model { id } =
+updateAnySelectedAnnotationsHelper : (Annotation -> Annotation) -> Model -> Int -> Model
+updateAnySelectedAnnotationsHelper fn model index =
     { model
-        | edits = UndoList.new (mapAtIndex id fn model.edits.present) model.edits
+        | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
     }
 
 
 updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
 updateAnySelectedAnnotations fn model =
     model
-        |> EditState.whenSelecting (updateAnySelectedAnnotationsHelper fn model) model.editState
-        |> EditState.whenEditingText (updateAnySelectedAnnotationsHelper fn model) model.editState
+        |> EditState.whenSelecting (updateAnySelectedAnnotationsHelper fn model << .id) model.editState
+        |> EditState.whenEditingText (updateAnySelectedAnnotationsHelper fn model << .id) model.editState
 
 
 currentAnnotationAttributes : Model -> AnnotationAttributes
@@ -1045,7 +1045,7 @@ handleKeyboardInteractions maybeKeyChange ({ pressedKeys, editState } as model) 
             model
                 |> EditState.whenNotSelecting (whenNotSelectingKeyboard keyChange model) editState
                 |> EditState.whenDrawing (whenDrawingKeyboard keyChange model) editState
-                |> EditState.whenSelecting (whenSelectingKeyboard keyChange model) editState
+                |> EditState.whenSelecting (whenSelectingKeyboard keyChange model << .id) editState
                 |> EditState.whenMoving (whenMovingKeyboard keyChange model) editState
                 |> EditState.whenResizing (whenResizingKeyboard keyChange model) editState
                 |> EditState.whenEditingText (whenEditingTextKeyboard keyChange model) editState
@@ -1345,15 +1345,15 @@ whenDrawingKeyboard keyChange model _ =
             |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
-whenSelectingKeyboard : KeyChange -> Model -> { a | id : Int } -> Model
-whenSelectingKeyboard keyChange model { id } =
+whenSelectingKeyboard : KeyChange -> Model -> Int -> Model
+whenSelectingKeyboard keyChange model index =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
         alterDrawing ctrlPressed keyChange model
             |> alterToolbarWithKeyboard ctrlPressed keyChange
-            |> handleSelectedAnnotationKeyboard id ctrlPressed keyChange
+            |> handleSelectedAnnotationKeyboard index ctrlPressed keyChange
             |> handlePaste ctrlPressed keyChange
 
 
