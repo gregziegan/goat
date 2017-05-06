@@ -47,74 +47,65 @@ viewImage { url, width, height } =
         []
 
 
-editStateDrawingAreaConfig : EditState.Config Msg (List (Attribute Msg))
-editStateDrawingAreaConfig =
-    { drawToMsg = ContinueDrawing << toDrawingPosition
-    , resizeToMsg = ResizeAnnotation << toDrawingPosition
-    , moveToMsg = MoveAnnotation << toDrawingPosition
-    , keyboardToMsg = KeyboardMsg
-    , whenNotSelecting = drawingAreaAttrsWhenNotSelecting
-    , whenDrawing = drawingAreaAttrsWhenDrawing
-    , whenSelecting = drawingAreaAttrsWhenSelecting
-    , whenMoving = drawingAreaAttrsWhenMoving
-    , whenResizing = drawingAreaAttrsWhenResizing
-    , whenEditingText = drawingAreaAttrsWhenEditingText
-    }
-
-
 drawingStateEvents : EditState -> List (Attribute Msg)
 drawingStateEvents editState =
-    EditState.map editStateDrawingAreaConfig editState []
+    []
+        |> EditState.whenNotSelecting drawingAreaAttrsWhenNotSelecting editState
+        |> EditState.whenDrawing drawingAreaAttrsWhenDrawing editState
+        |> EditState.whenSelecting drawingAreaAttrsWhenSelecting editState
+        |> EditState.whenMoving drawingAreaAttrsWhenMoving editState
+        |> EditState.whenResizing drawingAreaAttrsWhenResizing editState
+        |> EditState.whenEditingText drawingAreaAttrsWhenEditingText editState
 
 
-drawingAreaAttrsWhenNotSelecting attrs =
-    attrs
-        ++ [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
-           , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
-           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-           ]
+drawingAreaAttrsWhenNotSelecting : List (Svg.Attribute Msg)
+drawingAreaAttrsWhenNotSelecting =
+    [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
+    , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
+    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+    ]
 
 
-drawingAreaAttrsWhenDrawing attrs =
-    attrs
-        ++ [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
-           , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
-           , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
-           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-           ]
+drawingAreaAttrsWhenDrawing : a -> List (Attribute Msg)
+drawingAreaAttrsWhenDrawing _ =
+    [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
+    , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
+    , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
+    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+    ]
 
 
-drawingAreaAttrsWhenSelecting index attrs =
-    attrs
-        ++ [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
-           , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
-           ]
+drawingAreaAttrsWhenSelecting : a -> List (Attribute Msg)
+drawingAreaAttrsWhenSelecting _ =
+    [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
+    , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
+    ]
 
 
-drawingAreaAttrsWhenMoving attrs =
-    attrs
-        ++ [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
-           , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
-           , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
-           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-           ]
+drawingAreaAttrsWhenMoving : a -> List (Attribute Msg)
+drawingAreaAttrsWhenMoving _ =
+    [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
+    , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
+    , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
+    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+    ]
 
 
-drawingAreaAttrsWhenResizing attrs =
-    attrs
-        ++ [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
-           , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
-           , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
-           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-           ]
+drawingAreaAttrsWhenResizing : a -> List (Attribute Msg)
+drawingAreaAttrsWhenResizing _ =
+    [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
+    , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
+    , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
+    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+    ]
 
 
-drawingAreaAttrsWhenEditingText index attrs =
-    attrs
-        ++ [ Html.Events.onMouseDown <| FinishEditingText index
-           , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
-           , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-           ]
+drawingAreaAttrsWhenEditingText : Int -> List (Attribute Msg)
+drawingAreaAttrsWhenEditingText index =
+    [ Html.Events.onMouseDown <| FinishEditingText index
+    , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
+    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
+    ]
 
 
 canvasAttributes : Image -> Drawing -> EditState -> List (Svg.Attribute Msg)

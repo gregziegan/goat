@@ -5,7 +5,7 @@ import AutoExpand
 import Color exposing (Color)
 import Dom
 import Goat.AnnotationAttributes as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea)
-import Goat.EditState as EditState exposing (EditState, Vertex(..), ResizingData)
+import Goat.EditState as EditState exposing (EditState, Vertex(..), ResizingInfo)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
@@ -649,7 +649,7 @@ startResizingAnnotation index vertex start model =
 resizeAnnotation : Position -> Model -> Model
 resizeAnnotation curPos model =
     case EditState.continueResizing curPos model.editState of
-        Just ( newEditState, resizingData, annotationAttrs ) ->
+        Just ( newEditState, resizingData ) ->
             { model
                 | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize (List.member Shift model.pressedKeys) { resizingData | curPos = curPos })) model.edits
                 , editState = newEditState
@@ -664,7 +664,7 @@ finishResizingAnnotation model =
     { model | editState = EditState.finishResizing model.editState }
 
 
-resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingData -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
+resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingInfo -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
 resizeVertices constrain { curPos, vertex, originalCoords } annotation =
     let
         ( start, end ) =
@@ -684,7 +684,7 @@ resizeVertices constrain { curPos, vertex, originalCoords } annotation =
                 { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
 
 
-resize : Bool -> ResizingData -> Annotation -> Annotation
+resize : Bool -> ResizingInfo -> Annotation -> Annotation
 resize constrain resizingData annotation =
     case annotation of
         Lines lineType shape ->
@@ -1023,10 +1023,16 @@ handlePaste ctrlPressed keyChange model =
 
 
 handleKeyboardInteractions : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
-handleKeyboardInteractions maybeKeyChange ({ pressedKeys } as model) =
+handleKeyboardInteractions maybeKeyChange ({ pressedKeys, editState } as model) =
     case maybeKeyChange of
         Just keyChange ->
-            EditState.keyboardInteractions (editStateConfig keyChange) model.editState model
+            model
+                |> EditState.whenNotSelecting (whenNotSelectingKeyboard keyChange model) editState
+                |> EditState.whenDrawing (whenDrawingKeyboard keyChange model) editState
+                |> EditState.whenSelecting (whenSelectingKeyboard keyChange model) editState
+                |> EditState.whenMoving (whenMovingKeyboard keyChange model) editState
+                |> EditState.whenResizing (whenResizingKeyboard keyChange model) editState
+                |> EditState.whenEditingText (whenEditingTextKeyboard keyChange model) editState
                 => []
 
         Nothing ->
@@ -1287,6 +1293,7 @@ autoExpandConfig index fontSize =
         |> AutoExpand.withClass "text-box-textarea"
 
 
+controlKeys : OperatingSystem -> List Key
 controlKeys os =
     case os of
         MacOS ->
@@ -1296,10 +1303,12 @@ controlKeys os =
             [ Control ]
 
 
+isCtrlPressed : List Key -> OperatingSystem -> Bool
 isCtrlPressed pressedKeys os =
     List.any (\key -> List.member key pressedKeys) (controlKeys os)
 
 
+whenNotSelectingKeyboard : KeyChange -> Model -> Model
 whenNotSelectingKeyboard keyChange model =
     let
         ctrlPressed =
@@ -1310,7 +1319,8 @@ whenNotSelectingKeyboard keyChange model =
             |> handlePaste ctrlPressed keyChange
 
 
-whenDrawingKeyboard keyChange model =
+whenDrawingKeyboard : KeyChange -> Model -> a -> Model
+whenDrawingKeyboard keyChange model _ =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
@@ -1319,7 +1329,8 @@ whenDrawingKeyboard keyChange model =
             |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
-whenSelectingKeyboard keyChange index model =
+whenSelectingKeyboard : KeyChange -> Model -> Int -> Model
+whenSelectingKeyboard keyChange model index =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
@@ -1330,7 +1341,8 @@ whenSelectingKeyboard keyChange index model =
             |> handlePaste ctrlPressed keyChange
 
 
-whenMovingKeyboard keyChange model =
+whenMovingKeyboard : KeyChange -> Model -> a -> Model
+whenMovingKeyboard keyChange model _ =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
@@ -1339,32 +1351,20 @@ whenMovingKeyboard keyChange model =
             |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
-whenResizing =
-    whenMovingKeyboard
+whenResizingKeyboard : KeyChange -> Model -> a -> Model
+whenResizingKeyboard keyChange model _ =
+    let
+        ctrlPressed =
+            isCtrlPressed model.pressedKeys model.operatingSystem
+    in
+        alterDrawing ctrlPressed keyChange model
+            |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
-whenEditingText keyChange index model =
+whenEditingTextKeyboard : KeyChange -> Model -> c -> Model
+whenEditingTextKeyboard keyChange model index =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
         model
-
-
-
--- alterTextBoxDrawing keyChange index model
-
-
-editStateConfig : KeyChange -> EditState.Config Msg Model
-editStateConfig keyChange =
-    { drawToMsg = ContinueDrawing << toDrawingPosition
-    , resizeToMsg = ResizeAnnotation << toDrawingPosition
-    , moveToMsg = MoveAnnotation << toDrawingPosition
-    , keyboardToMsg = KeyboardMsg
-    , whenNotSelecting = whenNotSelectingKeyboard keyChange
-    , whenDrawing = whenDrawingKeyboard keyChange
-    , whenSelecting = whenSelectingKeyboard keyChange
-    , whenMoving = whenMovingKeyboard keyChange
-    , whenResizing = whenResizing keyChange
-    , whenEditingText = whenEditingText keyChange
-    }

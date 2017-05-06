@@ -1,13 +1,9 @@
-module Goat.EditState exposing (EditState, Config, ResizingData, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, selectedId, updateSelectedAttributes, keyboardInteractions, subscriptions, getDrawingAttributes, map, getSelectState, toDrawingAreaCursor)
+module Goat.EditState exposing (EditState, Config, MoveInfo, ResizingInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, selectedId, updateSelectedAttributes, subscriptions, getDrawingAttributes, getSelectState, toDrawingAreaCursor, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
 
 import Color exposing (Color)
 import Goat.AnnotationAttributes as Annotation exposing (AnnotationAttributes, SelectState, StrokeStyle, SelectState(..))
-import Goat.View.EventUtils exposing (stopPropagation)
-import Html.Events exposing (onWithOptions)
 import Keyboard.Extra as Keyboard exposing (KeyChange)
 import Mouse exposing (Position)
-import Svg
-import Svg.Attributes as Attr
 
 
 {-| Vertices are classified by their relationship to the `start` and `end`
@@ -33,12 +29,28 @@ type Vertex
     | StartPlusY
 
 
-type alias ResizingData =
+type alias DrawingInfo =
+    { start : Position
+    , curPos : Position
+    , freeDrawPositions : List Position
+    }
+
+
+type alias MoveInfo =
+    { id : Int
+    , start : Position
+    , translate : ( Int, Int )
+    , attributes : AnnotationAttributes
+    }
+
+
+type alias ResizingInfo =
     { index : Int
     , start : Position
     , curPos : Position
     , vertex : Vertex
     , originalCoords : ( Position, Position )
+    , attributes : AnnotationAttributes
     }
 
 
@@ -47,10 +59,10 @@ See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-Sta
 -}
 type EditState
     = ReadyToDraw
-    | DrawingAnnotation Position Position (List Position)
+    | DrawingAnnotation DrawingInfo
     | SelectedAnnotation Int AnnotationAttributes
-    | MovingAnnotation Int Position ( Int, Int ) AnnotationAttributes
-    | ResizingAnnotation ResizingData AnnotationAttributes
+    | MovingAnnotation MoveInfo
+    | ResizingAnnotation ResizingInfo
     | EditingATextBox Int AnnotationAttributes
 
 
@@ -72,11 +84,11 @@ editStateAttributes { strokeColor, fill, strokeStyle, fontSize } editState =
         SelectedAnnotation _ annotationAttrs ->
             annotationAttrs
 
-        MovingAnnotation _ _ _ annotationAttrs ->
-            annotationAttrs
+        MovingAnnotation { attributes } ->
+            attributes
 
-        ResizingAnnotation _ annotationAttrs ->
-            annotationAttrs
+        ResizingAnnotation { attributes } ->
+            attributes
 
         EditingATextBox _ annotationAttrs ->
             annotationAttrs
@@ -86,25 +98,27 @@ editStateAttributes { strokeColor, fill, strokeStyle, fontSize } editState =
 
 
 startDrawing start editState =
-    DrawingAnnotation start start []
+    DrawingAnnotation (DrawingInfo start start [])
 
 
 continueDrawing pos isFreeHand editState =
     case editState of
-        DrawingAnnotation start _ freeDrawPositions ->
+        DrawingAnnotation { start, freeDrawPositions } ->
             if isFreeHand then
-                DrawingAnnotation start pos <|
-                    case freeDrawPositions of
-                        [] ->
-                            [ pos ]
+                DrawingAnnotation
+                    (DrawingInfo start pos <|
+                        case freeDrawPositions of
+                            [] ->
+                                [ pos ]
 
-                        lastPos :: rest ->
-                            if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
-                                freeDrawPositions
-                            else
-                                pos :: freeDrawPositions
+                            lastPos :: rest ->
+                                if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
+                                    freeDrawPositions
+                                else
+                                    pos :: freeDrawPositions
+                    )
             else
-                DrawingAnnotation start pos []
+                DrawingAnnotation (DrawingInfo start pos [])
 
         _ ->
             editState
@@ -112,7 +126,7 @@ continueDrawing pos isFreeHand editState =
 
 finishDrawing editState =
     case editState of
-        DrawingAnnotation start _ freeDrawPositions ->
+        DrawingAnnotation { start, freeDrawPositions } ->
             Just ( ReadyToDraw, start, freeDrawPositions )
 
         _ ->
@@ -126,7 +140,7 @@ selectAnnotation id annotationAttrs editState =
 startMoving start editState =
     case editState of
         SelectedAnnotation id attrs ->
-            MovingAnnotation id start ( 0, 0 ) attrs
+            MovingAnnotation (MoveInfo id start ( 0, 0 ) attrs)
 
         _ ->
             editState
@@ -134,8 +148,8 @@ startMoving start editState =
 
 continueMoving newPos editState =
     case editState of
-        MovingAnnotation index start ( dx, dy ) annotationAttrs ->
-            MovingAnnotation index start ( newPos.x - start.x, newPos.y - start.y ) annotationAttrs
+        MovingAnnotation moveInfo ->
+            MovingAnnotation { moveInfo | translate = ( newPos.x - moveInfo.start.x, newPos.y - moveInfo.start.y ) }
 
         _ ->
             editState
@@ -143,8 +157,8 @@ continueMoving newPos editState =
 
 finishMoving editState =
     case editState of
-        MovingAnnotation annotationId _ translateAmt _ ->
-            Just ( ReadyToDraw, annotationId, translateAmt )
+        MovingAnnotation { id, translate } ->
+            Just ( ReadyToDraw, id, translate )
 
         _ ->
             Nothing
@@ -153,7 +167,7 @@ finishMoving editState =
 startResizing start vertex annotation editState =
     case editState of
         SelectedAnnotation id attrs ->
-            ResizingAnnotation (ResizingData id start start vertex (Annotation.positions annotation)) attrs
+            ResizingAnnotation (ResizingInfo id start start vertex (Annotation.positions annotation) attrs)
 
         _ ->
             editState
@@ -161,12 +175,11 @@ startResizing start vertex annotation editState =
 
 continueResizing curPos editState =
     case editState of
-        ResizingAnnotation resizingData annotationAttrs ->
+        ResizingAnnotation resizingData ->
             -- | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize (List.member Shift model.pressedKeys) { resizingData | curPos = curPos })) model.edits
             Just
-                ( ResizingAnnotation { resizingData | curPos = curPos } annotationAttrs
+                ( ResizingAnnotation { resizingData | curPos = curPos }
                 , resizingData
-                , annotationAttrs
                 )
 
         _ ->
@@ -175,8 +188,8 @@ continueResizing curPos editState =
 
 finishResizing editState =
     case editState of
-        ResizingAnnotation { index } attrs ->
-            SelectedAnnotation index attrs
+        ResizingAnnotation { index, attributes } ->
+            SelectedAnnotation index attributes
 
         _ ->
             editState
@@ -210,57 +223,29 @@ updateSelectedAttributes updateAttrs editState =
 subscriptions config editState =
     Sub.batch <|
         case editState of
-            DrawingAnnotation _ _ _ ->
+            DrawingAnnotation _ ->
                 [ Mouse.moves config.drawToMsg
                 , Sub.map config.keyboardToMsg Keyboard.subscriptions
                 ]
 
-            ResizingAnnotation _ _ ->
+            ResizingAnnotation _ ->
                 [ Mouse.moves config.resizeToMsg
                 , Sub.map config.keyboardToMsg Keyboard.subscriptions
                 ]
 
-            MovingAnnotation _ _ _ _ ->
+            MovingAnnotation _ ->
                 [ Mouse.moves config.moveToMsg ]
 
             _ ->
                 [ Sub.map config.keyboardToMsg Keyboard.subscriptions ]
 
 
-type alias Config msg a =
+type alias Config msg =
     { drawToMsg : Position -> msg
     , resizeToMsg : Position -> msg
     , moveToMsg : Position -> msg
     , keyboardToMsg : Keyboard.Msg -> msg
-    , whenNotSelecting : a -> a
-    , whenDrawing : a -> a
-    , whenSelecting : Int -> a -> a
-    , whenMoving : a -> a
-    , whenResizing : a -> a
-    , whenEditingText : Int -> a -> a
     }
-
-
-keyboardInteractions : Config msg a -> EditState -> a -> a
-keyboardInteractions config editState someModel =
-    case editState of
-        ReadyToDraw ->
-            config.whenNotSelecting someModel
-
-        DrawingAnnotation _ _ _ ->
-            config.whenDrawing someModel
-
-        SelectedAnnotation id _ ->
-            config.whenSelecting id someModel
-
-        MovingAnnotation _ _ _ _ ->
-            config.whenMoving someModel
-
-        ResizingAnnotation _ _ ->
-            config.whenResizing someModel
-
-        EditingATextBox id _ ->
-            config.whenEditingText id someModel
 
 
 selectedId editState =
@@ -288,13 +273,13 @@ toDrawingAreaCursor editState =
         ReadyToDraw ->
             "crosshair"
 
-        DrawingAnnotation _ _ _ ->
+        DrawingAnnotation _ ->
             "crosshair"
 
-        MovingAnnotation _ _ _ _ ->
+        MovingAnnotation _ ->
             "move"
 
-        ResizingAnnotation _ _ ->
+        ResizingAnnotation _ ->
             "nesw-resize"
 
         EditingATextBox _ _ ->
@@ -316,8 +301,8 @@ getSelectState annIndex isFreeHand editState =
             else
                 NotSelected
 
-        MovingAnnotation index _ _ _ ->
-            if index == annIndex then
+        MovingAnnotation { id } ->
+            if id == annIndex then
                 if isFreeHand then
                     Selected
                 else
@@ -325,7 +310,7 @@ getSelectState annIndex isFreeHand editState =
             else
                 NotSelected
 
-        ResizingAnnotation { index } _ ->
+        ResizingAnnotation { index } ->
             if index == annIndex then
                 if isFreeHand then
                     Selected
@@ -344,31 +329,92 @@ getSelectState annIndex isFreeHand editState =
             NotSelected
 
 
-map : Config msg a -> EditState -> a -> a
-map config editState someModel =
+
+-- map : Config msg a -> EditState -> a -> a
+-- map config editState someModel =
+--     case editState of
+--         ReadyToDraw ->
+--             config.whenNotSelecting someModel
+--
+--         DrawingAnnotation _ _ _ ->
+--             config.whenDrawing someModel
+--
+--         SelectedAnnotation id _ ->
+--             config.whenSelecting id someModel
+--
+--         MovingAnnotation moveInfo ->
+--             config.whenMoving moveInfo someModel
+--
+--         ResizingAnnotation _ _ ->
+--             config.whenResizing someModel
+--
+--         EditingATextBox id _ ->
+--             config.whenEditingText id someModel
+
+
+whenNotSelecting : a -> EditState -> a -> a
+whenNotSelecting notSelectingVal editState a =
     case editState of
         ReadyToDraw ->
-            config.whenNotSelecting someModel
+            notSelectingVal
 
-        DrawingAnnotation _ _ _ ->
-            config.whenDrawing someModel
+        _ ->
+            a
 
+
+whenDrawing : (DrawingInfo -> a) -> EditState -> a -> a
+whenDrawing f editState a =
+    case editState of
+        DrawingAnnotation drawingInfo ->
+            f drawingInfo
+
+        _ ->
+            a
+
+
+whenSelecting : (Int -> a) -> EditState -> a -> a
+whenSelecting f editState a =
+    case editState of
         SelectedAnnotation id _ ->
-            config.whenSelecting id someModel
+            f id
 
-        MovingAnnotation _ _ _ _ ->
-            config.whenMoving someModel
+        _ ->
+            a
 
-        ResizingAnnotation _ _ ->
-            config.whenResizing someModel
 
+whenMoving : (MoveInfo -> a) -> EditState -> a -> a
+whenMoving f editState a =
+    case editState of
+        MovingAnnotation moveInfo ->
+            f moveInfo
+
+        _ ->
+            a
+
+
+whenResizing : (ResizingInfo -> a) -> EditState -> a -> a
+whenResizing f editState a =
+    case editState of
+        ResizingAnnotation resizingInfo ->
+            f resizingInfo
+
+        _ ->
+            a
+
+
+whenEditingText : (Int -> a) -> EditState -> a -> a
+whenEditingText f editState a =
+    case editState of
         EditingATextBox id _ ->
-            config.whenEditingText id someModel
+            f id
+
+        _ ->
+            a
 
 
 getDrawingAttributes editState =
     case editState of
-        DrawingAnnotation start curPos freeDrawPositions ->
+        DrawingAnnotation { start, curPos, freeDrawPositions } ->
             Just ( start, curPos, freeDrawPositions )
 
         _ ->

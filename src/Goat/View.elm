@@ -3,7 +3,6 @@ module Goat.View exposing (view)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig, currentAnnotationAttributes)
-import Goat.Utils exposing (..)
 import Goat.View.Controls as Controls
 import Goat.View.DrawingArea as DrawingArea
 import Goat.View.ImageSelector as ImageSelector

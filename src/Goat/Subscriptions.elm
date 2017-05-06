@@ -8,18 +8,12 @@ import Goat.Utils exposing (toDrawingPosition)
 import Time exposing (second)
 
 
-editStateConfig : EditState.Config Msg ()
+editStateConfig : EditState.Config Msg
 editStateConfig =
     { drawToMsg = ContinueDrawing << toDrawingPosition
     , resizeToMsg = ResizeAnnotation << toDrawingPosition
     , moveToMsg = MoveAnnotation << toDrawingPosition
     , keyboardToMsg = KeyboardMsg
-    , whenNotSelecting = \_ -> ()
-    , whenDrawing = \_ -> ()
-    , whenSelecting = \_ _ -> ()
-    , whenMoving = \_ -> ()
-    , whenResizing = \_ -> ()
-    , whenEditingText = \_ _ -> ()
     }
 
 

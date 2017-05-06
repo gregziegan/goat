@@ -27,7 +27,7 @@ viewNonSpotlightAnnotations editState annotations =
 
 viewMaskCutOut : EditState -> ( Int, ShapeType, Shape ) -> Svg Msg
 viewMaskCutOut editState ( index, shapeType, shape ) =
-    Annotation.viewShape (Annotation.editStateAttributes index editState []) shapeType (Just Color.black) shape
+    Annotation.viewShape (Annotation.editStateAttributes index editState) shapeType (Just Color.black) shape
 
 
 viewSpotlights : EditState -> Array Annotation -> List (Svg Msg)
