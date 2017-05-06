@@ -9,8 +9,8 @@ import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (calcLinePos, calcShapePos, fontSizeToLineHeight, shiftPosition, toDrawingPosition, toPosition)
 import Goat.View.DrawingArea.Vertices as Vertices
-import Goat.View.EventUtils exposing (defaultPrevented, stopPropagation)
-import Goat.View.Utils exposing (..)
+import Goat.View.EventUtils exposing (defaultPrevented, stopPropagation, onMouseUp)
+import Goat.View.Utils exposing (posToString, toPx, directionToCursor)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
@@ -66,6 +66,65 @@ fillAttrs fill =
             ]
 
 
+linePath : Float -> StartPosition -> EndPosition -> String
+linePath strokeWidth start end =
+    let
+        theta =
+            (2 * pi)
+                - (arrowAngle start end)
+
+        perpen =
+            (pi / 2) - theta
+
+        dx =
+            toFloat (end.x - start.x)
+
+        dy =
+            toFloat (end.y - start.y)
+
+        startFloat =
+            { x = toFloat start.x, y = toFloat start.y }
+
+        ccPt1 =
+            shiftPosition ((strokeWidth / 2) * cos perpen) ((strokeWidth / 2) * sin perpen) startFloat
+
+        ccPt2 =
+            shiftPosition dx dy ccPt1
+
+        ccPt3 =
+            shiftPosition (-strokeWidth * cos perpen) (-strokeWidth * sin perpen) ccPt2
+
+        ccPt4 =
+            shiftPosition -dx -dy ccPt3
+    in
+        "M"
+            ++ posToString start
+            ++ " L"
+            ++ posToString ccPt1
+            ++ " L"
+            ++ posToString ccPt2
+            ++ " L"
+            ++ posToString ccPt3
+            ++ " L"
+            ++ posToString ccPt4
+            ++ "Z"
+
+
+freeDrawPathHelper : List Position -> String -> String
+freeDrawPathHelper positions pathString =
+    case positions of
+        [] ->
+            pathString
+
+        pos :: rest ->
+            freeDrawPathHelper rest (pathString ++ " L " ++ posToString pos)
+
+
+freeDrawPath : StartPosition -> List Position -> String
+freeDrawPath start positions =
+    freeDrawPathHelper positions ("M " ++ posToString start)
+
+
 freeDrawAttributes : Shape -> List Position -> List (Svg.Attribute Msg)
 freeDrawAttributes shape positions =
     [ Attr.d (freeDrawPath shape.start (List.reverse (shape.end :: positions)))
@@ -118,6 +177,15 @@ arrowAttributes shape =
     , Attr.d (arrowPath shape)
     , Attr.filter "url(#dropShadow)"
     ]
+
+
+arrowHeadPath : EndPosition -> String
+arrowHeadPath pos =
+    "M"
+        ++ toString (toFloat pos.x - 20.6667)
+        ++ ","
+        ++ toString (toFloat pos.y - 2.8)
+        ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z"
 
 
 moveArrowHead : Int -> StartPosition -> EndPosition -> MovingInfo -> List (Svg.Attribute Msg)
