@@ -77,30 +77,30 @@ type alias EditingTextInfo =
 See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
 -}
 type EditState
-    = ReadyToDraw
-    | DrawingAnnotation DrawingInfo
-    | SelectedAnnotation SelectingInfo
-    | MovingAnnotation MovingInfo
-    | ResizingAnnotation ResizingInfo
-    | EditingATextBox EditingTextInfo
+    = NotSelecting
+    | Drawing DrawingInfo
+    | Selecting SelectingInfo
+    | Moving MovingInfo
+    | Resizing ResizingInfo
+    | EditingText EditingTextInfo
 
 
 initialState : EditState
 initialState =
-    ReadyToDraw
+    NotSelecting
 
 
 startDrawing : Position -> EditState -> EditState
 startDrawing start editState =
-    DrawingAnnotation (DrawingInfo start start [])
+    Drawing (DrawingInfo start start [])
 
 
 continueDrawing : Position -> Bool -> EditState -> EditState
 continueDrawing pos trackPositions editState =
     case editState of
-        DrawingAnnotation { start, positions } ->
+        Drawing { start, positions } ->
             if trackPositions then
-                DrawingAnnotation
+                Drawing
                     (DrawingInfo start pos <|
                         case positions of
                             [] ->
@@ -113,7 +113,7 @@ continueDrawing pos trackPositions editState =
                                     pos :: positions
                     )
             else
-                DrawingAnnotation (DrawingInfo start pos [])
+                Drawing (DrawingInfo start pos [])
 
         _ ->
             editState
@@ -122,8 +122,8 @@ continueDrawing pos trackPositions editState =
 finishDrawing : EditState -> EditState
 finishDrawing editState =
     case editState of
-        DrawingAnnotation _ ->
-            ReadyToDraw
+        Drawing _ ->
+            NotSelecting
 
         _ ->
             editState
@@ -131,14 +131,14 @@ finishDrawing editState =
 
 selectAnnotation : Int -> AnnotationAttributes -> EditState -> EditState
 selectAnnotation id annotationAttrs editState =
-    SelectedAnnotation (SelectingInfo id annotationAttrs)
+    Selecting (SelectingInfo id annotationAttrs)
 
 
 startMoving : Position -> EditState -> EditState
 startMoving start editState =
     case editState of
-        SelectedAnnotation { id, attributes } ->
-            MovingAnnotation (MovingInfo id start ( 0, 0 ) attributes)
+        Selecting { id, attributes } ->
+            Moving (MovingInfo id start ( 0, 0 ) attributes)
 
         _ ->
             editState
@@ -147,8 +147,8 @@ startMoving start editState =
 continueMoving : Position -> EditState -> EditState
 continueMoving newPos editState =
     case editState of
-        MovingAnnotation moveInfo ->
-            MovingAnnotation { moveInfo | translate = ( newPos.x - moveInfo.start.x, newPos.y - moveInfo.start.y ) }
+        Moving moveInfo ->
+            Moving { moveInfo | translate = ( newPos.x - moveInfo.start.x, newPos.y - moveInfo.start.y ) }
 
         _ ->
             editState
@@ -157,8 +157,8 @@ continueMoving newPos editState =
 finishMoving : EditState -> EditState
 finishMoving editState =
     case editState of
-        MovingAnnotation { id, attributes } ->
-            SelectedAnnotation (SelectingInfo id attributes)
+        Moving { id, attributes } ->
+            Selecting (SelectingInfo id attributes)
 
         _ ->
             editState
@@ -167,8 +167,8 @@ finishMoving editState =
 startResizing : Position -> Vertex -> ( Position, Position ) -> EditState -> EditState
 startResizing start vertex originalCoords editState =
     case editState of
-        SelectedAnnotation { id, attributes } ->
-            ResizingAnnotation (ResizingInfo id start start vertex originalCoords attributes)
+        Selecting { id, attributes } ->
+            Resizing (ResizingInfo id start start vertex originalCoords attributes)
 
         _ ->
             editState
@@ -177,8 +177,8 @@ startResizing start vertex originalCoords editState =
 continueResizing : Position -> EditState -> EditState
 continueResizing curPos editState =
     case editState of
-        ResizingAnnotation resizingData ->
-            ResizingAnnotation { resizingData | curPos = curPos }
+        Resizing resizingData ->
+            Resizing { resizingData | curPos = curPos }
 
         _ ->
             editState
@@ -187,8 +187,8 @@ continueResizing curPos editState =
 finishResizing : EditState -> EditState
 finishResizing editState =
     case editState of
-        ResizingAnnotation { id, attributes } ->
-            SelectedAnnotation (SelectingInfo id attributes)
+        Resizing { id, attributes } ->
+            Selecting (SelectingInfo id attributes)
 
         _ ->
             editState
@@ -196,14 +196,14 @@ finishResizing editState =
 
 startEditingText : Int -> AnnotationAttributes -> EditState -> EditState
 startEditingText id attrs editState =
-    EditingATextBox (EditingTextInfo id attrs)
+    EditingText (EditingTextInfo id attrs)
 
 
 finishEditingText : EditState -> EditState
 finishEditingText editState =
     case editState of
-        EditingATextBox _ ->
-            ReadyToDraw
+        EditingText _ ->
+            NotSelecting
 
         _ ->
             editState
@@ -212,11 +212,11 @@ finishEditingText editState =
 updateSelectedAttributes : (AnnotationAttributes -> AnnotationAttributes) -> EditState -> EditState
 updateSelectedAttributes updateAttrs editState =
     case editState of
-        SelectedAnnotation selectingInfo ->
-            SelectedAnnotation { selectingInfo | attributes = (updateAttrs selectingInfo.attributes) }
+        Selecting selectingInfo ->
+            Selecting { selectingInfo | attributes = (updateAttrs selectingInfo.attributes) }
 
-        EditingATextBox editingInfo ->
-            EditingATextBox { editingInfo | attributes = (updateAttrs editingInfo.attributes) }
+        EditingText editingInfo ->
+            EditingText { editingInfo | attributes = (updateAttrs editingInfo.attributes) }
 
         _ ->
             editState
@@ -226,17 +226,17 @@ subscriptions : Config msg -> EditState -> Sub msg
 subscriptions config editState =
     Sub.batch <|
         case editState of
-            DrawingAnnotation _ ->
+            Drawing _ ->
                 [ Mouse.moves config.drawToMsg
                 , Sub.map config.keyboardToMsg Keyboard.subscriptions
                 ]
 
-            ResizingAnnotation _ ->
+            Resizing _ ->
                 [ Mouse.moves config.resizeToMsg
                 , Sub.map config.keyboardToMsg Keyboard.subscriptions
                 ]
 
-            MovingAnnotation _ ->
+            Moving _ ->
                 [ Mouse.moves config.moveToMsg ]
 
             _ ->
@@ -246,7 +246,7 @@ subscriptions config editState =
 selectState : Int -> Bool -> EditState -> SelectState
 selectState candidateId usesVertices editState =
     case editState of
-        SelectedAnnotation { id } ->
+        Selecting { id } ->
             if id == candidateId then
                 if usesVertices then
                     SelectedWithVertices
@@ -255,7 +255,7 @@ selectState candidateId usesVertices editState =
             else
                 NotSelected
 
-        MovingAnnotation { id } ->
+        Moving { id } ->
             if id == candidateId then
                 if usesVertices then
                     SelectedWithVertices
@@ -264,7 +264,7 @@ selectState candidateId usesVertices editState =
             else
                 NotSelected
 
-        ResizingAnnotation { id } ->
+        Resizing { id } ->
             if id == candidateId then
                 if usesVertices then
                     SelectedWithVertices
@@ -273,7 +273,7 @@ selectState candidateId usesVertices editState =
             else
                 NotSelected
 
-        EditingATextBox { id } ->
+        EditingText { id } ->
             if id == candidateId then
                 Selected
             else
@@ -284,10 +284,10 @@ selectState candidateId usesVertices editState =
 
 
 whenNotSelecting : a -> EditState -> a -> a
-whenNotSelecting notSelectingVal editState a =
+whenNotSelecting notSelectingValue editState a =
     case editState of
-        ReadyToDraw ->
-            notSelectingVal
+        NotSelecting ->
+            notSelectingValue
 
         _ ->
             a
@@ -296,7 +296,7 @@ whenNotSelecting notSelectingVal editState a =
 whenDrawing : (DrawingInfo -> a) -> EditState -> a -> a
 whenDrawing f editState a =
     case editState of
-        DrawingAnnotation drawingInfo ->
+        Drawing drawingInfo ->
             f drawingInfo
 
         _ ->
@@ -306,7 +306,7 @@ whenDrawing f editState a =
 whenSelecting : (SelectingInfo -> a) -> EditState -> a -> a
 whenSelecting f editState a =
     case editState of
-        SelectedAnnotation selectingInfo ->
+        Selecting selectingInfo ->
             f selectingInfo
 
         _ ->
@@ -316,7 +316,7 @@ whenSelecting f editState a =
 whenMoving : (MovingInfo -> a) -> EditState -> a -> a
 whenMoving f editState a =
     case editState of
-        MovingAnnotation moveInfo ->
+        Moving moveInfo ->
             f moveInfo
 
         _ ->
@@ -326,7 +326,7 @@ whenMoving f editState a =
 whenResizing : (ResizingInfo -> a) -> EditState -> a -> a
 whenResizing f editState a =
     case editState of
-        ResizingAnnotation resizingInfo ->
+        Resizing resizingInfo ->
             f resizingInfo
 
         _ ->
@@ -336,7 +336,7 @@ whenResizing f editState a =
 whenEditingText : (EditingTextInfo -> a) -> EditState -> a -> a
 whenEditingText f editState a =
     case editState of
-        EditingATextBox editingTextInfo ->
+        EditingText editingTextInfo ->
             f editingTextInfo
 
         _ ->
