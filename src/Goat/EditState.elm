@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, Config, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, getSelectState, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
+module Goat.EditState exposing (EditState, Config, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
 
 import Goat.AnnotationAttributes as Annotation exposing (AnnotationAttributes, SelectState, StrokeStyle, SelectState(..))
 import Keyboard.Extra as Keyboard exposing (KeyChange)
@@ -243,33 +243,33 @@ subscriptions config editState =
                 [ Sub.map config.keyboardToMsg Keyboard.subscriptions ]
 
 
-getSelectState : Int -> Bool -> EditState -> SelectState
-getSelectState candidateId isFreeHand editState =
+selectState : Int -> Bool -> EditState -> SelectState
+selectState candidateId usesVertices editState =
     case editState of
         SelectedAnnotation { id } ->
             if id == candidateId then
-                if isFreeHand then
-                    Selected
-                else
+                if usesVertices then
                     SelectedWithVertices
+                else
+                    Selected
             else
                 NotSelected
 
         MovingAnnotation { id } ->
             if id == candidateId then
-                if isFreeHand then
-                    Selected
-                else
+                if usesVertices then
                     SelectedWithVertices
+                else
+                    Selected
             else
                 NotSelected
 
         ResizingAnnotation { id } ->
             if id == candidateId then
-                if isFreeHand then
-                    Selected
-                else
+                if usesVertices then
                     SelectedWithVertices
+                else
+                    Selected
             else
                 NotSelected
 

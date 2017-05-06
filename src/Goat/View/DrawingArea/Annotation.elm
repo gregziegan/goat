@@ -404,7 +404,7 @@ viewAnnotation : EditState -> Int -> Annotation -> ( Svg Msg, Maybe (Svg Msg) )
 viewAnnotation editState index annotation =
     let
         selectState =
-            EditState.getSelectState index (isFreeHand annotation) editState
+            EditState.getSelectState index (not (isFreeHand annotation)) editState
 
         editStateAttrs =
             editStateAttributes index editState
