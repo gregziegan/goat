@@ -91,7 +91,7 @@ viewImageAnnotator : Model -> Image -> Html Msg
 viewImageAnnotator model selectedImage =
     let
         annotationAttrs =
-            (currentAnnotationAttributes model)
+            currentAnnotationAttributes model
     in
         div
             [ class "annotation-app"

@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, Config, DrawingInfo, MovingInfo, ResizingInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, getSelectState, toDrawingAreaCursor, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
+module Goat.EditState exposing (EditState, Config, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, getSelectState, toDrawingAreaCursor, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
 
 import Color exposing (Color)
 import Goat.AnnotationAttributes as Annotation exposing (AnnotationAttributes, SelectState, StrokeStyle, SelectState(..))
@@ -352,11 +352,11 @@ whenDrawing f editState a =
             a
 
 
-whenSelecting : (Int -> a) -> EditState -> a -> a
+whenSelecting : (SelectingInfo -> a) -> EditState -> a -> a
 whenSelecting f editState a =
     case editState of
-        SelectedAnnotation { id } ->
-            f id
+        SelectedAnnotation selectingInfo ->
+            f selectingInfo
 
         _ ->
             a
@@ -382,11 +382,11 @@ whenResizing f editState a =
             a
 
 
-whenEditingText : (Int -> a) -> EditState -> a -> a
+whenEditingText : (EditingTextInfo -> a) -> EditState -> a -> a
 whenEditingText f editState a =
     case editState of
-        EditingATextBox { id } ->
-            f id
+        EditingATextBox editingTextInfo ->
+            f editingTextInfo
 
         _ ->
             a

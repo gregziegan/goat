@@ -416,10 +416,10 @@ finishMovingAnnotation model =
         model
 
 
-updateAnySelectedAnnotationsHelper : (Annotation -> Annotation) -> Model -> Int -> Model
-updateAnySelectedAnnotationsHelper fn model index =
+updateAnySelectedAnnotationsHelper : (Annotation -> Annotation) -> Model -> { a | id : Int } -> Model
+updateAnySelectedAnnotationsHelper fn model { id } =
     { model
-        | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
+        | edits = UndoList.new (mapAtIndex id fn model.edits.present) model.edits
     }
 
 
@@ -431,7 +431,16 @@ updateAnySelectedAnnotations fn model =
 
 
 currentAnnotationAttributes : Model -> AnnotationAttributes
-currentAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
+currentAnnotationAttributes ({ editState } as model) =
+    annotationAttributesInModel model
+        |> EditState.whenSelecting .attributes editState
+        |> EditState.whenMoving .attributes editState
+        |> EditState.whenResizing .attributes editState
+        |> EditState.whenEditingText .attributes editState
+
+
+annotationAttributesInModel : Model -> AnnotationAttributes
+annotationAttributesInModel { strokeColor, fill, strokeStyle, fontSize } =
     AnnotationAttributes strokeColor fill strokeStyle fontSize
 
 
@@ -439,7 +448,7 @@ selectAnnotation : Int -> Model -> Model
 selectAnnotation index model =
     case Array.get index model.edits.present of
         Just annotation ->
-            { model | editState = EditState.selectAnnotation index (Annotation.attributes annotation (currentAnnotationAttributes model)) model.editState }
+            { model | editState = EditState.selectAnnotation index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState }
 
         Nothing ->
             model
@@ -497,7 +506,7 @@ startEditingText : Int -> Model -> Model
 startEditingText index model =
     case Array.get index model.edits.present of
         Just annotation ->
-            { model | editState = EditState.startEditingText index (Annotation.attributes annotation (currentAnnotationAttributes model)) model.editState }
+            { model | editState = EditState.startEditingText index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState }
 
         Nothing ->
             model
@@ -623,7 +632,7 @@ startMovingAnnotation index newPos model =
     case Array.get index model.edits.present of
         Just annotation ->
             { model
-                | editState = EditState.startMoving newPos model.editState --(Annotation.attributes annotation (currentAnnotationAttributes model))
+                | editState = EditState.startMoving newPos model.editState
             }
 
         Nothing ->
@@ -1336,15 +1345,15 @@ whenDrawingKeyboard keyChange model _ =
             |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
-whenSelectingKeyboard : KeyChange -> Model -> Int -> Model
-whenSelectingKeyboard keyChange model index =
+whenSelectingKeyboard : KeyChange -> Model -> { a | id : Int } -> Model
+whenSelectingKeyboard keyChange model { id } =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
         alterDrawing ctrlPressed keyChange model
             |> alterToolbarWithKeyboard ctrlPressed keyChange
-            |> handleSelectedAnnotationKeyboard index ctrlPressed keyChange
+            |> handleSelectedAnnotationKeyboard id ctrlPressed keyChange
             |> handlePaste ctrlPressed keyChange
 
 

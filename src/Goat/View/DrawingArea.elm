@@ -100,10 +100,10 @@ drawingAreaAttrsWhenResizing _ =
     ]
 
 
-drawingAreaAttrsWhenEditingText : Int -> List (Attribute Msg)
-drawingAreaAttrsWhenEditingText index =
-    [ Html.Events.onMouseDown <| FinishEditingText index
-    , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
+drawingAreaAttrsWhenEditingText : { a | id : Int } -> List (Attribute Msg)
+drawingAreaAttrsWhenEditingText { id } =
+    [ Html.Events.onMouseDown <| FinishEditingText id
+    , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText id)
     , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
     ]
 
