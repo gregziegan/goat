@@ -651,7 +651,7 @@ resizeAnnotation curPos model =
     case EditState.continueResizing curPos model.editState of
         Just ( newEditState, resizingData ) ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize (List.member Shift model.pressedKeys) { resizingData | curPos = curPos })) model.edits
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (resize (List.member Shift model.pressedKeys) { resizingData | curPos = curPos })) model.edits
                 , editState = newEditState
             }
 

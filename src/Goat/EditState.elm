@@ -29,10 +29,24 @@ type Vertex
     | StartPlusY
 
 
+type alias Config msg =
+    { drawToMsg : Position -> msg
+    , resizeToMsg : Position -> msg
+    , moveToMsg : Position -> msg
+    , keyboardToMsg : Keyboard.Msg -> msg
+    }
+
+
 type alias DrawingInfo =
     { start : Position
     , curPos : Position
     , freeDrawPositions : List Position
+    }
+
+
+type alias SelectingInfo =
+    { id : Int
+    , attributes : AnnotationAttributes
     }
 
 
@@ -45,11 +59,17 @@ type alias MoveInfo =
 
 
 type alias ResizingInfo =
-    { index : Int
+    { id : Int
     , start : Position
     , curPos : Position
     , vertex : Vertex
     , originalCoords : ( Position, Position )
+    , attributes : AnnotationAttributes
+    }
+
+
+type alias EditingTextInfo =
+    { id : Int
     , attributes : AnnotationAttributes
     }
 
@@ -60,10 +80,10 @@ See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-Sta
 type EditState
     = ReadyToDraw
     | DrawingAnnotation DrawingInfo
-    | SelectedAnnotation Int AnnotationAttributes
+    | SelectedAnnotation SelectingInfo
     | MovingAnnotation MoveInfo
     | ResizingAnnotation ResizingInfo
-    | EditingATextBox Int AnnotationAttributes
+    | EditingATextBox EditingTextInfo
 
 
 initialState : EditState
@@ -81,8 +101,8 @@ editStateAttributes :
     -> AnnotationAttributes
 editStateAttributes { strokeColor, fill, strokeStyle, fontSize } editState =
     case editState of
-        SelectedAnnotation _ annotationAttrs ->
-            annotationAttrs
+        SelectedAnnotation { attributes } ->
+            attributes
 
         MovingAnnotation { attributes } ->
             attributes
@@ -90,17 +110,19 @@ editStateAttributes { strokeColor, fill, strokeStyle, fontSize } editState =
         ResizingAnnotation { attributes } ->
             attributes
 
-        EditingATextBox _ annotationAttrs ->
-            annotationAttrs
+        EditingATextBox { attributes } ->
+            attributes
 
         _ ->
             AnnotationAttributes strokeColor fill strokeStyle fontSize
 
 
+startDrawing : Position -> EditState -> EditState
 startDrawing start editState =
     DrawingAnnotation (DrawingInfo start start [])
 
 
+continueDrawing : Position -> Bool -> EditState -> EditState
 continueDrawing pos isFreeHand editState =
     case editState of
         DrawingAnnotation { start, freeDrawPositions } ->
@@ -134,13 +156,13 @@ finishDrawing editState =
 
 
 selectAnnotation id annotationAttrs editState =
-    SelectedAnnotation id annotationAttrs
+    SelectedAnnotation (SelectingInfo id annotationAttrs)
 
 
 startMoving start editState =
     case editState of
-        SelectedAnnotation id attrs ->
-            MovingAnnotation (MoveInfo id start ( 0, 0 ) attrs)
+        SelectedAnnotation { id, attributes } ->
+            MovingAnnotation (MoveInfo id start ( 0, 0 ) attributes)
 
         _ ->
             editState
@@ -166,8 +188,8 @@ finishMoving editState =
 
 startResizing start vertex annotation editState =
     case editState of
-        SelectedAnnotation id attrs ->
-            ResizingAnnotation (ResizingInfo id start start vertex (Annotation.positions annotation) attrs)
+        SelectedAnnotation { id, attributes } ->
+            ResizingAnnotation (ResizingInfo id start start vertex (Annotation.positions annotation) attributes)
 
         _ ->
             editState
@@ -176,7 +198,6 @@ startResizing start vertex annotation editState =
 continueResizing curPos editState =
     case editState of
         ResizingAnnotation resizingData ->
-            -- | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize (List.member Shift model.pressedKeys) { resizingData | curPos = curPos })) model.edits
             Just
                 ( ResizingAnnotation { resizingData | curPos = curPos }
                 , resizingData
@@ -188,20 +209,20 @@ continueResizing curPos editState =
 
 finishResizing editState =
     case editState of
-        ResizingAnnotation { index, attributes } ->
-            SelectedAnnotation index attributes
+        ResizingAnnotation { id, attributes } ->
+            SelectedAnnotation (SelectingInfo id attributes)
 
         _ ->
             editState
 
 
 startEditingText id attrs editState =
-    EditingATextBox id attrs
+    EditingATextBox (EditingTextInfo id attrs)
 
 
 finishEditingText editState =
     case editState of
-        EditingATextBox _ _ ->
+        EditingATextBox _ ->
             ReadyToDraw
 
         _ ->
@@ -210,16 +231,17 @@ finishEditingText editState =
 
 updateSelectedAttributes updateAttrs editState =
     case editState of
-        SelectedAnnotation id annotationAttrs ->
-            SelectedAnnotation id (updateAttrs annotationAttrs)
+        SelectedAnnotation selectingInfo ->
+            SelectedAnnotation { selectingInfo | attributes = (updateAttrs selectingInfo.attributes) }
 
-        EditingATextBox id annotationAttrs ->
-            EditingATextBox id (updateAttrs annotationAttrs)
+        EditingATextBox editingInfo ->
+            EditingATextBox { editingInfo | attributes = (updateAttrs editingInfo.attributes) }
 
         _ ->
             editState
 
 
+subscriptions : Config msg -> EditState -> Sub msg
 subscriptions config editState =
     Sub.batch <|
         case editState of
@@ -240,21 +262,13 @@ subscriptions config editState =
                 [ Sub.map config.keyboardToMsg Keyboard.subscriptions ]
 
 
-type alias Config msg =
-    { drawToMsg : Position -> msg
-    , resizeToMsg : Position -> msg
-    , moveToMsg : Position -> msg
-    , keyboardToMsg : Keyboard.Msg -> msg
-    }
-
-
 selectedId editState =
     case editState of
-        SelectedAnnotation index _ ->
-            Just index
+        SelectedAnnotation { id } ->
+            Just id
 
-        EditingATextBox index _ ->
-            Just index
+        EditingATextBox { id } ->
+            Just id
 
         _ ->
             Nothing
@@ -282,7 +296,7 @@ toDrawingAreaCursor editState =
         ResizingAnnotation _ ->
             "nesw-resize"
 
-        EditingATextBox _ _ ->
+        EditingATextBox _ ->
             "default"
 
         _ ->
@@ -290,10 +304,10 @@ toDrawingAreaCursor editState =
 
 
 getSelectState : Int -> Bool -> EditState -> SelectState
-getSelectState annIndex isFreeHand editState =
+getSelectState candidateId isFreeHand editState =
     case editState of
-        SelectedAnnotation index _ ->
-            if index == annIndex then
+        SelectedAnnotation { id } ->
+            if id == candidateId then
                 if isFreeHand then
                     Selected
                 else
@@ -302,7 +316,7 @@ getSelectState annIndex isFreeHand editState =
                 NotSelected
 
         MovingAnnotation { id } ->
-            if id == annIndex then
+            if id == candidateId then
                 if isFreeHand then
                     Selected
                 else
@@ -310,8 +324,8 @@ getSelectState annIndex isFreeHand editState =
             else
                 NotSelected
 
-        ResizingAnnotation { index } ->
-            if index == annIndex then
+        ResizingAnnotation { id } ->
+            if id == candidateId then
                 if isFreeHand then
                     Selected
                 else
@@ -319,8 +333,8 @@ getSelectState annIndex isFreeHand editState =
             else
                 NotSelected
 
-        EditingATextBox index _ ->
-            if index == annIndex then
+        EditingATextBox { id } ->
+            if id == candidateId then
                 Selected
             else
                 NotSelected
@@ -375,7 +389,7 @@ whenDrawing f editState a =
 whenSelecting : (Int -> a) -> EditState -> a -> a
 whenSelecting f editState a =
     case editState of
-        SelectedAnnotation id _ ->
+        SelectedAnnotation { id } ->
             f id
 
         _ ->
@@ -405,7 +419,7 @@ whenResizing f editState a =
 whenEditingText : (Int -> a) -> EditState -> a -> a
 whenEditingText f editState a =
     case editState of
-        EditingATextBox id _ ->
+        EditingATextBox { id } ->
             f id
 
         _ ->
