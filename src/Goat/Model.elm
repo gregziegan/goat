@@ -2,7 +2,7 @@ module Goat.Model exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
-import Goat.AnnotationAttributes as AnnotationAttributes exposing (Annotation, LineType(..), ShapeType(..), StrokeStyle, defaultStroke)
+import Goat.Annotation exposing (Annotation, LineType(..), ShapeType(..), StrokeStyle, defaultStroke)
 import Goat.EditState as EditState exposing (EditState)
 import Goat.Flags exposing (Flags, Image)
 import Goat.Ports as Ports
@@ -128,7 +128,7 @@ init { isMac, inZendesk } =
     , waitingForDropdownToggle = Nothing
     , fill = Nothing
     , strokeColor = Color.rgb 255 0 212
-    , strokeStyle = AnnotationAttributes.defaultStroke
+    , strokeStyle = defaultStroke
     , fontSize = 20
     , currentDropdown = Nothing
     , annotationMenu = Nothing

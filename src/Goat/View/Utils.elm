@@ -1,6 +1,6 @@
 module Goat.View.Utils exposing (..)
 
-import Goat.AnnotationAttributes exposing (StrokeStyle, arrowAngle)
+import Goat.Annotation exposing (StrokeStyle, arrowAngle)
 import Goat.Model exposing (EndPosition, ResizeDirection(..), StartPosition)
 import Goat.Utils exposing (shiftPosition)
 import Html exposing (Attribute)

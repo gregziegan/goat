@@ -4,7 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
-import Goat.AnnotationAttributes as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea)
+import Goat.Annotation as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea)
 import Goat.EditState as EditState exposing (EditState, Vertex(..), DrawingInfo, ResizingInfo)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)

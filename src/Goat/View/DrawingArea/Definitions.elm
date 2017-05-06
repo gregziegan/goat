@@ -2,7 +2,7 @@ module Goat.View.DrawingArea.Definitions exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
-import Goat.AnnotationAttributes exposing (Annotation, ShapeType, Shape, spotlightToMaskCutout)
+import Goat.Annotation exposing (Annotation, ShapeType, Shape, spotlightToMaskCutout)
 import Goat.EditState exposing (EditState)
 import Goat.Model exposing (..)
 import Goat.Update exposing (Msg(..), autoExpandConfig)

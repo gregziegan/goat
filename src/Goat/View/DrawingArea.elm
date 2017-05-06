@@ -1,7 +1,7 @@
 module Goat.View.DrawingArea exposing (..)
 
 import Array.Hamt as Array exposing (Array)
-import Goat.AnnotationAttributes exposing (Annotation(..), AnnotationAttributes)
+import Goat.Annotation exposing (Annotation(..), AnnotationAttributes)
 import Goat.EditState as EditState exposing (EditState)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)

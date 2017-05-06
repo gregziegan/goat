@@ -2,7 +2,7 @@ module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos,
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
-import Goat.AnnotationAttributes exposing (Annotation, AnnotationAttributes, isSpotlightShape, arrowAngle)
+import Goat.Annotation exposing (Annotation, AnnotationAttributes, isSpotlightShape, arrowAngle)
 import Goat.Model exposing (Drawing(..), EndPosition, Model, ResizeDirection(..), StartPosition)
 import List.Extra
 import Mouse exposing (Position)
