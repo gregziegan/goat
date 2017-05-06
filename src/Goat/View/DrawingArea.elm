@@ -108,6 +108,12 @@ drawingAreaAttrsWhenEditingText index =
     ]
 
 
+toDrawingAreaCursor : EditState -> String
+toDrawingAreaCursor editState =
+    "crosshair"
+        |> EditState.whenEditingText (\_ -> "default") editState
+
+
 canvasAttributes : Image -> Drawing -> EditState -> List (Svg.Attribute Msg)
 canvasAttributes image drawing editState =
     [ id "canvas"
@@ -115,7 +121,7 @@ canvasAttributes image drawing editState =
     , style
         [ "width" => toString (round image.width) ++ "px"
         , "height" => toString (round image.height) ++ "px"
-        , "cursor" => EditState.toDrawingAreaCursor editState
+        , "cursor" => toDrawingAreaCursor editState
         ]
     , Html.Events.onMouseDown CloseDropdown
     , Html.Attributes.contextmenu "annotation-menu"

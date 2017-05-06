@@ -1,6 +1,5 @@
-module Goat.EditState exposing (EditState, Config, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, getSelectState, toDrawingAreaCursor, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
+module Goat.EditState exposing (EditState, Config, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex(..), initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, getSelectState, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
 
-import Color exposing (Color)
 import Goat.AnnotationAttributes as Annotation exposing (AnnotationAttributes, SelectState, StrokeStyle, SelectState(..))
 import Keyboard.Extra as Keyboard exposing (KeyChange)
 import Mouse exposing (Position)
@@ -89,32 +88,6 @@ type EditState
 initialState : EditState
 initialState =
     ReadyToDraw
-
-
-editStateAttributes :
-    { strokeColor : Color
-    , fill : Maybe Color
-    , strokeStyle : StrokeStyle
-    , fontSize : Int
-    }
-    -> EditState
-    -> AnnotationAttributes
-editStateAttributes { strokeColor, fill, strokeStyle, fontSize } editState =
-    case editState of
-        SelectedAnnotation { attributes } ->
-            attributes
-
-        MovingAnnotation { attributes } ->
-            attributes
-
-        ResizingAnnotation { attributes } ->
-            attributes
-
-        EditingATextBox { attributes } ->
-            attributes
-
-        _ ->
-            AnnotationAttributes strokeColor fill strokeStyle fontSize
 
 
 startDrawing : Position -> EditState -> EditState
@@ -268,28 +241,6 @@ subscriptions config editState =
 
             _ ->
                 [ Sub.map config.keyboardToMsg Keyboard.subscriptions ]
-
-
-toDrawingAreaCursor : EditState -> String
-toDrawingAreaCursor editState =
-    case editState of
-        ReadyToDraw ->
-            "crosshair"
-
-        DrawingAnnotation _ ->
-            "crosshair"
-
-        MovingAnnotation _ ->
-            "move"
-
-        ResizingAnnotation _ ->
-            "nesw-resize"
-
-        EditingATextBox _ ->
-            "default"
-
-        _ ->
-            "crosshair"
 
 
 getSelectState : Int -> Bool -> EditState -> SelectState
