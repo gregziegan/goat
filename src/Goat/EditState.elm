@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, ifDrawing, ifMoving, currentAnnotationAttributes)
+module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
 
 import Goat.Annotation exposing (AnnotationAttributes, SelectState, SelectState(..), StrokeStyle, Vertex)
 import Goat.ControlOptions as ControlOptions
@@ -473,14 +473,25 @@ drawingEvents config editState =
             ]
 
 
-ifDrawing : EditState -> Maybe DrawingInfo
-ifDrawing editState =
+viewDrawing : (DrawingInfo -> a) -> EditState -> Maybe a
+viewDrawing fn editState =
     case editState of
         Drawing drawingInfo ->
-            Just drawingInfo
+            Just (fn drawingInfo)
 
         _ ->
             Nothing
+
+
+
+-- ifDrawing : EditState -> Maybe DrawingInfo
+-- ifDrawing editState =
+--     case editState of
+--         Drawing drawingInfo ->
+--             Just drawingInfo
+--
+--         _ ->
+--             Nothing
 
 
 ifMoving : EditState -> Maybe MovingInfo

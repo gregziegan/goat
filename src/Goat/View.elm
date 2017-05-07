@@ -96,6 +96,7 @@ toDrawingModifiers model =
     DrawingModifiers model.drawing (List.member Shift model.pressedKeys) model.editState
 
 
+extractAnnotationAttributes : Model -> AnnotationAttributes
 extractAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
     AnnotationAttributes strokeColor fill strokeStyle fontSize
 

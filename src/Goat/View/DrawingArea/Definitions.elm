@@ -43,13 +43,13 @@ viewPixelates editState annotations =
         |> List.concat
 
 
-maskDefinition : Float -> Float -> List (Svg Msg) -> Svg Msg
-maskDefinition width height shapes =
+maskDefinition : List (Svg Msg) -> Svg Msg
+maskDefinition shapes =
     rect
         ([ Attr.x "0"
          , Attr.y "0"
-         , Attr.width <| toString width
-         , Attr.height <| toString height
+         , Attr.width "100%"
+         , Attr.height "100%"
          , Attr.opacity "0.5"
          , Attr.fill "white"
          ]
@@ -99,13 +99,13 @@ viewSvgFilters =
     ]
 
 
-viewDefinitions : Float -> Float -> List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg)
-viewDefinitions width height spotlightCutOuts blurCutOuts =
+viewDefinitions : List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg)
+viewDefinitions spotlightCutOuts blurCutOuts =
     [ Svg.linearGradient [ id "striped", Attr.x1 "50%", Attr.x2 "50%", Attr.y1 "0%", Attr.y2 "100%" ]
         [ Svg.stop [ Attr.offset "0%", Attr.stopColor "#FFF", Attr.stopOpacity ".5" ] []
         , Svg.stop [ Attr.offset "100%", Attr.stopOpacity ".5" ] []
         ]
-    , maskDefinition width height spotlightCutOuts
+    , maskDefinition spotlightCutOuts
     , pixelateMaskDefinition blurCutOuts
     , Svg.path [ Attr.d "M0 0h28v28H0V0zm6 7v14h16V7H6z", id "rect" ] []
     , Svg.mask [ Attr.fill "#fff", id "rectMask" ]

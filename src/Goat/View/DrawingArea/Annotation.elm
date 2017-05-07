@@ -265,18 +265,15 @@ type alias DrawingModifiers =
     }
 
 
-viewDrawing : DrawingModifiers -> AnnotationAttributes -> EditState -> Bool -> Svg Msg
-viewDrawing drawingModifiers annotationAttrs editState isInMask =
-    case EditState.ifDrawing editState of
-        Just drawingInfo ->
-            viewDrawingHelper drawingModifiers annotationAttrs drawingInfo isInMask
-
-        Nothing ->
-            (Svg.text "")
+viewDrawing : EditState -> DrawingModifiers -> AnnotationAttributes -> Bool -> Svg Msg
+viewDrawing editState drawingModifiers annotationAttrs isInMask =
+    editState
+        |> EditState.viewDrawing (viewDrawingHelper drawingModifiers annotationAttrs isInMask)
+        |> Maybe.withDefault (Svg.text "")
 
 
-viewDrawingHelper : DrawingModifiers -> AnnotationAttributes -> EditState.DrawingInfo -> Bool -> Svg Msg
-viewDrawingHelper { drawing, constrain, editState } { strokeColor, fill, strokeStyle, fontSize } { start, curPos, positions } isInMask =
+viewDrawingHelper : DrawingModifiers -> AnnotationAttributes -> Bool -> EditState.DrawingInfo -> Svg Msg
+viewDrawingHelper { drawing, constrain, editState } { strokeColor, fill, strokeStyle, fontSize } isInMask { start, curPos, positions } =
     let
         lineAttrs lineType =
             lineAttributes lineType (Shape start (calcLinePos constrain start curPos) strokeColor strokeStyle)

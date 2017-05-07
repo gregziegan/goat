@@ -2,26 +2,20 @@ module Goat.View.DrawingArea exposing (viewDrawingArea, viewAnnotationMenu)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.Annotation exposing (Annotation(..), AnnotationAttributes)
-import Goat.EditState as EditState exposing (EditState)
+import Goat.EditState as EditState exposing (DrawingConfig, DrawingInfo, EditState)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (Drawing(..))
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.Utils exposing (getFirstSpotlightIndex, isSpotlightDrawing)
 import Goat.View.DrawingArea.Annotation as Annotation exposing (viewAnnotation)
 import Goat.View.DrawingArea.Definitions as Definitions
-import Goat.View.EventUtils exposing (defaultPrevented, stopPropagation, onMouseDown, onMouseUp)
 import Goat.View.Utils exposing (toPx)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onMouseEnter, onWithOptions)
-import Json.Decode as Json
 import Mouse exposing (Position)
-import Rocket exposing ((=>))
-import SingleTouch as ST
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
-import Svg.Lazy
-import Touch as T
 
 
 viewPixelatedImage : Image -> Svg Msg
@@ -47,6 +41,7 @@ viewImage { url, width, height } =
         []
 
 
+drawingConfig : DrawingConfig Msg
 drawingConfig =
     { startDrawing = StartDrawing
     , continueDrawing = ContinueDrawing
@@ -70,78 +65,85 @@ canvasAttributes drawing editState =
         ++ EditState.drawingEvents drawingConfig editState
 
 
-getAnnotations : Image -> Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Bool -> List (Svg Msg)
-getAnnotations image annotations spotlights nonSpotlights isDrawingSpotlight =
+viewAnnotations : Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Bool -> List (Svg Msg)
+viewAnnotations annotations spotlights nonSpotlights isDrawingSpotlight =
     let
         firstSpotlightIndex =
             getFirstSpotlightIndex annotations
     in
         if isDrawingSpotlight && List.isEmpty spotlights then
-            nonSpotlights ++ [ viewMask image.width image.height ]
+            nonSpotlights ++ [ viewMask ]
         else if List.isEmpty spotlights then
             nonSpotlights
         else
             List.take firstSpotlightIndex nonSpotlights
-                ++ (viewMask image.width image.height
-                        :: List.drop firstSpotlightIndex nonSpotlights
-                   )
+                ++ (viewMask :: List.drop firstSpotlightIndex nonSpotlights)
+
+
+type alias Spotlights =
+    List (Svg Msg)
+
+
+type alias Pixelates =
+    List (Svg Msg)
+
+
+type alias Annotations =
+    List (Svg Msg)
+
+
+type alias IsInMask =
+    Bool
 
 
 viewDrawingAndAnnotations :
     Image
-    -> (List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg))
+    -> Spotlights
+    -> Pixelates
+    -> Annotations
+    -> Bool
+    -> (IsInMask -> Svg Msg)
     -> List (Svg Msg)
-    -> List (Svg Msg)
-    -> List (Svg Msg)
-    -> (Bool -> Svg Msg)
-    -> Drawing
-    -> List (Svg Msg)
-viewDrawingAndAnnotations image definitions spotlights pixelates annotations toDrawing drawing =
-    let
-        nonSpotlightDrawingAndAnnotations =
-            definitions spotlights pixelates ++ (Svg.Lazy.lazy viewPixelatedImage image :: viewImage image :: annotations) ++ [ toDrawing False ]
+viewDrawingAndAnnotations image spotlights pixelates annotations isSpotlight toDrawing =
+    if isSpotlight then
+        Definitions.viewDefinitions (spotlights ++ [ toDrawing True ]) pixelates
+            ++ (viewPixelatedImage image :: viewImage image :: annotations)
+            ++ [ toDrawing False ]
+    else
+        Definitions.viewDefinitions spotlights pixelates
+            ++ (viewPixelatedImage image :: viewImage image :: annotations)
+            ++ [ toDrawing False ]
 
-        spotlightDrawingAndAnnotations =
-            definitions (spotlights ++ [ toDrawing True ]) pixelates ++ (Svg.Lazy.lazy viewPixelatedImage image :: Svg.Lazy.lazy viewImage image :: annotations) ++ [ toDrawing False ]
-    in
-        case drawing of
-            DrawSpotlight _ ->
-                spotlightDrawingAndAnnotations
 
-            _ ->
-                nonSpotlightDrawingAndAnnotations
+insertIfPixelate : Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Drawing -> DrawingInfo -> ( Array Annotation, List (Svg Msg) )
+insertIfPixelate annotations spotlights nonSpotlights drawing { start, curPos } =
+    case drawing of
+        DrawPixelate ->
+            ( Array.push (Pixelate start curPos) annotations
+            , viewAnnotations annotations spotlights nonSpotlights (isSpotlightDrawing drawing)
+            )
+
+        _ ->
+            ( annotations, viewAnnotations annotations spotlights nonSpotlights (isSpotlightDrawing drawing) )
 
 
 viewDrawingArea : Annotation.DrawingModifiers -> Array Annotation -> AnnotationAttributes -> Image -> Html Msg
 viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotations annotationAttrs image =
     let
         toDrawing =
-            Annotation.viewDrawing drawingModifiers annotationAttrs editState
+            Annotation.viewDrawing editState drawingModifiers annotationAttrs
 
         spotlights =
             Definitions.viewSpotlights editState annotations
 
         ( pixelates, svgAnnotations ) =
-            Tuple.mapFirst (Definitions.viewPixelates editState) <|
-                case EditState.ifDrawing editState of
-                    Just { start, curPos } ->
-                        case drawing of
-                            DrawPixelate ->
-                                ( Array.push (Pixelate start curPos) annotations
-                                , getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing drawing)
-                                )
-
-                            _ ->
-                                ( annotations, getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing drawing) )
-
-                    Nothing ->
-                        ( annotations, getAnnotations image annotations spotlights nonSpotlights False )
+            editState
+                |> EditState.viewDrawing (insertIfPixelate annotations spotlights nonSpotlights drawing)
+                |> Maybe.withDefault ( annotations, viewAnnotations annotations spotlights nonSpotlights False )
+                |> Tuple.mapFirst (Definitions.viewPixelates editState)
 
         nonSpotlights =
             Definitions.viewNonSpotlightAnnotations editState annotations
-
-        definitions =
-            Definitions.viewDefinitions image.width image.height
     in
         div
             (canvasAttributes drawing editState)
@@ -152,17 +154,17 @@ viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotati
                 , Attr.height (toString (round image.height))
                 , attribute "xmlns" "http://www.w3.org/2000/svg"
                 ]
-                (viewDrawingAndAnnotations image definitions spotlights pixelates svgAnnotations toDrawing drawing)
+                (viewDrawingAndAnnotations image spotlights pixelates svgAnnotations (isSpotlightDrawing drawing) toDrawing)
             ]
 
 
-viewMask : Float -> Float -> Svg msg
-viewMask width height =
+viewMask : Svg msg
+viewMask =
     rect
         [ Attr.x "0"
         , Attr.y "0"
-        , Attr.height <| toString height
-        , Attr.width <| toString width
+        , Attr.height "100%"
+        , Attr.width "100%"
         , Attr.mask "url(#Mask)"
         , Attr.style "pointer-events: none;"
         ]
