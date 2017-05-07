@@ -6,7 +6,7 @@ import Goat.EditState as EditState exposing (EditState)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (Drawing(..))
 import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.Utils exposing (getFirstSpotlightIndex, isSpotlightDrawing, toDrawingPosition, toPosition)
+import Goat.Utils exposing (getFirstSpotlightIndex, isSpotlightDrawing)
 import Goat.View.DrawingArea.Annotation as Annotation exposing (viewAnnotation)
 import Goat.View.DrawingArea.Definitions as Definitions
 import Goat.View.EventUtils exposing (defaultPrevented, stopPropagation, onMouseDown, onMouseUp)
@@ -47,82 +47,27 @@ viewImage { url, width, height } =
         []
 
 
-drawingStateEvents : EditState -> List (Attribute Msg)
-drawingStateEvents editState =
-    []
-        |> EditState.whenNotSelecting drawingAreaAttrsWhenNotSelecting editState
-        |> EditState.whenDrawing drawingAreaAttrsWhenDrawing editState
-        |> EditState.whenSelecting drawingAreaAttrsWhenSelecting editState
-        |> EditState.whenMoving drawingAreaAttrsWhenMoving editState
-        |> EditState.whenResizing drawingAreaAttrsWhenResizing editState
-        |> EditState.whenEditingText (drawingAreaAttrsWhenEditingText << .id) editState
-
-
-drawingAreaAttrsWhenNotSelecting : List (Svg.Attribute Msg)
-drawingAreaAttrsWhenNotSelecting =
-    [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
-    , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
-    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-    ]
-
-
-drawingAreaAttrsWhenDrawing : a -> List (Attribute Msg)
-drawingAreaAttrsWhenDrawing _ =
-    [ onMouseUp (Json.map (FinishDrawing << toDrawingPosition) Mouse.position)
-    , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishDrawing << toDrawingPosition << toPosition)
-    , ST.onSingleTouch T.TouchMove T.preventAndStop (ContinueDrawing << toDrawingPosition << toPosition)
-    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-    ]
-
-
-drawingAreaAttrsWhenSelecting : a -> List (Attribute Msg)
-drawingAreaAttrsWhenSelecting _ =
-    [ onMouseDown <| Json.map (StartDrawing << toDrawingPosition) Mouse.position
-    , ST.onSingleTouch T.TouchStart T.preventAndStop <| (StartDrawing << toDrawingPosition << toPosition)
-    ]
-
-
-drawingAreaAttrsWhenMoving : a -> List (Attribute Msg)
-drawingAreaAttrsWhenMoving _ =
-    [ onMouseUp <| Json.map (FinishMovingAnnotation << toDrawingPosition) Mouse.position
-    , ST.onSingleTouch T.TouchMove T.preventAndStop (MoveAnnotation << toDrawingPosition << toPosition)
-    , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishMovingAnnotation << toDrawingPosition << toPosition)
-    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-    ]
-
-
-drawingAreaAttrsWhenResizing : a -> List (Attribute Msg)
-drawingAreaAttrsWhenResizing _ =
-    [ onMouseUp <| Json.map (FinishResizingAnnotation << toDrawingPosition) Mouse.position
-    , ST.onSingleTouch T.TouchMove T.preventAndStop (ResizeAnnotation << toDrawingPosition << toPosition)
-    , ST.onSingleTouch T.TouchEnd T.preventAndStop (FinishResizingAnnotation << toDrawingPosition << toPosition)
-    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-    ]
-
-
-drawingAreaAttrsWhenEditingText : Int -> List (Attribute Msg)
-drawingAreaAttrsWhenEditingText index =
-    [ Html.Events.onMouseDown <| FinishEditingText index
-    , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FinishEditingText index)
-    , onWithOptions "contextmenu" defaultPrevented (Json.map ToggleAnnotationMenu Mouse.position)
-    ]
-
-
-toDrawingAreaCursor : EditState -> String
-toDrawingAreaCursor editState =
-    "crosshair"
-        |> EditState.whenEditingText (\_ -> "default") editState
+drawingConfig =
+    { startDrawing = StartDrawing
+    , continueDrawing = ContinueDrawing
+    , finishDrawing = FinishDrawing
+    , continueMoving = MoveAnnotation
+    , finishMoving = FinishMovingAnnotation
+    , continueResizing = ResizeAnnotation
+    , finishResizing = FinishResizingAnnotation
+    , finishEditingText = FinishEditingText
+    , contextMenu = ToggleAnnotationMenu
+    }
 
 
 canvasAttributes : Drawing -> EditState -> List (Svg.Attribute Msg)
 canvasAttributes drawing editState =
     [ id "canvas"
     , class "image-edit"
-    , style [ "cursor" => toDrawingAreaCursor editState ]
     , Html.Events.onMouseDown CloseDropdown
     , Html.Attributes.contextmenu "annotation-menu"
     ]
-        ++ drawingStateEvents editState
+        ++ EditState.drawingEvents drawingConfig editState
 
 
 getAnnotations : Image -> Array Annotation -> List (Svg Msg) -> List (Svg Msg) -> Bool -> List (Svg Msg)
@@ -178,8 +123,8 @@ viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotati
 
         ( pixelates, svgAnnotations ) =
             Tuple.mapFirst (Definitions.viewPixelates editState) <|
-                EditState.whenDrawing
-                    (\{ start, curPos } ->
+                case EditState.ifDrawing editState of
+                    Just { start, curPos } ->
                         case drawing of
                             DrawPixelate ->
                                 ( Array.push (Pixelate start curPos) annotations
@@ -188,9 +133,9 @@ viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotati
 
                             _ ->
                                 ( annotations, getAnnotations image annotations spotlights nonSpotlights (isSpotlightDrawing drawing) )
-                    )
-                    editState
-                    ( annotations, getAnnotations image annotations spotlights nonSpotlights False )
+
+                    Nothing ->
+                        ( annotations, getAnnotations image annotations spotlights nonSpotlights False )
 
         nonSpotlights =
             Definitions.viewNonSpotlightAnnotations editState annotations

@@ -3,8 +3,10 @@ module Fixtures exposing (..)
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color
+import Goat.Annotation exposing (ShapeType(..), LineType(..), StrokeStyle(SolidMedium), Shape, TextArea)
+import Goat.EditState as EditState
 import Goat.Flags exposing (Image)
-import Goat.Model exposing (..)
+import Goat.Model exposing (Model, Drawing(..), OperatingSystem(..), Platform(Web), StartPosition, EndPosition)
 import Goat.Update exposing (..)
 import List.Zipper
 import Mouse exposing (Position)
@@ -25,6 +27,7 @@ goat =
 model : Model
 model =
     { edits = UndoList.fresh Array.empty
+    , editState = EditState.initialState
     , waitingForDropdownToggle = Nothing
     , fill = Nothing
     , strokeColor = Color.red
@@ -37,7 +40,6 @@ model =
     , drawing = DrawLine Arrow
     , shape = DrawShape Rect
     , spotlight = DrawSpotlight RoundedRect
-    , annotationState = ReadyToDraw
     , operatingSystem = MacOS
     , annotationMenu = Nothing
     , showingAnyMenu = False

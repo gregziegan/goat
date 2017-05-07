@@ -1,18 +1,17 @@
 module Goat.Subscriptions exposing (subscriptions)
 
-import Goat.EditState as EditState
+import Goat.EditState as EditState exposing (SubscriptionConfig)
 import Goat.Model exposing (Model)
 import Goat.Ports as Ports
 import Goat.Update exposing (Msg(..))
-import Goat.Utils exposing (toDrawingPosition)
 import Time exposing (second)
 
 
-editStateConfig : EditState.Config Msg
+editStateConfig : SubscriptionConfig Msg
 editStateConfig =
-    { drawToMsg = ContinueDrawing << toDrawingPosition
-    , resizeToMsg = ResizeAnnotation << toDrawingPosition
-    , moveToMsg = MoveAnnotation << toDrawingPosition
+    { drawToMsg = ContinueDrawing
+    , resizeToMsg = ResizeAnnotation
+    , moveToMsg = MoveAnnotation
     , keyboardToMsg = KeyboardMsg
     }
 

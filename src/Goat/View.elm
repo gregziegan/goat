@@ -1,11 +1,13 @@
 module Goat.View exposing (view)
 
+import Goat.Annotation exposing (AnnotationAttributes)
+import Goat.EditState exposing (currentAnnotationAttributes)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (Model, Platform(Web, Zendesk))
-import Goat.Update exposing (Msg(..), autoExpandConfig, currentAnnotationAttributes)
-import Goat.View.DrawingArea.Annotation exposing (DrawingModifiers)
+import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.View.Controls as Controls
 import Goat.View.DrawingArea as DrawingArea
+import Goat.View.DrawingArea.Annotation exposing (DrawingModifiers)
 import Goat.View.ImageSelector as ImageSelector
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
@@ -94,11 +96,15 @@ toDrawingModifiers model =
     DrawingModifiers model.drawing (List.member Shift model.pressedKeys) model.editState
 
 
+extractAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
+    AnnotationAttributes strokeColor fill strokeStyle fontSize
+
+
 viewImageAnnotator : Model -> Image -> Html Msg
 viewImageAnnotator model selectedImage =
     let
         annotationAttrs =
-            currentAnnotationAttributes model
+            currentAnnotationAttributes model.editState (extractAnnotationAttributes model)
     in
         div
             [ class "annotation-app"

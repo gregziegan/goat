@@ -18,14 +18,6 @@ type Platform
     | Web
 
 
-type alias StartPosition =
-    Position
-
-
-type alias EndPosition =
-    Position
-
-
 type AttributeDropdown
     = ShapesDropdown
     | SpotlightsDropdown
@@ -35,20 +27,9 @@ type AttributeDropdown
     | Strokes
 
 
-type Vertices
-    = Rectangular
-    | Linear
-
-
 type OperatingSystem
     = MacOS
     | Windows
-
-
-type ResizeDirection
-    = NWSE
-    | NESW
-    | Move
 
 
 type Drawing
@@ -64,6 +45,14 @@ type alias AnnotationMenu =
     { index : Maybe Int
     , position : Position
     }
+
+
+type alias StartPosition =
+    Position
+
+
+type alias EndPosition =
+    Position
 
 
 type alias Model =

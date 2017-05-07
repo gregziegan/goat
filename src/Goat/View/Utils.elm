@@ -1,24 +1,9 @@
-module Goat.View.Utils exposing (posToString, directionToCursor, toPx)
-
-import Goat.Model exposing (EndPosition, ResizeDirection(..), StartPosition)
+module Goat.View.Utils exposing (posToString, toPx)
 
 
 posToString : { x : number, y : number } -> String
 posToString pos =
     toString pos.x ++ "," ++ toString pos.y
-
-
-directionToCursor : ResizeDirection -> String
-directionToCursor direction =
-    case direction of
-        NWSE ->
-            "northWestCursor"
-
-        NESW ->
-            "northEastCursor"
-
-        Move ->
-            "moveCursor"
 
 
 toPx : number -> String

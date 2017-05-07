@@ -1,4 +1,4 @@
-module Goat.Annotation exposing (Annotation(..), SelectState(..), StrokeStyle(..), LineType(..), Shape, ShapeType(..), TextArea, AnnotationAttributes, Vertex(..), defaultStroke, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, arrowPath, spotlightToMaskCutout)
+module Goat.Annotation exposing (Annotation(..), SelectState(..), StrokeStyle(..), LineType(..), Shape, ShapeType(..), TextArea, AnnotationAttributes, Vertex(..), Vertices(..), defaultStroke, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, arrowPath, spotlightToMaskCutout)
 
 import AutoExpand
 import Color exposing (Color)
@@ -85,6 +85,11 @@ type Vertex
     | End
     | StartPlusX
     | StartPlusY
+
+
+type Vertices
+    = Rectangular
+    | Linear
 
 
 {-| Annotations are viewed differently based on the kind of selection.

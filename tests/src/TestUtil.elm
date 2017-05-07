@@ -2,8 +2,9 @@ module TestUtil exposing (..)
 
 import Array.Hamt as Array
 import Fuzz exposing (Fuzzer)
-import Goat.Model exposing (Annotation(TextBox), AnnotationState(..), EndPosition, Model, ResizingData, StartPosition, Vertex(..))
-import Goat.Utils exposing (getPositions, shiftPosition)
+import Goat.Annotation exposing (Annotation(TextBox), Vertex(..), positions)
+import Goat.Model exposing (EndPosition, Model, StartPosition)
+import Goat.Utils exposing (shiftPosition)
 import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
@@ -34,21 +35,11 @@ position =
         (\{ x, y } -> Shrink.map Position (Shrink.int x) |> Shrink.andMap (Shrink.int y))
 
 
-getDrawingStateCurPos : AnnotationState -> Maybe Position
-getDrawingStateCurPos annotationState =
-    case annotationState of
-        DrawingAnnotation _ curPos _ ->
-            Just curPos
-
-        _ ->
-            Nothing
-
-
 isAnnotationMovedByCorrectAmount : Position -> Position -> ( StartPosition, EndPosition ) -> Annotation -> Bool
 isAnnotationMovedByCorrectAmount start end ( origStart, origEnd ) shiftedAnnotation =
     let
         ( shiftedStart, shiftedEnd ) =
-            getPositions shiftedAnnotation
+            positions shiftedAnnotation
 
         dx =
             shiftedEnd.x - shiftedStart.x
@@ -60,28 +51,3 @@ isAnnotationMovedByCorrectAmount start end ( origStart, origEnd ) shiftedAnnotat
             == shiftedStart
             && shiftPosition dx dy origEnd
             == shiftedEnd
-
-
-
--- isAnnotationResizedByCorrectAmount : ResizingData -> Annotation -> ( StartPosition, EndPosition )
--- isAnnotationResizedByCorrectAmount { start, curPos, vertex, originalCoords } annotation =
---     let
---         ( origStart, origEnd ) =
---             originalCoords
---
---         ( resizedStart, resizedEnd ) =
---             getPositions annotation
---
---         dx =
---             curPos.x - start.x
---
---         dy =
---             curPos.y - start.y
---     in
---         case vertex of
---             Start ->
---                 ( shiftPosition dx dy origStart, origEnd )
---
---             _ ->
---                 -- TODO: implement test
---                 ( origStart, origEnd )

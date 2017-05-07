@@ -1,16 +1,16 @@
-module Goat.EditState exposing (EditState, Config, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, whenNotSelecting, whenDrawing, whenSelecting, whenMoving, whenResizing, whenEditingText)
+module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, InfoConfig, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, info, annotationEvents, vertexEvents, drawingEvents, ifDrawing, currentAnnotationAttributes)
 
-import Goat.Annotation exposing (AnnotationAttributes, SelectState, StrokeStyle, SelectState(..), Vertex)
+import Goat.Annotation exposing (AnnotationAttributes, SelectState, SelectState(..), StrokeStyle, Vertex)
+import Goat.ControlOptions as ControlOptions
+import Goat.View.EventUtils exposing (defaultPrevented, onMouseDown, onMouseUp, stopPropagation)
+import Html.Events exposing (onWithOptions)
+import Json.Decode as Json
 import Keyboard.Extra as Keyboard exposing (KeyChange)
 import Mouse exposing (Position)
-
-
-type alias Config msg =
-    { drawToMsg : Position -> msg
-    , resizeToMsg : Position -> msg
-    , moveToMsg : Position -> msg
-    , keyboardToMsg : Keyboard.Msg -> msg
-    }
+import SingleTouch as ST
+import Svg exposing (Attribute)
+import Svg.Attributes as Attr
+import Touch as T
 
 
 type alias DrawingInfo =
@@ -47,6 +47,50 @@ type alias ResizingInfo =
 type alias EditingTextInfo =
     { id : Int
     , attributes : AnnotationAttributes
+    }
+
+
+type alias SubscriptionConfig msg =
+    { drawToMsg : Position -> msg
+    , resizeToMsg : Position -> msg
+    , moveToMsg : Position -> msg
+    , keyboardToMsg : Keyboard.Msg -> msg
+    }
+
+
+type alias AnnotationConfig msg =
+    { selectAndMove : Position -> msg
+    , contextMenu : Position -> msg
+    , startMoving : Position -> msg
+    , finishMoving : Position -> msg
+    }
+
+
+type alias DrawingConfig msg =
+    { startDrawing : Position -> msg
+    , continueDrawing : Position -> msg
+    , finishDrawing : Position -> msg
+    , continueMoving : Position -> msg
+    , finishMoving : Position -> msg
+    , continueResizing : Position -> msg
+    , finishResizing : Position -> msg
+    , finishEditingText : Int -> msg
+    , contextMenu : Position -> msg
+    }
+
+
+type alias VertexConfig msg =
+    { startResizing : Vertex -> Position -> msg
+    }
+
+
+type alias InfoConfig a b =
+    { notSelecting : a -> b
+    , drawing : DrawingInfo -> a -> b
+    , selecting : SelectingInfo -> a -> b
+    , moving : MovingInfo -> a -> b
+    , resizing : ResizingInfo -> a -> b
+    , editingText : EditingTextInfo -> a -> b
     }
 
 
@@ -96,14 +140,14 @@ continueDrawing pos trackPositions editState =
             editState
 
 
-finishDrawing : EditState -> EditState
+finishDrawing : EditState -> Maybe ( EditState, DrawingInfo )
 finishDrawing editState =
     case editState of
-        Drawing _ ->
-            NotSelecting
+        Drawing drawingInfo ->
+            Just ( NotSelecting, drawingInfo )
 
         _ ->
-            editState
+            Nothing
 
 
 selectAnnotation : Int -> AnnotationAttributes -> EditState -> EditState
@@ -121,24 +165,24 @@ startMoving start editState =
             editState
 
 
-continueMoving : Position -> EditState -> EditState
+continueMoving : Position -> EditState -> Maybe ( EditState, MovingInfo )
 continueMoving newPos editState =
     case editState of
-        Moving moveInfo ->
-            Moving { moveInfo | translate = ( newPos.x - moveInfo.start.x, newPos.y - moveInfo.start.y ) }
+        Moving movingInfo ->
+            Just ( Moving { movingInfo | translate = ( newPos.x - movingInfo.start.x, newPos.y - movingInfo.start.y ) }, movingInfo )
 
         _ ->
-            editState
+            Nothing
 
 
-finishMoving : EditState -> EditState
+finishMoving : EditState -> Maybe ( EditState, MovingInfo )
 finishMoving editState =
     case editState of
-        Moving { id, attributes } ->
-            Selecting (SelectingInfo id attributes)
+        Moving ({ id, attributes } as movingInfo) ->
+            Just ( Selecting (SelectingInfo id attributes), movingInfo )
 
         _ ->
-            editState
+            Nothing
 
 
 startResizing : Position -> Vertex -> ( Position, Position ) -> EditState -> EditState
@@ -151,24 +195,24 @@ startResizing start vertex originalCoords editState =
             editState
 
 
-continueResizing : Position -> EditState -> EditState
+continueResizing : Position -> EditState -> Maybe ( EditState, ResizingInfo )
 continueResizing curPos editState =
     case editState of
         Resizing resizingData ->
-            Resizing { resizingData | curPos = curPos }
+            Just ( Resizing { resizingData | curPos = curPos }, resizingData )
 
         _ ->
-            editState
+            Nothing
 
 
-finishResizing : EditState -> EditState
+finishResizing : EditState -> Maybe ( EditState, ResizingInfo )
 finishResizing editState =
     case editState of
-        Resizing { id, attributes } ->
-            Selecting (SelectingInfo id attributes)
+        Resizing ({ id, attributes } as resizingInfo) ->
+            Just ( Selecting (SelectingInfo id attributes), resizingInfo )
 
         _ ->
-            editState
+            Nothing
 
 
 startEditingText : Int -> AnnotationAttributes -> EditState -> EditState
@@ -176,14 +220,14 @@ startEditingText id attrs editState =
     EditingText (EditingTextInfo id attrs)
 
 
-finishEditingText : EditState -> EditState
+finishEditingText : EditState -> Maybe ( EditState, EditingTextInfo )
 finishEditingText editState =
     case editState of
-        EditingText _ ->
-            NotSelecting
+        EditingText editingTextInfo ->
+            Just ( NotSelecting, editingTextInfo )
 
         _ ->
-            editState
+            Nothing
 
 
 updateSelectedAttributes : (AnnotationAttributes -> AnnotationAttributes) -> EditState -> EditState
@@ -199,22 +243,32 @@ updateSelectedAttributes updateAttrs editState =
             editState
 
 
-subscriptions : Config msg -> EditState -> Sub msg
+toDrawingPosition : Mouse.Position -> Mouse.Position
+toDrawingPosition mouse =
+    { mouse | x = mouse.x - ControlOptions.controlUIWidth, y = mouse.y - 10 }
+
+
+toPosition : ST.SingleTouch -> Position
+toPosition st =
+    Position (round st.touch.clientX) (round st.touch.clientY)
+
+
+subscriptions : SubscriptionConfig msg -> EditState -> Sub msg
 subscriptions config editState =
     Sub.batch <|
         case editState of
             Drawing _ ->
-                [ Mouse.moves config.drawToMsg
+                [ Mouse.moves (config.drawToMsg << toDrawingPosition)
                 , Sub.map config.keyboardToMsg Keyboard.subscriptions
                 ]
 
             Resizing _ ->
-                [ Mouse.moves config.resizeToMsg
+                [ Mouse.moves (config.resizeToMsg << toDrawingPosition)
                 , Sub.map config.keyboardToMsg Keyboard.subscriptions
                 ]
 
             Moving _ ->
-                [ Mouse.moves config.moveToMsg ]
+                [ Mouse.moves (config.moveToMsg << toDrawingPosition) ]
 
             _ ->
                 [ Sub.map config.keyboardToMsg Keyboard.subscriptions ]
@@ -260,61 +314,170 @@ selectState candidateId usesVertices editState =
             NotSelected
 
 
-whenNotSelecting : a -> EditState -> a -> a
-whenNotSelecting notSelectingValue editState a =
+info : InfoConfig a b -> EditState -> a -> b
+info config editState a =
     case editState of
         NotSelecting ->
-            notSelectingValue
+            config.notSelecting a
+
+        Drawing drawingInfo ->
+            config.drawing drawingInfo a
+
+        Selecting selectingInfo ->
+            config.selecting selectingInfo a
+
+        Moving movingInfo ->
+            config.moving movingInfo a
+
+        Resizing resizingInfo ->
+            config.resizing resizingInfo a
+
+        EditingText editingTextInfo ->
+            config.editingText editingTextInfo a
+
+
+annotationEvents : AnnotationConfig msg -> Int -> EditState -> List (Svg.Attribute msg)
+annotationEvents config candidateId editState =
+    case editState of
+        NotSelecting ->
+            [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (config.selectAndMove << toDrawingPosition) Mouse.position
+            , Attr.class "pointerCursor"
+            , onWithOptions "contextmenu" (Html.Events.Options True True) (Json.map (config.contextMenu) Mouse.position)
+            ]
+
+        Drawing drawingInfo ->
+            [ Attr.class "crosshairCursor" ]
+
+        Selecting selectingInfo ->
+            [ Attr.class "moveCursor"
+            , Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (config.startMoving << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchStart T.preventAndStop (config.startMoving << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            ]
+
+        Moving { id, translate } ->
+            let
+                ( dx, dy ) =
+                    translate
+            in
+                [ onMouseUp <| Json.map (config.finishMoving << toDrawingPosition) Mouse.position
+                , ST.onSingleTouch T.TouchEnd T.preventAndStop (config.finishMoving << toDrawingPosition << toPosition)
+                , Attr.class "moveCursor"
+                ]
+                    ++ if id == candidateId then
+                        [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
+                       else
+                        []
+
+        Resizing resizingInfo ->
+            [ Attr.class "resizeCursor" ]
+
+        EditingText editingTextInfo ->
+            [ Attr.class "crosshairCursor" ]
+
+
+vertexEvents : VertexConfig msg -> EditState -> Vertex -> List (Attribute msg)
+vertexEvents config editState vertex =
+    [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (config.startResizing vertex << toDrawingPosition) Mouse.position
+    , ST.onSingleTouch T.TouchStart T.preventAndStop (config.startResizing vertex << toDrawingPosition << toPosition)
+    ]
+        ++ case editState of
+            Moving movingInfo ->
+                vertexAttrsWhenMoving movingInfo
+
+            _ ->
+                []
+
+
+vertexAttrsWhenMoving : MovingInfo -> List (Svg.Attribute msg)
+vertexAttrsWhenMoving { translate } =
+    let
+        ( dx, dy ) =
+            translate
+    in
+        [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
+
+
+updateAnySelectedAnnotations : (Int -> a) -> EditState -> Maybe a
+updateAnySelectedAnnotations fn editState =
+    case editState of
+        Selecting { id } ->
+            Just (fn id)
+
+        EditingText { id } ->
+            Just (fn id)
 
         _ ->
-            a
+            Nothing
 
 
-whenDrawing : (DrawingInfo -> a) -> EditState -> a -> a
-whenDrawing f editState a =
+currentAnnotationAttributes : EditState -> AnnotationAttributes -> AnnotationAttributes
+currentAnnotationAttributes editState defaultAttributes =
+    case editState of
+        Selecting { attributes } ->
+            attributes
+
+        Moving { attributes } ->
+            attributes
+
+        Resizing { attributes } ->
+            attributes
+
+        EditingText { attributes } ->
+            attributes
+
+        _ ->
+            defaultAttributes
+
+
+drawingEvents : DrawingConfig msg -> EditState -> List (Attribute msg)
+drawingEvents config editState =
+    case editState of
+        NotSelecting ->
+            [ onMouseDown <| Json.map (config.startDrawing << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (config.startDrawing << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            ]
+
+        Drawing _ ->
+            [ onMouseUp (Json.map (config.finishDrawing << toDrawingPosition) Mouse.position)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (config.finishDrawing << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (config.continueDrawing << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            ]
+
+        Selecting _ ->
+            [ onMouseDown <| Json.map (config.startDrawing << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (config.startDrawing << toDrawingPosition << toPosition)
+            ]
+
+        Moving _ ->
+            [ onMouseUp <| Json.map (config.finishMoving << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (config.continueMoving << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (config.finishMoving << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            ]
+
+        Resizing _ ->
+            [ onMouseUp <| Json.map (config.finishResizing << toDrawingPosition) Mouse.position
+            , ST.onSingleTouch T.TouchMove T.preventAndStop (config.continueResizing << toDrawingPosition << toPosition)
+            , ST.onSingleTouch T.TouchEnd T.preventAndStop (config.continueResizing << toDrawingPosition << toPosition)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            ]
+
+        EditingText { id } ->
+            [ Html.Events.onMouseDown (config.finishEditingText id)
+            , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> config.finishEditingText id)
+            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            , Attr.style "cursor: default;"
+            ]
+
+
+ifDrawing : EditState -> Maybe DrawingInfo
+ifDrawing editState =
     case editState of
         Drawing drawingInfo ->
-            f drawingInfo
+            Just drawingInfo
 
         _ ->
-            a
-
-
-whenSelecting : (SelectingInfo -> a) -> EditState -> a -> a
-whenSelecting f editState a =
-    case editState of
-        Selecting selectingInfo ->
-            f selectingInfo
-
-        _ ->
-            a
-
-
-whenMoving : (MovingInfo -> a) -> EditState -> a -> a
-whenMoving f editState a =
-    case editState of
-        Moving moveInfo ->
-            f moveInfo
-
-        _ ->
-            a
-
-
-whenResizing : (ResizingInfo -> a) -> EditState -> a -> a
-whenResizing f editState a =
-    case editState of
-        Resizing resizingInfo ->
-            f resizingInfo
-
-        _ ->
-            a
-
-
-whenEditingText : (EditingTextInfo -> a) -> EditState -> a -> a
-whenEditingText f editState a =
-    case editState of
-        EditingText editingTextInfo ->
-            f editingTextInfo
-
-        _ ->
-            a
+            Nothing

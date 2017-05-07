@@ -1,9 +1,9 @@
-module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, drawingsAreEqual, toDrawingPosition, toPosition, getFirstSpotlightIndex, shiftPosition, stepMouse, fontSizeToLineHeight)
+module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, drawingsAreEqual, getFirstSpotlightIndex, shiftPosition, stepMouse, fontSizeToLineHeight)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.ControlOptions as ControlOptions
 import Goat.Annotation exposing (Annotation, AnnotationAttributes, isSpotlightShape, arrowAngle)
-import Goat.Model exposing (Drawing(..), EndPosition, Model, ResizeDirection(..), StartPosition)
+import Goat.Model exposing (Drawing(..), EndPosition, Model, StartPosition)
 import List.Extra
 import Mouse exposing (Position)
 import SingleTouch as ST
@@ -88,11 +88,6 @@ stepMouse start curPos =
         |> positionMapY ((+) start.y)
 
 
-toDrawingPosition : Mouse.Position -> Mouse.Position
-toDrawingPosition mouse =
-    { mouse | x = mouse.x - ControlOptions.controlUIWidth, y = mouse.y - 10 }
-
-
 toDeltas : Float -> Float -> Position
 toDeltas h theta =
     Position (round (cos theta * h)) (round (sin theta * h))
@@ -101,11 +96,6 @@ toDeltas h theta =
 calcDistance : Position -> Position -> Float
 calcDistance a b =
     sqrt <| toFloat <| (b.x - a.x) ^ 2 + (b.y - a.y) ^ 2
-
-
-toPosition : ST.SingleTouch -> Position
-toPosition st =
-    Position (round st.touch.clientX) (round st.touch.clientY)
 
 
 mapAtIndex : Int -> (a -> a) -> Array a -> Array a

@@ -3,7 +3,7 @@ module Goat.View.DrawingArea.Definitions exposing (..)
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
 import Goat.Annotation exposing (Annotation, ShapeType, Shape, spotlightToMaskCutout)
-import Goat.EditState exposing (EditState)
+import Goat.EditState as EditState exposing (EditState)
 import Goat.Update exposing (Msg(..), autoExpandConfig)
 import Goat.View.DrawingArea.Annotation as Annotation
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
@@ -25,7 +25,7 @@ viewNonSpotlightAnnotations editState annotations =
 
 viewMaskCutOut : EditState -> ( Int, ShapeType, Shape ) -> Svg Msg
 viewMaskCutOut editState ( index, shapeType, shape ) =
-    Annotation.viewShape (Annotation.editStateAttributes index editState) shapeType (Just Color.black) shape
+    Annotation.viewShape (EditState.annotationEvents (Annotation.annotationConfig index) index editState) shapeType (Just Color.black) shape
 
 
 viewSpotlights : EditState -> Array Annotation -> List (Svg Msg)

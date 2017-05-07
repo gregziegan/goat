@@ -5,11 +5,11 @@ import AutoExpand
 import Color exposing (Color)
 import Dom
 import Goat.Annotation as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea, Vertex(..))
-import Goat.EditState as EditState exposing (EditState, DrawingInfo, ResizingInfo)
+import Goat.EditState as EditState exposing (DrawingInfo, EditState, EditingTextInfo, InfoConfig, ResizingInfo, SelectingInfo)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
-import Goat.Utils exposing (calcLinePos, calcShapePos, drawingsAreEqual, fontSizeToLineHeight, isDrawingTooSmall, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition, toDrawingPosition)
+import Goat.Utils exposing (calcLinePos, calcShapePos, drawingsAreEqual, fontSizeToLineHeight, isDrawingTooSmall, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp))
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position, position)
@@ -162,29 +162,33 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
                 => []
 
         SelectFill fill ->
-            model
-                |> updateAnySelectedAnnotations (updateFill fill)
+            model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (updateFill fill) model)
+                |> Maybe.withDefault model
                 |> setFill fill
                 |> closeDropdown
                 => []
 
         SelectStrokeColor strokeColor ->
-            model
-                |> updateAnySelectedAnnotations (updateStrokeColor strokeColor)
+            model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (updateStrokeColor strokeColor) model)
+                |> Maybe.withDefault model
                 |> setStrokeColor strokeColor
                 |> closeDropdown
                 => []
 
         SelectStrokeStyle strokeStyle ->
-            model
-                |> updateAnySelectedAnnotations (updateStrokeStyle strokeStyle)
+            model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (updateStrokeStyle strokeStyle) model)
+                |> Maybe.withDefault model
                 |> setStrokeStyle strokeStyle
                 |> closeDropdown
                 => []
 
         SelectFontSize fontSize ->
-            model
-                |> updateAnySelectedAnnotations (updateFontSize fontSize)
+            model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (updateFontSize fontSize) model)
+                |> Maybe.withDefault model
                 |> setFontSize fontSize
                 |> closeDropdown
                 => []
@@ -378,19 +382,24 @@ finishValidDrawing ({ fill, strokeColor, strokeStyle, fontSize } as model) { sta
                 => []
 
 
-finishDrawingHelper : Model -> DrawingInfo -> ( Model, List (Cmd Msg) )
-finishDrawingHelper model ({ start, curPos } as drawingInfo) =
+finishDrawingHelper : EditState -> DrawingInfo -> Model -> ( Model, List (Cmd Msg) )
+finishDrawingHelper finishedEditState ({ start, curPos } as drawingInfo) model =
     if isDrawingTooSmall (isSpotlightDrawing model.drawing) start curPos then
         model
             |> resetEditState
             => []
     else
-        finishValidDrawing { model | editState = EditState.finishDrawing model.editState } drawingInfo
+        finishValidDrawing { model | editState = finishedEditState } drawingInfo
 
 
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
 finishDrawing pos model =
-    EditState.whenDrawing (finishDrawingHelper model) model.editState ( model, [] )
+    case EditState.finishDrawing model.editState of
+        Just ( newEditState, drawingInfo ) ->
+            finishDrawingHelper newEditState drawingInfo model
+
+        Nothing ->
+            model => []
 
 
 setEditState : EditState -> Model -> Model
@@ -405,15 +414,15 @@ resetEditState model =
 
 finishMovingAnnotation : Model -> Model
 finishMovingAnnotation model =
-    EditState.whenMoving
-        (\{ id, translate } ->
+    case EditState.finishMoving model.editState of
+        Just ( newEditState, { id, translate } ) ->
             { model
                 | edits = UndoList.new (mapAtIndex id (move translate) model.edits.present) model.edits
-                , editState = EditState.finishMoving model.editState
+                , editState = newEditState
             }
-        )
-        model.editState
-        model
+
+        Nothing ->
+            model
 
 
 updateAnySelectedAnnotationsHelper : (Annotation -> Annotation) -> Model -> Int -> Model
@@ -421,22 +430,6 @@ updateAnySelectedAnnotationsHelper fn model index =
     { model
         | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
     }
-
-
-updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
-updateAnySelectedAnnotations fn model =
-    model
-        |> EditState.whenSelecting (updateAnySelectedAnnotationsHelper fn model << .id) model.editState
-        |> EditState.whenEditingText (updateAnySelectedAnnotationsHelper fn model << .id) model.editState
-
-
-currentAnnotationAttributes : Model -> AnnotationAttributes
-currentAnnotationAttributes ({ editState } as model) =
-    annotationAttributesInModel model
-        |> EditState.whenSelecting .attributes editState
-        |> EditState.whenMoving .attributes editState
-        |> EditState.whenResizing .attributes editState
-        |> EditState.whenEditingText .attributes editState
 
 
 annotationAttributesInModel : Model -> AnnotationAttributes
@@ -641,7 +634,12 @@ startMovingAnnotation index newPos model =
 
 moveAnnotation : Position -> Model -> Model
 moveAnnotation newPos model =
-    { model | editState = EditState.continueMoving newPos model.editState }
+    case EditState.continueMoving newPos model.editState of
+        Just ( newEditState, _ ) ->
+            { model | editState = newEditState }
+
+        Nothing ->
+            model
 
 
 startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
@@ -656,28 +654,28 @@ startResizingAnnotation index vertex start model =
 
 resizeAnnotation : Position -> Model -> Model
 resizeAnnotation curPos model =
-    EditState.whenResizing
-        (\resizingData ->
+    case EditState.continueResizing curPos model.editState of
+        Just ( newEditState, resizingData ) ->
             { model
                 | edits = UndoList.mapPresent (mapAtIndex resizingData.id (resize (List.member Shift model.pressedKeys) resizingData)) model.edits
-                , editState = EditState.continueResizing curPos model.editState
+                , editState = newEditState
             }
-        )
-        model.editState
-        model
+
+        Nothing ->
+            model
 
 
 finishResizingAnnotation : Model -> Model
 finishResizingAnnotation model =
-    EditState.whenResizing
-        (\resizingData ->
+    case EditState.finishResizing model.editState of
+        Just ( newEditState, resizingData ) ->
             { model
                 | edits = UndoList.mapPresent (mapAtIndex resizingData.id (resize (List.member Shift model.pressedKeys) resizingData)) model.edits
-                , editState = EditState.finishResizing model.editState
+                , editState = newEditState
             }
-        )
-        model.editState
-        model
+
+        Nothing ->
+            model
 
 
 resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingInfo -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
@@ -824,10 +822,15 @@ toggleDropdown attributeDropdown model =
 
 finishEditingText : Int -> Model -> Model
 finishEditingText index model =
-    { model
-        | editState = EditState.finishEditingText model.editState
-        , edits = UndoList.new (removeItemIf Annotation.isEmptyTextBox index model.edits.present) model.edits
-    }
+    case EditState.finishEditingText model.editState of
+        Just ( newEditState, _ ) ->
+            { model
+                | editState = newEditState
+                , edits = UndoList.new (removeItemIf Annotation.isEmptyTextBox index model.edits.present) model.edits
+            }
+
+        Nothing ->
+            model
 
 
 alterToolbarWithKeyboard : Bool -> KeyChange -> Model -> Model
@@ -1036,23 +1039,6 @@ handlePaste ctrlPressed keyChange model =
 
         KeyUp key ->
             model
-
-
-handleKeyboardInteractions : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
-handleKeyboardInteractions maybeKeyChange ({ pressedKeys, editState } as model) =
-    case maybeKeyChange of
-        Just keyChange ->
-            model
-                |> EditState.whenNotSelecting (whenNotSelectingKeyboard keyChange model) editState
-                |> EditState.whenDrawing (whenDrawingKeyboard keyChange model) editState
-                |> EditState.whenSelecting (whenSelectingKeyboard keyChange model << .id) editState
-                |> EditState.whenMoving (whenMovingKeyboard keyChange model) editState
-                |> EditState.whenResizing (whenResizingKeyboard keyChange model) editState
-                |> EditState.whenEditingText (whenEditingTextKeyboard keyChange model) editState
-                => []
-
-        Nothing ->
-            model => []
 
 
 alterTextBoxDrawing : KeyChange -> Int -> Model -> ( Model, List (Cmd Msg) )
@@ -1319,6 +1305,29 @@ controlKeys os =
             [ Control ]
 
 
+keyboardConfig : KeyChange -> InfoConfig Model Model
+keyboardConfig keyChange =
+    { notSelecting = whenNotSelectingKeyboard keyChange
+    , drawing = whenDrawingKeyboard keyChange
+    , selecting = whenSelectingKeyboard keyChange
+    , moving = whenMovingKeyboard keyChange
+    , resizing = whenResizingKeyboard keyChange
+    , editingText = whenEditingTextKeyboard keyChange
+    }
+
+
+handleKeyboardInteractions : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
+handleKeyboardInteractions maybeKeyChange model =
+    case maybeKeyChange of
+        Just keyChange ->
+            EditState.info (keyboardConfig keyChange) model.editState model
+                => []
+
+        Nothing ->
+            model
+                => []
+
+
 isCtrlPressed : List Key -> OperatingSystem -> Bool
 isCtrlPressed pressedKeys os =
     List.any (\key -> List.member key pressedKeys) (controlKeys os)
@@ -1335,8 +1344,8 @@ whenNotSelectingKeyboard keyChange model =
             |> handlePaste ctrlPressed keyChange
 
 
-whenDrawingKeyboard : KeyChange -> Model -> a -> Model
-whenDrawingKeyboard keyChange model _ =
+whenDrawingKeyboard : KeyChange -> DrawingInfo -> Model -> Model
+whenDrawingKeyboard keyChange _ model =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
@@ -1345,20 +1354,20 @@ whenDrawingKeyboard keyChange model _ =
             |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
-whenSelectingKeyboard : KeyChange -> Model -> Int -> Model
-whenSelectingKeyboard keyChange model index =
+whenSelectingKeyboard : KeyChange -> SelectingInfo -> Model -> Model
+whenSelectingKeyboard keyChange { id } model =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
         alterDrawing ctrlPressed keyChange model
             |> alterToolbarWithKeyboard ctrlPressed keyChange
-            |> handleSelectedAnnotationKeyboard index ctrlPressed keyChange
+            |> handleSelectedAnnotationKeyboard id ctrlPressed keyChange
             |> handlePaste ctrlPressed keyChange
 
 
-whenMovingKeyboard : KeyChange -> Model -> a -> Model
-whenMovingKeyboard keyChange model _ =
+whenMovingKeyboard : KeyChange -> a -> Model -> Model
+whenMovingKeyboard keyChange _ model =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
@@ -1367,18 +1376,13 @@ whenMovingKeyboard keyChange model _ =
             |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
-whenResizingKeyboard : KeyChange -> Model -> a -> Model
-whenResizingKeyboard keyChange model _ =
-    let
-        ctrlPressed =
-            isCtrlPressed model.pressedKeys model.operatingSystem
-    in
-        alterDrawing ctrlPressed keyChange model
-            |> alterToolbarWithKeyboard ctrlPressed keyChange
+whenResizingKeyboard : KeyChange -> a -> Model -> Model
+whenResizingKeyboard =
+    whenMovingKeyboard
 
 
-whenEditingTextKeyboard : KeyChange -> Model -> c -> Model
-whenEditingTextKeyboard keyChange model index =
+whenEditingTextKeyboard : KeyChange -> a -> Model -> Model
+whenEditingTextKeyboard keyChange _ model =
     let
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
