@@ -477,11 +477,6 @@ viewPixelate editState index annotation =
             Nothing
 
 
-vertexConfig index =
-    { startResizing = StartResizingAnnotation index
-    }
-
-
 viewAnnotation : EditState -> Int -> Annotation -> ( Svg Msg, Maybe (Svg Msg) )
 viewAnnotation editState index annotation =
     let
@@ -492,7 +487,7 @@ viewAnnotation editState index annotation =
             EditState.annotationEvents (annotationConfig index) index editState
 
         toVertexEvents =
-            EditState.vertexEvents (vertexConfig index) editState
+            EditState.vertexEvents (StartResizingAnnotation index) editState
 
         vertices verticesType { start, end } =
             Vertices.viewVertices verticesType start end toVertexEvents selectState

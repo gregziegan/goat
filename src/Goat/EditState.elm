@@ -79,11 +79,6 @@ type alias DrawingConfig msg =
     }
 
 
-type alias VertexConfig msg =
-    { startResizing : Vertex -> Position -> msg
-    }
-
-
 type alias KeyboardConfig a b =
     { notSelecting : a -> b
     , drawing : DrawingInfo -> a -> b
@@ -376,10 +371,10 @@ annotationEvents config candidateId editState =
             [ Attr.class "crosshairCursor" ]
 
 
-vertexEvents : VertexConfig msg -> EditState -> Vertex -> List (Attribute msg)
-vertexEvents config editState vertex =
-    [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (config.startResizing vertex << toDrawingPosition) Mouse.position
-    , ST.onSingleTouch T.TouchStart T.preventAndStop (config.startResizing vertex << toDrawingPosition << toPosition)
+vertexEvents : (Vertex -> Position -> msg) -> EditState -> Vertex -> List (Attribute msg)
+vertexEvents startResizing editState vertex =
+    [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (startResizing vertex << toDrawingPosition) Mouse.position
+    , ST.onSingleTouch T.TouchStart T.preventAndStop (startResizing vertex << toDrawingPosition << toPosition)
     ]
         ++ case editState of
             Moving movingInfo ->
@@ -473,6 +468,19 @@ drawingEvents config editState =
             ]
 
 
+
+{-
+   The below functions are being used for two special cases that may be able to be solved
+   in a different way.
+
+   viewDrawing -> Pixelate needs to be added to the svg <defs/>, and we therefore need access to DrawingInfo
+   ifMoving -> The arrow head is being rotated and translated, but the Svg.Attributes.translate attribute does not stack.
+               TODO:
+                 a) try to resize/move the arrow path with only Svg.Attributes.translate so both are treated equally
+                 b) try to resize/move the arrow head with only the Svg.Attributes.d string
+-}
+
+
 viewDrawing : (DrawingInfo -> a) -> EditState -> Maybe a
 viewDrawing fn editState =
     case editState of
@@ -481,17 +489,6 @@ viewDrawing fn editState =
 
         _ ->
             Nothing
-
-
-
--- ifDrawing : EditState -> Maybe DrawingInfo
--- ifDrawing editState =
---     case editState of
---         Drawing drawingInfo ->
---             Just drawingInfo
---
---         _ ->
---             Nothing
 
 
 ifMoving : EditState -> Maybe MovingInfo

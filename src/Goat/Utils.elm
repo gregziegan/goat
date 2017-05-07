@@ -1,12 +1,10 @@
 module Goat.Utils exposing (isDrawingTooSmall, isSpotlightDrawing, calcShapePos, calcLinePos, equalXandY, positionMap, positionMapX, positionMapY, mapAtIndex, removeItemIf, removeItem, drawingsAreEqual, getFirstSpotlightIndex, shiftPosition, stepMouse, fontSizeToLineHeight)
 
 import Array.Hamt as Array exposing (Array)
-import Goat.ControlOptions as ControlOptions
 import Goat.Annotation exposing (Annotation, AnnotationAttributes, isSpotlightShape, arrowAngle)
 import Goat.Model exposing (Drawing(..), EndPosition, Model, StartPosition)
 import List.Extra
 import Mouse exposing (Position)
-import SingleTouch as ST
 
 
 minDrawingDistance : number
