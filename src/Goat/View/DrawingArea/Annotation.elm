@@ -229,16 +229,6 @@ viewArrowHeadDrawing showDropShadow start end strokeColor =
         []
 
 
-arrowHeadConfig index start end =
-    { notSelecting = identity
-    , drawing = \_ attrs -> attrs
-    , selecting = \_ attrs -> attrs
-    , moving = \movingInfo _ -> moveArrowHead index start end movingInfo
-    , resizing = \_ attrs -> attrs
-    , editingText = \_ attrs -> attrs
-    }
-
-
 viewArrowHead : Int -> EditState -> List (Svg.Attribute Msg) -> Bool -> StartPosition -> EndPosition -> Color -> Svg Msg
 viewArrowHead index editState attrs showDropShadow start end strokeColor =
     let
@@ -249,7 +239,7 @@ viewArrowHead index editState attrs showDropShadow start end strokeColor =
         Svg.path
             (arrowHeadAttrs start end strokeColor
                 ++ attrs
-                ++ EditState.info (arrowHeadConfig index start end) editState []
+                ++ Maybe.withDefault [] (Maybe.map (moveArrowHead index start end) (EditState.ifMoving editState))
                 ++ if showDropShadow then
                     [ Attr.filter "url(#dropShadow)" ]
                    else
@@ -275,25 +265,18 @@ type alias DrawingModifiers =
     }
 
 
-drawingConfig drawingModifiers annotationAttrs isInMask =
-    { notSelecting = identity
-    , drawing =
-        \{ start, curPos, positions } _ ->
-            viewDrawingHelper drawingModifiers annotationAttrs start curPos positions isInMask
-    , selecting = \_ svg -> svg
-    , moving = \_ svg -> svg
-    , resizing = \_ svg -> svg
-    , editingText = \_ svg -> svg
-    }
-
-
 viewDrawing : DrawingModifiers -> AnnotationAttributes -> EditState -> Bool -> Svg Msg
 viewDrawing drawingModifiers annotationAttrs editState isInMask =
-    EditState.info (drawingConfig drawingModifiers annotationAttrs isInMask) drawingModifiers.editState (Svg.text "")
+    case EditState.ifDrawing editState of
+        Just drawingInfo ->
+            viewDrawingHelper drawingModifiers annotationAttrs drawingInfo isInMask
+
+        Nothing ->
+            (Svg.text "")
 
 
-viewDrawingHelper : DrawingModifiers -> AnnotationAttributes -> StartPosition -> Position -> List Position -> Bool -> Svg Msg
-viewDrawingHelper { drawing, constrain, editState } { strokeColor, fill, strokeStyle, fontSize } start curPos freeDrawPositions isInMask =
+viewDrawingHelper : DrawingModifiers -> AnnotationAttributes -> EditState.DrawingInfo -> Bool -> Svg Msg
+viewDrawingHelper { drawing, constrain, editState } { strokeColor, fill, strokeStyle, fontSize } { start, curPos, positions } isInMask =
     let
         lineAttrs lineType =
             lineAttributes lineType (Shape start (calcLinePos constrain start curPos) strokeColor strokeStyle)
@@ -321,7 +304,7 @@ viewDrawingHelper { drawing, constrain, editState } { strokeColor, fill, strokeS
                         Svg.path (lineAttrs lineType) []
 
             DrawFreeHand ->
-                Svg.path (freeDrawAttributes (Shape start curPos strokeColor strokeStyle) freeDrawPositions) []
+                Svg.path (freeDrawAttributes (Shape start curPos strokeColor strokeStyle) positions) []
 
             DrawShape shapeType ->
                 case shapeType of

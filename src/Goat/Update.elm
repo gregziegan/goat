@@ -5,7 +5,7 @@ import AutoExpand
 import Color exposing (Color)
 import Dom
 import Goat.Annotation as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea, Vertex(..))
-import Goat.EditState as EditState exposing (DrawingInfo, EditState, EditingTextInfo, InfoConfig, ResizingInfo, SelectingInfo)
+import Goat.EditState as EditState exposing (DrawingInfo, EditState, EditingTextInfo, KeyboardConfig, ResizingInfo, SelectingInfo)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
@@ -1305,7 +1305,7 @@ controlKeys os =
             [ Control ]
 
 
-keyboardConfig : KeyChange -> InfoConfig Model Model
+keyboardConfig : KeyChange -> KeyboardConfig Model Model
 keyboardConfig keyChange =
     { notSelecting = whenNotSelectingKeyboard keyChange
     , drawing = whenDrawingKeyboard keyChange
@@ -1320,7 +1320,7 @@ handleKeyboardInteractions : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg)
 handleKeyboardInteractions maybeKeyChange model =
     case maybeKeyChange of
         Just keyChange ->
-            EditState.info (keyboardConfig keyChange) model.editState model
+            EditState.keyboard (keyboardConfig keyChange) model.editState model
                 => []
 
         Nothing ->

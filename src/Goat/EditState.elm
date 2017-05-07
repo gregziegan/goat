@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, InfoConfig, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, info, annotationEvents, vertexEvents, drawingEvents, ifDrawing, currentAnnotationAttributes)
+module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, ifDrawing, ifMoving, currentAnnotationAttributes)
 
 import Goat.Annotation exposing (AnnotationAttributes, SelectState, SelectState(..), StrokeStyle, Vertex)
 import Goat.ControlOptions as ControlOptions
@@ -84,7 +84,7 @@ type alias VertexConfig msg =
     }
 
 
-type alias InfoConfig a b =
+type alias KeyboardConfig a b =
     { notSelecting : a -> b
     , drawing : DrawingInfo -> a -> b
     , selecting : SelectingInfo -> a -> b
@@ -314,8 +314,8 @@ selectState candidateId usesVertices editState =
             NotSelected
 
 
-info : InfoConfig a b -> EditState -> a -> b
-info config editState a =
+keyboard : KeyboardConfig a b -> EditState -> a -> b
+keyboard config editState a =
     case editState of
         NotSelecting ->
             config.notSelecting a
@@ -478,6 +478,16 @@ ifDrawing editState =
     case editState of
         Drawing drawingInfo ->
             Just drawingInfo
+
+        _ ->
+            Nothing
+
+
+ifMoving : EditState -> Maybe MovingInfo
+ifMoving editState =
+    case editState of
+        Moving movingInfo ->
+            Just movingInfo
 
         _ ->
             Nothing
