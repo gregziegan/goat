@@ -1,6 +1,7 @@
-module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
+module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
 
-import Goat.Annotation exposing (AnnotationAttributes, SelectState, SelectState(..), StrokeStyle, Vertex)
+import Goat.Annotation exposing (SelectState, SelectState(..))
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex)
 import Goat.ControlOptions as ControlOptions
 import Goat.View.EventUtils exposing (defaultPrevented, onMouseDown, onMouseUp, stopPropagation)
 import Html.Events exposing (onWithOptions)
@@ -11,43 +12,6 @@ import SingleTouch as ST
 import Svg exposing (Attribute)
 import Svg.Attributes as Attr
 import Touch as T
-
-
-type alias DrawingInfo =
-    { start : Position
-    , curPos : Position
-    , positions : List Position
-    }
-
-
-type alias SelectingInfo =
-    { id : Int
-    , attributes : AnnotationAttributes
-    }
-
-
-type alias MovingInfo =
-    { id : Int
-    , start : Position
-    , translate : ( Int, Int )
-    , attributes : AnnotationAttributes
-    }
-
-
-type alias ResizingInfo =
-    { id : Int
-    , start : Position
-    , curPos : Position
-    , vertex : Vertex
-    , originalCoords : ( Position, Position )
-    , attributes : AnnotationAttributes
-    }
-
-
-type alias EditingTextInfo =
-    { id : Int
-    , attributes : AnnotationAttributes
-    }
 
 
 type alias SubscriptionConfig msg =
@@ -168,6 +132,9 @@ selectAnnotation : Int -> AnnotationAttributes -> EditState -> Maybe EditState
 selectAnnotation id annotationAttrs editState =
     case editState of
         NotSelecting ->
+            Just (Selecting (SelectingInfo id annotationAttrs))
+
+        Selecting selectingInfo ->
             Just (Selecting (SelectingInfo id annotationAttrs))
 
         Moving movingInfo ->

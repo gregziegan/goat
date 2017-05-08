@@ -4,7 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
 import Goat.Annotation exposing (Annotation, ShapeType, Shape, spotlightToMaskCutout)
 import Goat.EditState as EditState exposing (EditState)
-import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Goat.Update exposing (Msg(..))
 import Goat.View.DrawingArea.Annotation as Annotation
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)

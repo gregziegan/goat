@@ -2,7 +2,8 @@ module Goat.Model exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
-import Goat.Annotation exposing (Annotation, LineType(..), ShapeType(..), StrokeStyle, defaultStroke)
+import Goat.Annotation exposing (Annotation, Drawing, defaultDrawing, defaultShape, defaultSpotlight, defaultStroke)
+import Goat.Annotation.Shared exposing (StrokeStyle)
 import Goat.EditState as EditState exposing (EditState)
 import Goat.Flags exposing (Flags, Image)
 import Goat.Ports as Ports
@@ -32,27 +33,10 @@ type OperatingSystem
     | Windows
 
 
-type Drawing
-    = DrawLine LineType
-    | DrawFreeHand
-    | DrawShape ShapeType
-    | DrawTextBox
-    | DrawSpotlight ShapeType
-    | DrawPixelate
-
-
 type alias AnnotationMenu =
     { index : Maybe Int
     , position : Position
     }
-
-
-type alias StartPosition =
-    Position
-
-
-type alias EndPosition =
-    Position
 
 
 type alias Model =
@@ -89,31 +73,14 @@ type alias Model =
     }
 
 
-shapes : List Drawing
-shapes =
-    [ DrawShape RoundedRect
-    , DrawShape Rect
-    , DrawShape Ellipse
-    , DrawLine StraightLine
-    ]
-
-
-spotlights : List Drawing
-spotlights =
-    [ DrawSpotlight RoundedRect
-    , DrawSpotlight Rect
-    , DrawSpotlight Ellipse
-    ]
-
-
 init : Flags -> ( Model, List (Cmd msg) )
 init { isMac, inZendesk } =
     { edits = UndoList.fresh Array.empty
     , editState = EditState.initialState
     , clipboard = Nothing
-    , drawing = DrawLine Arrow
-    , shape = DrawShape RoundedRect
-    , spotlight = DrawSpotlight RoundedRect
+    , drawing = defaultDrawing
+    , shape = defaultShape
+    , spotlight = defaultSpotlight
     , waitingForDropdownToggle = Nothing
     , fill = Nothing
     , strokeColor = Color.rgb 255 0 212

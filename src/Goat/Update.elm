@@ -4,13 +4,15 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
-import Goat.Annotation as Annotation exposing (Annotation(..), AnnotationAttributes, LineType(..), Shape, ShapeType(..), StrokeStyle, TextArea, Vertex(..))
-import Goat.EditState as EditState exposing (DrawingInfo, EditState, EditingTextInfo, KeyboardConfig, ResizingInfo, SelectingInfo)
+import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea)
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, ResizingInfo, SelectingInfo, StrokeStyle, Vertex)
+import Goat.EditState as EditState exposing (EditState, KeyboardConfig)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (..)
 import Goat.Ports as Ports
-import Goat.Utils exposing (calcLinePos, calcShapePos, drawingsAreEqual, fontSizeToLineHeight, isDrawingTooSmall, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition)
+import Goat.Utils exposing (mapAtIndex, removeItemIf, removeItem)
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp))
+import List.Extra
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position, position)
 import Rocket exposing ((=>))
@@ -163,7 +165,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
 
         SelectFill fill ->
             model.editState
-                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (updateFill fill) model)
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateFill fill) model)
                 |> Maybe.withDefault model
                 |> setFill fill
                 |> closeDropdown
@@ -171,7 +173,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
 
         SelectStrokeColor strokeColor ->
             model.editState
-                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (updateStrokeColor strokeColor) model)
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateStrokeColor strokeColor) model)
                 |> Maybe.withDefault model
                 |> setStrokeColor strokeColor
                 |> closeDropdown
@@ -179,7 +181,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
 
         SelectStrokeStyle strokeStyle ->
             model.editState
-                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (updateStrokeStyle strokeStyle) model)
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateStrokeStyle strokeStyle) model)
                 |> Maybe.withDefault model
                 |> setStrokeStyle strokeStyle
                 |> closeDropdown
@@ -187,7 +189,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
 
         SelectFontSize fontSize ->
             model.editState
-                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (updateFontSize fontSize) model)
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateFontSize fontSize) model)
                 |> Maybe.withDefault model
                 |> setFontSize fontSize
                 |> closeDropdown
@@ -349,25 +351,13 @@ continueDrawing pos model =
 
 
 finishValidDrawing : Model -> DrawingInfo -> Model
-finishValidDrawing ({ fill, strokeColor, strokeStyle, fontSize } as model) { start, curPos, positions } =
-    case model.drawing of
-        DrawLine lineType ->
-            finishLineDrawing start curPos lineType model
+finishValidDrawing model drawingInfo =
+    case Annotation.fromDrawing (List.member Shift model.pressedKeys) model.drawing (extractAnnotationAttributes model) drawingInfo of
+        Just annotation ->
+            addAnnotation annotation model
 
-        DrawFreeHand ->
-            finishFreeDrawing start curPos positions model
-
-        DrawShape shapeType ->
-            finishShapeDrawing start curPos shapeType model
-
-        DrawTextBox ->
+        Nothing ->
             model
-
-        DrawSpotlight shapeType ->
-            finishSpotlightDrawing start curPos shapeType model
-
-        DrawPixelate ->
-            finishPixelateDrawing start curPos model
 
 
 finishNonTextDrawing : EditState -> DrawingInfo -> Model -> Model
@@ -388,9 +378,9 @@ finishTextDrawing pos model =
             AnnotationAttributes model.strokeColor model.fill model.strokeStyle model.fontSize
     in
         case EditState.finishTextDrawing numAnnotations attributes model.editState of
-            Just ( newEditState, { start, curPos } ) ->
+            Just ( newEditState, drawingInfo ) ->
                 { model | editState = newEditState }
-                    |> addAnnotation (TextBox (TextArea start curPos model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations model.fontSize))))
+                    |> addAnnotation (Annotation.newTextBox TextBoxInput numAnnotations attributes drawingInfo)
                     => [ "text-box-edit--"
                             ++ toString numAnnotations
                             |> Dom.focus
@@ -417,11 +407,6 @@ finishDrawing pos model =
                     model => []
 
 
-setEditState : EditState -> Model -> Model
-setEditState editState model =
-    { model | editState = editState }
-
-
 resetEditState : Model -> Model
 resetEditState model =
     { model | editState = EditState.initialState }
@@ -432,7 +417,7 @@ finishMovingAnnotation model =
     case EditState.finishMoving model.editState of
         Just ( newEditState, { id, translate } ) ->
             { model
-                | edits = UndoList.new (mapAtIndex id (move translate) model.edits.present) model.edits
+                | edits = UndoList.new (mapAtIndex id (Annotation.move translate) model.edits.present) model.edits
                 , editState = newEditState
             }
 
@@ -468,36 +453,6 @@ addAnnotation annotation model =
     }
 
 
-finishLineDrawing : StartPosition -> EndPosition -> LineType -> Model -> Model
-finishLineDrawing start end lineType model =
-    model
-        |> addAnnotation (Lines lineType (Shape start (calcLinePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
-
-
-finishFreeDrawing : StartPosition -> EndPosition -> List Position -> Model -> Model
-finishFreeDrawing start end positions model =
-    model
-        |> addAnnotation (FreeDraw (Shape start end model.strokeColor model.strokeStyle) positions)
-
-
-finishPixelateDrawing : StartPosition -> EndPosition -> Model -> Model
-finishPixelateDrawing start end model =
-    model
-        |> addAnnotation (Pixelate start end)
-
-
-finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
-finishShapeDrawing start end shapeType model =
-    model
-        |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
-
-
-finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
-finishSpotlightDrawing start end shapeType model =
-    model
-        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
-
-
 startEditingText : Int -> Model -> Model
 startEditingText index model =
     model.edits.present
@@ -514,86 +469,10 @@ editTextBoxAnnotation index autoExpandState autoExpandText model =
         |> skipChange model
 
 
-updateStrokeColor : Color -> Annotation -> Annotation
-updateStrokeColor strokeColor annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType { line | strokeColor = strokeColor }
-
-        FreeDraw shape positions ->
-            FreeDraw { shape | strokeColor = strokeColor } positions
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill { shape | strokeColor = strokeColor }
-
-        TextBox textBox ->
-            TextBox { textBox | fill = strokeColor }
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType { shape | strokeColor = strokeColor }
-
-        Pixelate _ _ ->
-            annotation
-
-
-updateFill : Maybe Color -> Annotation -> Annotation
-updateFill fill annotation =
-    case annotation of
-        Lines _ _ ->
-            annotation
-
-        FreeDraw _ _ ->
-            annotation
-
-        Shapes shapeType _ shape ->
-            Shapes shapeType fill shape
-
-        TextBox textBox ->
-            annotation
-
-        Spotlight shapeType shape ->
-            annotation
-
-        Pixelate _ _ ->
-            annotation
-
-
-updateStrokeStyle : StrokeStyle -> Annotation -> Annotation
-updateStrokeStyle strokeStyle annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType { line | strokeStyle = strokeStyle }
-
-        FreeDraw shape positions ->
-            FreeDraw { shape | strokeStyle = strokeStyle } positions
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill { shape | strokeStyle = strokeStyle }
-
-        TextBox textBox ->
-            annotation
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType { shape | strokeStyle = strokeStyle }
-
-        Pixelate _ _ ->
-            annotation
-
-
-updateFontSize : Int -> Annotation -> Annotation
-updateFontSize fontSize annotation =
-    case annotation of
-        TextBox textBox ->
-            TextBox { textBox | fontSize = fontSize }
-
-        _ ->
-            annotation
-
-
 setFill : Maybe Color -> Model -> Model
 setFill fill model =
     { model
-        | editState = EditState.updateSelectedAttributes (Annotation.updateFill fill) model.editState
+        | editState = EditState.updateSelectedAttributes (Annotation.setFill fill) model.editState
         , fill = fill
     }
 
@@ -601,7 +480,7 @@ setFill fill model =
 setFontSize : Int -> Model -> Model
 setFontSize fontSize model =
     { model
-        | editState = EditState.updateSelectedAttributes (Annotation.updateFontSize fontSize) model.editState
+        | editState = EditState.updateSelectedAttributes (Annotation.setFontSize fontSize) model.editState
         , fontSize = fontSize
     }
 
@@ -609,7 +488,7 @@ setFontSize fontSize model =
 setStrokeStyle : StrokeStyle -> Model -> Model
 setStrokeStyle strokeStyle model =
     { model
-        | editState = EditState.updateSelectedAttributes (Annotation.updateStrokeStyle strokeStyle) model.editState
+        | editState = EditState.updateSelectedAttributes (Annotation.setStrokeStyle strokeStyle) model.editState
         , strokeStyle = strokeStyle
     }
 
@@ -617,7 +496,7 @@ setStrokeStyle strokeStyle model =
 setStrokeColor : Color -> Model -> Model
 setStrokeColor strokeColor model =
     { model
-        | editState = EditState.updateSelectedAttributes (Annotation.updateStrokeColor strokeColor) model.editState
+        | editState = EditState.updateSelectedAttributes (Annotation.setStrokeColor strokeColor) model.editState
         , strokeColor = strokeColor
     }
 
@@ -658,7 +537,7 @@ resizeAnnotation curPos model =
     case EditState.continueResizing curPos model.editState of
         Just ( newEditState, resizingData ) ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (resize (List.member Shift model.pressedKeys) resizingData)) model.edits
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (Annotation.resize (List.member Shift model.pressedKeys) resizingData)) model.edits
                 , editState = newEditState
             }
 
@@ -671,87 +550,12 @@ finishResizingAnnotation model =
     case EditState.finishResizing model.editState of
         Just ( newEditState, resizingData ) ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (resize (List.member Shift model.pressedKeys) resizingData)) model.edits
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (Annotation.resize (List.member Shift model.pressedKeys) resizingData)) model.edits
                 , editState = newEditState
             }
 
         Nothing ->
             model
-
-
-resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingInfo -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeVertices constrain { curPos, vertex, originalCoords } annotation =
-    let
-        ( start, end ) =
-            originalCoords
-    in
-        case vertex of
-            Start ->
-                { annotation | start = constrain annotation.end curPos }
-
-            Annotation.End ->
-                { annotation | end = constrain annotation.start curPos }
-
-            StartPlusX ->
-                { annotation | start = constrain annotation.end curPos, end = Position start.x end.y }
-
-            StartPlusY ->
-                { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
-
-
-resize : Bool -> ResizingInfo -> Annotation -> Annotation
-resize constrain resizingData annotation =
-    case annotation of
-        Lines lineType shape ->
-            Lines lineType (resizeVertices (calcLinePos constrain) resizingData shape)
-
-        FreeDraw _ _ ->
-            annotation
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill (resizeVertices (calcShapePos constrain) resizingData shape)
-
-        TextBox textArea ->
-            TextBox (resizeVertices (calcShapePos False) resizingData textArea)
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType (resizeVertices (calcShapePos constrain) resizingData shape)
-
-        Pixelate start end ->
-            Pixelate (resizeVertices (calcShapePos constrain) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos constrain) resizingData { start = start, end = end }).end
-
-
-shift :
-    ( Int, Int )
-    -> { a | start : Position, end : Position }
-    -> { a | end : Position, start : Position }
-shift ( dx, dy ) drawing =
-    { drawing
-        | start = shiftPosition dx dy drawing.start
-        , end = shiftPosition dx dy drawing.end
-    }
-
-
-move : ( Int, Int ) -> Annotation -> Annotation
-move translate annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType (shift translate line)
-
-        FreeDraw shape positions ->
-            FreeDraw (shift translate shape) (List.map (shiftPosition (Tuple.first translate) (Tuple.second translate)) positions)
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill (shift translate shape)
-
-        TextBox textArea ->
-            TextBox (shift translate textArea)
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType (shift translate shape)
-
-        Pixelate start end ->
-            Pixelate (shiftPosition (Tuple.first translate) (Tuple.second translate) start) (shiftPosition (Tuple.first translate) (Tuple.second translate) end)
 
 
 closeDropdown : Model -> Model
@@ -969,35 +773,13 @@ handleSelectedAnnotationKeyboard index ctrlPressed keyChange model =
             model
 
 
-shiftForPaste : Annotation -> Annotation
-shiftForPaste annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType { line | start = shiftPosition 10 10 line.start, end = shiftPosition 10 10 line.end }
-
-        FreeDraw shape positions ->
-            FreeDraw { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end } (List.map (shiftPosition 10 10) positions)
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
-
-        TextBox textArea ->
-            TextBox { textArea | start = shiftPosition 10 10 textArea.start, end = shiftPosition 10 10 textArea.end }
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
-
-        Pixelate start end ->
-            Pixelate (shiftPosition 10 10 start) (shiftPosition 10 10 end)
-
-
 pasteAnnotation : Model -> Model
 pasteAnnotation model =
     case model.clipboard of
         Just annotation ->
             { model
-                | edits = UndoList.new (Array.push (shiftForPaste annotation) model.edits.present) model.edits
-                , clipboard = Just (shiftForPaste annotation)
+                | edits = UndoList.new (Array.push (Annotation.shiftForPaste annotation) model.edits.present) model.edits
+                , clipboard = Just (Annotation.shiftForPaste annotation)
             }
                 |> selectAnnotation (Array.length model.edits.present)
 
@@ -1283,19 +1065,6 @@ returnToImageSelection model =
     { model | imageSelected = False, edits = UndoList.reset model.edits }
 
 
-autoExpandConfig : Int -> Int -> AutoExpand.Config Msg
-autoExpandConfig index fontSize =
-    AutoExpand.config
-        { onInput = TextBoxInput index
-        , padding = 2
-        , minRows = 1
-        , maxRows = 4
-        , lineHeight = fontSizeToLineHeight fontSize
-        }
-        |> AutoExpand.withId ("text-box-edit--" ++ toString index)
-        |> AutoExpand.withClass "text-box-textarea"
-
-
 controlKeys : OperatingSystem -> List Key
 controlKeys os =
     case os of
@@ -1389,3 +1158,86 @@ whenEditingTextKeyboard keyChange _ model =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
         model
+
+
+getFirstSpotlightIndex : Array Annotation -> Int
+getFirstSpotlightIndex annotations =
+    annotations
+        |> Array.toList
+        |> List.Extra.findIndex Annotation.isSpotlightShape
+        |> Maybe.withDefault 0
+
+
+isSpotlightDrawing : Drawing -> Bool
+isSpotlightDrawing drawing =
+    case drawing of
+        DrawSpotlight _ ->
+            True
+
+        _ ->
+            False
+
+
+drawingsAreEqual : Drawing -> Drawing -> Bool
+drawingsAreEqual drawing drawing2 =
+    case drawing of
+        DrawLine lineType ->
+            case drawing2 of
+                DrawLine lineType2 ->
+                    lineType == lineType2
+
+                _ ->
+                    False
+
+        DrawFreeHand ->
+            drawing2 == DrawFreeHand
+
+        DrawShape shapeType ->
+            case drawing2 of
+                DrawShape shapeType2 ->
+                    shapeType == shapeType2
+
+                _ ->
+                    False
+
+        DrawTextBox ->
+            case drawing2 of
+                DrawTextBox ->
+                    True
+
+                _ ->
+                    False
+
+        DrawSpotlight shapeType ->
+            case drawing2 of
+                DrawSpotlight shapeType2 ->
+                    shapeType == shapeType2
+
+                _ ->
+                    False
+
+        DrawPixelate ->
+            drawing2 == DrawPixelate
+
+
+extractAnnotationAttributes : Model -> AnnotationAttributes
+extractAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
+    AnnotationAttributes strokeColor fill strokeStyle fontSize
+
+
+minDrawingDistance : number
+minDrawingDistance =
+    4
+
+
+minSpotlightDrawingDistance : number
+minSpotlightDrawingDistance =
+    8
+
+
+isDrawingTooSmall : Bool -> StartPosition -> EndPosition -> Bool
+isDrawingTooSmall isSpotlight start end =
+    if isSpotlight then
+        abs (start.x - end.x) < minSpotlightDrawingDistance && abs (start.y - end.y) < minSpotlightDrawingDistance
+    else
+        abs (start.x - end.x) < minDrawingDistance && abs (start.y - end.y) < minDrawingDistance

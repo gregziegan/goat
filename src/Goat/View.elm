@@ -1,10 +1,9 @@
 module Goat.View exposing (view)
 
-import Goat.Annotation exposing (AnnotationAttributes)
 import Goat.EditState exposing (currentAnnotationAttributes)
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (Model, Platform(Web, Zendesk))
-import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Goat.Update exposing (Msg(..), extractAnnotationAttributes)
 import Goat.View.Controls as Controls
 import Goat.View.DrawingArea as DrawingArea
 import Goat.View.DrawingArea.Annotation exposing (DrawingModifiers)
@@ -94,11 +93,6 @@ viewInfoScreen =
 toDrawingModifiers : Model -> DrawingModifiers
 toDrawingModifiers model =
     DrawingModifiers model.drawing (List.member Shift model.pressedKeys) model.editState
-
-
-extractAnnotationAttributes : Model -> AnnotationAttributes
-extractAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
-    AnnotationAttributes strokeColor fill strokeStyle fontSize
 
 
 viewImageAnnotator : Model -> Image -> Html Msg

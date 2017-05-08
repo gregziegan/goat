@@ -1,12 +1,11 @@
 module Goat.View.DrawingArea exposing (viewDrawingArea, viewAnnotationMenu)
 
 import Array.Hamt as Array exposing (Array)
-import Goat.Annotation exposing (Annotation(..), AnnotationAttributes)
-import Goat.EditState as EditState exposing (DrawingConfig, DrawingInfo, EditState)
+import Goat.Annotation exposing (Annotation(..), Drawing(..))
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo)
+import Goat.EditState as EditState exposing (DrawingConfig, EditState)
 import Goat.Flags exposing (Image)
-import Goat.Model exposing (Drawing(..))
-import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.Utils exposing (getFirstSpotlightIndex, isSpotlightDrawing)
+import Goat.Update exposing (Msg(..), getFirstSpotlightIndex, isSpotlightDrawing)
 import Goat.View.DrawingArea.Annotation as Annotation exposing (viewAnnotation)
 import Goat.View.DrawingArea.Definitions as Definitions
 import Goat.View.Utils exposing (toPx)

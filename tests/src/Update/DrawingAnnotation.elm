@@ -3,11 +3,10 @@ module Update.DrawingAnnotation exposing (all)
 import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Fixtures exposing (end, model, start, aTextArea, firstFreeDrawPosition, secondFreeDrawPosition)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..))
-import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishTextBoxDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing, finishFreeDrawing)
+import Goat.Update exposing (changeDrawing, continueDrawing, finishDrawing, finishLineDrawing, finishPixelateDrawing, finishTextDrawing, finishShapeDrawing, finishSpotlightDrawing, startDrawing, finishFreeDrawing)
 import Goat.Utils exposing (shiftPosition)
 import Test exposing (..)
-import TestUtil exposing (getDrawingStateCurPos, getFirstAnnotation)
+import TestUtil exposing (getFirstAnnotation)
 
 
 all : Test
@@ -27,7 +26,7 @@ startDrawingTests =
                 model
                     |> startDrawing start
                     |> .annotationState
-                    |> Expect.equal (DrawingAnnotation start start [])
+                    |> Expect.notEqual a
         ]
 
 

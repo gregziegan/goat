@@ -2,7 +2,7 @@ module Goat.View.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSp
 
 import Color exposing (Color)
 import Color.Convert exposing (colorToHex)
-import Goat.Annotation exposing (StrokeStyle(..))
+import Goat.Annotation.Shared exposing (StrokeStyle(..))
 import Html exposing (Html)
 import Html.Attributes
 import Svg exposing (circle, ellipse, g, mask, polygon, rect, svg, path, linearGradient, stop, use)

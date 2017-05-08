@@ -1,7 +1,8 @@
 module Goat.ControlOptions exposing (strokeColors, fills, strokeStyles, fontSizes, controlUIWidth)
 
 import Color exposing (Color)
-import Goat.Annotation as Annotation exposing (StrokeStyle)
+import Goat.Annotation as Annotation
+import Goat.Annotation.Shared exposing (StrokeStyle)
 
 
 strokeColors : List Color
