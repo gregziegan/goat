@@ -2,9 +2,8 @@ module TestUtil exposing (..)
 
 import Array.Hamt as Array
 import Fuzz exposing (Fuzzer)
-import Goat.Annotation exposing (Annotation(TextBox), Vertex(..), positions)
-import Goat.Model exposing (EndPosition, Model, StartPosition)
-import Goat.Utils exposing (shiftPosition)
+import Goat.Annotation as Annotation exposing (StartPosition, EndPosition, Annotation, shiftPosition)
+import Goat.Model exposing (Model)
 import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink
@@ -18,16 +17,6 @@ getFirstAnnotation model =
         |> Array.get 0
 
 
-getAnnotationText : Annotation -> Maybe String
-getAnnotationText annotation =
-    case annotation of
-        TextBox { text } ->
-            Just text
-
-        _ ->
-            Nothing
-
-
 position : Fuzzer Position
 position =
     Fuzz.custom
@@ -39,7 +28,7 @@ isAnnotationMovedByCorrectAmount : Position -> Position -> ( StartPosition, EndP
 isAnnotationMovedByCorrectAmount start end ( origStart, origEnd ) shiftedAnnotation =
     let
         ( shiftedStart, shiftedEnd ) =
-            positions shiftedAnnotation
+            Annotation.positions shiftedAnnotation
 
         dx =
             shiftedEnd.x - shiftedStart.x

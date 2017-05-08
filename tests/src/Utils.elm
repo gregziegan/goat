@@ -1,8 +1,7 @@
 module Utils exposing (all)
 
 import Expect exposing (Expectation)
-import Goat.Annotation exposing (arrowAngle)
-import Goat.Utils exposing (stepMouse)
+import Goat.Annotation exposing (arrowAngle, stepMouse)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation, position)
 

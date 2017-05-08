@@ -3,11 +3,12 @@ module Fixtures exposing (..)
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color
-import Goat.Annotation exposing (ShapeType(..), LineType(..), StrokeStyle(SolidMedium), Shape, TextArea)
+import Goat.Annotation.Shared exposing (DrawingInfo, StrokeStyle)
+import Goat.Annotation as Annotation exposing (ShapeType(..), LineType(..), Shape, TextArea, StartPosition, EndPosition, autoExpandConfig)
 import Goat.EditState as EditState
 import Goat.Flags exposing (Image)
-import Goat.Model exposing (Model, Drawing(..), OperatingSystem(..), Platform(Web), StartPosition, EndPosition)
-import Goat.Update exposing (..)
+import Goat.Model exposing (Model, OperatingSystem(MacOS), Platform(Web))
+import Goat.Update exposing (Msg(..))
 import List.Zipper
 import Mouse exposing (Position)
 import UndoList
@@ -31,15 +32,15 @@ model =
     , waitingForDropdownToggle = Nothing
     , fill = Nothing
     , strokeColor = Color.red
-    , strokeStyle = SolidMedium
+    , strokeStyle = Annotation.defaultStroke
     , fontSize = 14
     , pressedKeys = []
     , images = List.Zipper.fromList [ goat ]
     , imageSelected = True
     , currentDropdown = Nothing
-    , drawing = DrawLine Arrow
-    , shape = DrawShape Rect
-    , spotlight = DrawSpotlight RoundedRect
+    , drawing = Annotation.defaultDrawing
+    , shape = Annotation.defaultShape
+    , spotlight = Annotation.defaultSpotlight
     , operatingSystem = MacOS
     , annotationMenu = Nothing
     , showingAnyMenu = False
@@ -80,14 +81,19 @@ aShape =
 
 aTextArea : TextArea
 aTextArea =
-    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig 0 model.fontSize))
+    TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig TextBoxInput 0 model.fontSize))
 
 
 autoExpand : AutoExpand.State
 autoExpand =
-    AutoExpand.initState (autoExpandConfig 0 14)
+    AutoExpand.initState (autoExpandConfig TextBoxInput 0 model.fontSize)
 
 
 testColor : Color.Color
 testColor =
     Color.blue
+
+
+drawingInfo : DrawingInfo
+drawingInfo =
+    DrawingInfo start end []

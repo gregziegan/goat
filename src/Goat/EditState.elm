@@ -108,21 +108,21 @@ continueDrawing pos trackPositions editState =
             Nothing
 
 
-finishDrawing : EditState -> Maybe ( EditState, DrawingInfo )
-finishDrawing editState =
+finishDrawing : Position -> EditState -> Maybe ( EditState, DrawingInfo )
+finishDrawing end editState =
     case editState of
         Drawing drawingInfo ->
-            Just ( NotSelecting, drawingInfo )
+            Just ( NotSelecting, { drawingInfo | curPos = end } )
 
         _ ->
             Nothing
 
 
-finishTextDrawing : Int -> AnnotationAttributes -> EditState -> Maybe ( EditState, DrawingInfo )
-finishTextDrawing id attributes editState =
+finishTextDrawing : Position -> Int -> AnnotationAttributes -> EditState -> Maybe ( EditState, DrawingInfo )
+finishTextDrawing end id attributes editState =
     case editState of
         Drawing drawingInfo ->
-            Just ( EditingText (EditingTextInfo id attributes), drawingInfo )
+            Just ( EditingText (EditingTextInfo id attributes), { drawingInfo | curPos = end } )
 
         _ ->
             Nothing

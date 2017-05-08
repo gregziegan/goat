@@ -377,7 +377,7 @@ finishTextDrawing pos model =
         attributes =
             AnnotationAttributes model.strokeColor model.fill model.strokeStyle model.fontSize
     in
-        case EditState.finishTextDrawing numAnnotations attributes model.editState of
+        case EditState.finishTextDrawing pos numAnnotations attributes model.editState of
             Just ( newEditState, drawingInfo ) ->
                 { model | editState = newEditState }
                     |> addAnnotation (Annotation.newTextBox TextBoxInput numAnnotations attributes drawingInfo)
@@ -398,7 +398,7 @@ finishDrawing pos model =
             finishTextDrawing pos model
 
         _ ->
-            case EditState.finishDrawing model.editState of
+            case EditState.finishDrawing pos model.editState of
                 Just ( newEditState, drawingInfo ) ->
                     finishNonTextDrawing newEditState drawingInfo model
                         => []
