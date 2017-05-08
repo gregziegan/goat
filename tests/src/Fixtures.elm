@@ -3,12 +3,12 @@ module Fixtures exposing (..)
 import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color
-import Goat.Annotation.Shared exposing (DrawingInfo, StrokeStyle)
-import Goat.Annotation as Annotation exposing (ShapeType(..), LineType(..), Shape, TextArea, StartPosition, EndPosition, autoExpandConfig)
+import Goat.Annotation as Annotation exposing (EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, autoExpandConfig, shiftPosition)
+import Goat.Annotation.Shared exposing (DrawingInfo, ResizingInfo, StrokeStyle, Vertex(..))
 import Goat.EditState as EditState
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (Model, OperatingSystem(MacOS), Platform(Web))
-import Goat.Update exposing (Msg(..))
+import Goat.Update exposing (Msg(..), extractAnnotationAttributes)
 import List.Zipper
 import Mouse exposing (Position)
 import UndoList
@@ -97,3 +97,8 @@ testColor =
 drawingInfo : DrawingInfo
 drawingInfo =
     DrawingInfo start end []
+
+
+resizingInfo : ResizingInfo
+resizingInfo =
+    ResizingInfo 0 start (shiftPosition -10 -10 start) Start ( start, end ) (extractAnnotationAttributes model)

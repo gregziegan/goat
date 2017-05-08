@@ -426,25 +426,25 @@ move translate annotation =
 
 
 resize : Bool -> ResizingInfo -> Annotation -> Annotation
-resize constrain resizingData annotation =
+resize constrain resizingInfo annotation =
     case annotation of
         Lines lineType shape ->
-            Lines lineType (resizeVertices (calcLinePos constrain) resizingData shape)
+            Lines lineType (resizeVertices (calcLinePos constrain) resizingInfo shape)
 
         FreeDraw _ _ ->
             annotation
 
         Shapes shapeType fill shape ->
-            Shapes shapeType fill (resizeVertices (calcShapePos constrain) resizingData shape)
+            Shapes shapeType fill (resizeVertices (calcShapePos constrain) resizingInfo shape)
 
         TextBox textArea ->
-            TextBox (resizeVertices (calcShapePos False) resizingData textArea)
+            TextBox (resizeVertices (calcShapePos False) resizingInfo textArea)
 
         Spotlight shapeType shape ->
-            Spotlight shapeType (resizeVertices (calcShapePos constrain) resizingData shape)
+            Spotlight shapeType (resizeVertices (calcShapePos constrain) resizingInfo shape)
 
         Pixelate start end ->
-            Pixelate (resizeVertices (calcShapePos constrain) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos constrain) resizingData { start = start, end = end }).end
+            Pixelate (resizeVertices (calcShapePos constrain) resizingInfo { start = start, end = end }).start (resizeVertices (calcShapePos constrain) resizingInfo { start = start, end = end }).end
 
 
 resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingInfo -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
