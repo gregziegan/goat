@@ -526,23 +526,7 @@ stepMouse start curPos =
         |> toFloat
         |> (*) (pi / 4)
         |> toDeltas (calcDistance start curPos)
-        |> positionMapX ((+) start.x)
-        |> positionMapY ((+) start.y)
-
-
-positionMapX : (Int -> Int) -> Position -> Position
-positionMapX fn pos =
-    { pos | x = fn pos.x }
-
-
-positionMapY : (Int -> Int) -> Position -> Position
-positionMapY fn pos =
-    { pos | y = fn pos.y }
-
-
-positionMap : (Int -> Int) -> Position -> Position
-positionMap fn { x, y } =
-    Position (fn x) (fn y)
+        |> shiftPosition start.x start.y
 
 
 toDeltas : Float -> Float -> Position
