@@ -2,8 +2,8 @@ module Update exposing (all)
 
 import Color
 import Expect exposing (Expectation)
-import Fixtures exposing (aShape, drawingInfo, end, model, start, testColor, resizingInfo)
-import Goat.Annotation as Annotation exposing (Annotation, shiftPosition)
+import Fixtures exposing (aShape, autoExpand, drawingInfo, end, model, resizingInfo, start, testColor)
+import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), shiftPosition)
 import Goat.Annotation.Shared exposing (Vertex(Start))
 import Goat.Model exposing (Model)
 import Goat.Update exposing (Msg(..), Msg(SelectStrokeColor), extractAnnotationAttributes, moveAnnotation, selectAnnotation)
@@ -27,7 +27,6 @@ modelWithOneAnnotation =
         |> update (StartDrawing start)
         |> update (ContinueDrawing (shiftPosition 10 10 start))
         |> update (FinishDrawing end)
-        |> Debug.log "model"
 
 
 modelWithAlteredSelectedAnnotation : Model
@@ -35,6 +34,15 @@ modelWithAlteredSelectedAnnotation =
     modelWithOneAnnotation
         |> update (SelectAnnotation 0)
         |> update (SelectStrokeColor Color.red)
+
+
+modelWithGoatsText : Model
+modelWithGoatsText =
+    model
+        |> update (ChangeDrawing DrawTextBox)
+        |> update (StartDrawing start)
+        |> update (FinishDrawing end)
+        |> update (TextBoxInput 0 { state = autoExpand, textValue = "Goats!" })
 
 
 shiftedAnnotation : Maybe Annotation
@@ -47,6 +55,12 @@ resizedAnnotation : Maybe Annotation
 resizedAnnotation =
     initAnnotation model
         |> Maybe.map (Annotation.resize False resizingInfo)
+
+
+goatsTextArea : Annotation
+goatsTextArea =
+    Annotation.newTextBox TextBoxInput 0 (extractAnnotationAttributes model) drawingInfo
+        |> Annotation.updateTextArea autoExpand "Goats!"
 
 
 all : Test
@@ -80,4 +94,9 @@ all =
                     |> update (FinishResizingAnnotation (shiftPosition -10 -10 start))
                     |> getFirstAnnotation
                     |> Expect.equal resizedAnnotation
+        , test "can edit a text box" <|
+            \() ->
+                modelWithGoatsText
+                    |> getFirstAnnotation
+                    |> Expect.equal (Just goatsTextArea)
         ]
