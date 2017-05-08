@@ -9,7 +9,10 @@
   "private": false,
   "location": {
     "support": {
-      "ticket_editor": "assets/index.html"
+      "ticket_editor": {
+        "url": "assets/index.html",
+        "title": "Mark Up Images"
+      }
     }
   },
   "parameters": [],
