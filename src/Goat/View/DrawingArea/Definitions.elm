@@ -74,8 +74,6 @@ pixelateMaskDefinition shapes =
         |> Svg.mask [ Attr.id "pixelateMask" ]
 
 
-{-| TODO: fix these filters for lines. Lines/Arrows render very strangely with this filter.
--}
 viewSvgFilters : List (Svg Msg)
 viewSvgFilters =
     [ Svg.filter [ id "pixelate", Attr.x "0", Attr.y "0" ]

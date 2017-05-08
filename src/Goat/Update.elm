@@ -228,7 +228,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
         SelectAndMoveAnnotation index start ->
             model
                 |> selectAnnotation index
-                |> startMovingAnnotation index start
+                |> startMovingAnnotation start
                 => []
 
         ResetToReadyToDraw ->
@@ -239,7 +239,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
         StartMovingAnnotation index start ->
             model
                 |> selectAnnotation index
-                |> startMovingAnnotation index start
+                |> startMovingAnnotation start
                 |> closeDropdown
                 => []
 
@@ -330,76 +330,91 @@ skipChange model annotations =
 
 startDrawing : StartPosition -> Model -> Model
 startDrawing start model =
-    { model
-        | editState = EditState.startDrawing start model.editState
-    }
+    case EditState.startDrawing start model.editState of
+        Just newEditState ->
+            { model | editState = newEditState }
+
+        Nothing ->
+            model
 
 
 continueDrawing : Position -> Model -> Model
 continueDrawing pos model =
-    { model | editState = EditState.continueDrawing pos (model.drawing == DrawFreeHand) model.editState }
+    case EditState.continueDrawing pos (model.drawing == DrawFreeHand) model.editState of
+        Just newEditState ->
+            { model | editState = newEditState }
+
+        Nothing ->
+            model
 
 
-finishValidDrawing : Model -> DrawingInfo -> ( Model, List (Cmd Msg) )
+finishValidDrawing : Model -> DrawingInfo -> Model
 finishValidDrawing ({ fill, strokeColor, strokeStyle, fontSize } as model) { start, curPos, positions } =
     case model.drawing of
         DrawLine lineType ->
-            model
-                |> finishLineDrawing start curPos lineType
-                => []
+            finishLineDrawing start curPos lineType model
 
         DrawFreeHand ->
-            model
-                |> finishFreeDrawing start curPos positions
-                => []
+            finishFreeDrawing start curPos positions model
 
         DrawShape shapeType ->
-            model
-                |> finishShapeDrawing start curPos shapeType
-                => []
+            finishShapeDrawing start curPos shapeType model
 
         DrawTextBox ->
-            let
-                numAnnotations =
-                    Array.length model.edits.present
-            in
-                model
-                    |> finishTextBoxDrawing start curPos
+            model
+
+        DrawSpotlight shapeType ->
+            finishSpotlightDrawing start curPos shapeType model
+
+        DrawPixelate ->
+            finishPixelateDrawing start curPos model
+
+
+finishNonTextDrawing : EditState -> DrawingInfo -> Model -> Model
+finishNonTextDrawing finishedEditState ({ start, curPos } as drawingInfo) model =
+    if isDrawingTooSmall (isSpotlightDrawing model.drawing) start curPos then
+        resetEditState model
+    else
+        finishValidDrawing { model | editState = finishedEditState } drawingInfo
+
+
+finishTextDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
+finishTextDrawing pos model =
+    let
+        numAnnotations =
+            Array.length model.edits.present
+
+        attributes =
+            AnnotationAttributes model.strokeColor model.fill model.strokeStyle model.fontSize
+    in
+        case EditState.finishTextDrawing numAnnotations attributes model.editState of
+            Just ( newEditState, { start, curPos } ) ->
+                { model | editState = newEditState }
+                    |> addAnnotation (TextBox (TextArea start curPos model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations model.fontSize))))
                     => [ "text-box-edit--"
                             ++ toString numAnnotations
                             |> Dom.focus
                             |> Task.attempt (tryToEdit numAnnotations)
                        ]
 
-        DrawSpotlight shapeType ->
-            model
-                |> finishSpotlightDrawing start curPos shapeType
-                => []
-
-        DrawPixelate ->
-            model
-                |> finishPixelateDrawing start curPos
-                => []
-
-
-finishDrawingHelper : EditState -> DrawingInfo -> Model -> ( Model, List (Cmd Msg) )
-finishDrawingHelper finishedEditState ({ start, curPos } as drawingInfo) model =
-    if isDrawingTooSmall (isSpotlightDrawing model.drawing) start curPos then
-        model
-            |> resetEditState
-            => []
-    else
-        finishValidDrawing { model | editState = finishedEditState } drawingInfo
+            Nothing ->
+                model => []
 
 
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
 finishDrawing pos model =
-    case EditState.finishDrawing model.editState of
-        Just ( newEditState, drawingInfo ) ->
-            finishDrawingHelper newEditState drawingInfo model
+    case model.drawing of
+        DrawTextBox ->
+            finishTextDrawing pos model
 
-        Nothing ->
-            model => []
+        _ ->
+            case EditState.finishDrawing model.editState of
+                Just ( newEditState, drawingInfo ) ->
+                    finishNonTextDrawing newEditState drawingInfo model
+                        => []
+
+                Nothing ->
+                    model => []
 
 
 setEditState : EditState -> Model -> Model
@@ -439,12 +454,11 @@ annotationAttributesInModel { strokeColor, fill, strokeStyle, fontSize } =
 
 selectAnnotation : Int -> Model -> Model
 selectAnnotation index model =
-    case Array.get index model.edits.present of
-        Just annotation ->
-            { model | editState = EditState.selectAnnotation index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState }
-
-        Nothing ->
-            model
+    model.edits.present
+        |> Array.get index
+        |> Maybe.andThen (\annotation -> EditState.selectAnnotation index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState)
+        |> Maybe.map (\newEditState -> { model | editState = newEditState })
+        |> Maybe.withDefault model
 
 
 addAnnotation : Annotation -> Model -> Model
@@ -478,17 +492,6 @@ finishShapeDrawing start end shapeType model =
         |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
 
 
-finishTextBoxDrawing : StartPosition -> EndPosition -> Model -> Model
-finishTextBoxDrawing start end model =
-    let
-        numAnnotations =
-            Array.length model.edits.present
-    in
-        model
-            |> addAnnotation (TextBox (TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations model.fontSize))))
-            |> startEditingText numAnnotations
-
-
 finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
 finishSpotlightDrawing start end shapeType model =
     model
@@ -497,12 +500,11 @@ finishSpotlightDrawing start end shapeType model =
 
 startEditingText : Int -> Model -> Model
 startEditingText index model =
-    case Array.get index model.edits.present of
-        Just annotation ->
-            { model | editState = EditState.startEditingText index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState }
-
-        Nothing ->
-            model
+    model.edits.present
+        |> Array.get index
+        |> Maybe.andThen (\annotation -> EditState.startEditingText index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState)
+        |> Maybe.map (\newEditState -> { model | editState = newEditState })
+        |> Maybe.withDefault model
 
 
 editTextBoxAnnotation : Int -> AutoExpand.State -> String -> Model -> Model
@@ -620,12 +622,12 @@ setStrokeColor strokeColor model =
     }
 
 
-startMovingAnnotation : Int -> Position -> Model -> Model
-startMovingAnnotation index newPos model =
-    case Array.get index model.edits.present of
-        Just annotation ->
+startMovingAnnotation : Position -> Model -> Model
+startMovingAnnotation newPos model =
+    case EditState.startMoving newPos model.editState of
+        Just newEditState ->
             { model
-                | editState = EditState.startMoving newPos model.editState
+                | editState = newEditState
             }
 
         Nothing ->
@@ -644,12 +646,11 @@ moveAnnotation newPos model =
 
 startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
 startResizingAnnotation index vertex start model =
-    case Array.get index model.edits.present of
-        Just annotation ->
-            { model | editState = EditState.startResizing start vertex (Annotation.positions annotation) model.editState }
-
-        Nothing ->
-            model
+    model.edits.present
+        |> Array.get index
+        |> Maybe.andThen (\annotation -> EditState.startResizing start vertex (Annotation.positions annotation) model.editState)
+        |> Maybe.map (\newEditState -> { model | editState = newEditState })
+        |> Maybe.withDefault model
 
 
 resizeAnnotation : Position -> Model -> Model

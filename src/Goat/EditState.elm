@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
+module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
 
 import Goat.Annotation exposing (AnnotationAttributes, SelectState, SelectState(..), StrokeStyle, Vertex)
 import Goat.ControlOptions as ControlOptions
@@ -106,33 +106,42 @@ initialState =
     NotSelecting
 
 
-startDrawing : Position -> EditState -> EditState
+startDrawing : Position -> EditState -> Maybe EditState
 startDrawing start editState =
-    Drawing (DrawingInfo start start [])
+    case editState of
+        NotSelecting ->
+            Just (Drawing (DrawingInfo start start []))
+
+        Selecting selectingInfo ->
+            Just (Drawing (DrawingInfo start start []))
+
+        _ ->
+            Nothing
 
 
-continueDrawing : Position -> Bool -> EditState -> EditState
+continueDrawing : Position -> Bool -> EditState -> Maybe EditState
 continueDrawing pos trackPositions editState =
     case editState of
         Drawing { start, positions } ->
-            if trackPositions then
-                Drawing
-                    (DrawingInfo start pos <|
-                        case positions of
-                            [] ->
-                                [ pos ]
+            Just <|
+                if trackPositions then
+                    Drawing
+                        (DrawingInfo start pos <|
+                            case positions of
+                                [] ->
+                                    [ pos ]
 
-                            lastPos :: rest ->
-                                if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
-                                    positions
-                                else
-                                    pos :: positions
-                    )
-            else
-                Drawing (DrawingInfo start pos [])
+                                lastPos :: rest ->
+                                    if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
+                                        positions
+                                    else
+                                        pos :: positions
+                        )
+                else
+                    Drawing (DrawingInfo start pos [])
 
         _ ->
-            editState
+            Nothing
 
 
 finishDrawing : EditState -> Maybe ( EditState, DrawingInfo )
@@ -145,19 +154,40 @@ finishDrawing editState =
             Nothing
 
 
-selectAnnotation : Int -> AnnotationAttributes -> EditState -> EditState
+finishTextDrawing : Int -> AnnotationAttributes -> EditState -> Maybe ( EditState, DrawingInfo )
+finishTextDrawing id attributes editState =
+    case editState of
+        Drawing drawingInfo ->
+            Just ( EditingText (EditingTextInfo id attributes), drawingInfo )
+
+        _ ->
+            Nothing
+
+
+selectAnnotation : Int -> AnnotationAttributes -> EditState -> Maybe EditState
 selectAnnotation id annotationAttrs editState =
-    Selecting (SelectingInfo id annotationAttrs)
+    case editState of
+        NotSelecting ->
+            Just (Selecting (SelectingInfo id annotationAttrs))
+
+        Moving movingInfo ->
+            Just (Selecting (SelectingInfo id annotationAttrs))
+
+        Resizing resizingInfo ->
+            Just (Selecting (SelectingInfo id annotationAttrs))
+
+        _ ->
+            Nothing
 
 
-startMoving : Position -> EditState -> EditState
+startMoving : Position -> EditState -> Maybe EditState
 startMoving start editState =
     case editState of
         Selecting { id, attributes } ->
-            Moving (MovingInfo id start ( 0, 0 ) attributes)
+            Just (Moving (MovingInfo id start ( 0, 0 ) attributes))
 
         _ ->
-            editState
+            Nothing
 
 
 continueMoving : Position -> EditState -> Maybe ( EditState, MovingInfo )
@@ -180,14 +210,14 @@ finishMoving editState =
             Nothing
 
 
-startResizing : Position -> Vertex -> ( Position, Position ) -> EditState -> EditState
+startResizing : Position -> Vertex -> ( Position, Position ) -> EditState -> Maybe EditState
 startResizing start vertex originalCoords editState =
     case editState of
         Selecting { id, attributes } ->
-            Resizing (ResizingInfo id start start vertex originalCoords attributes)
+            Just (Resizing (ResizingInfo id start start vertex originalCoords attributes))
 
         _ ->
-            editState
+            Nothing
 
 
 continueResizing : Position -> EditState -> Maybe ( EditState, ResizingInfo )
@@ -210,9 +240,17 @@ finishResizing editState =
             Nothing
 
 
-startEditingText : Int -> AnnotationAttributes -> EditState -> EditState
-startEditingText id attrs editState =
-    EditingText (EditingTextInfo id attrs)
+startEditingText : Int -> AnnotationAttributes -> EditState -> Maybe EditState
+startEditingText index attributes editState =
+    case editState of
+        Drawing _ ->
+            Just (EditingText (EditingTextInfo index attributes))
+
+        Selecting { id, attributes } ->
+            Just (EditingText (EditingTextInfo id attributes))
+
+        _ ->
+            Nothing
 
 
 finishEditingText : EditState -> Maybe ( EditState, EditingTextInfo )
@@ -331,7 +369,7 @@ keyboard config editState a =
             config.editingText editingTextInfo a
 
 
-annotationEvents : AnnotationConfig msg -> Int -> EditState -> List (Svg.Attribute msg)
+annotationEvents : AnnotationConfig msg -> Int -> EditState -> List (Attribute msg)
 annotationEvents config candidateId editState =
     case editState of
         NotSelecting ->
@@ -384,7 +422,7 @@ vertexEvents startResizing editState vertex =
                 []
 
 
-vertexAttrsWhenMoving : MovingInfo -> List (Svg.Attribute msg)
+vertexAttrsWhenMoving : MovingInfo -> List (Attribute msg)
 vertexAttrsWhenMoving { translate } =
     let
         ( dx, dy ) =
