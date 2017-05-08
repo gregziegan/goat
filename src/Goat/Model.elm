@@ -1,67 +1,22 @@
-module Goat.Model exposing (..)
+module Goat.Model exposing (Model, Platform(..), AttributeDropdown(..), OperatingSystem(..), AnnotationMenu, init)
 
 import Array.Hamt as Array exposing (Array)
-import AutoExpand
 import Color exposing (Color)
+import Goat.Annotation exposing (Annotation, Drawing, defaultDrawing, defaultShape, defaultSpotlight, defaultStroke)
+import Goat.Annotation.Shared exposing (StrokeStyle)
+import Goat.EditState as EditState exposing (EditState)
+import Goat.Flags exposing (Flags, Image)
+import Goat.Ports as Ports
 import Keyboard.Extra as Keyboard exposing (Key)
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position)
 import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
-import Goat.Flags exposing (Flags, Image)
-import Goat.Ports as Ports
 
 
 type Platform
     = Zendesk
     | Web
-
-
-type alias StartPosition =
-    Position
-
-
-type alias EndPosition =
-    Position
-
-
-type Drawing
-    = DrawLine LineType
-    | DrawFreeHand
-    | DrawShape ShapeType
-    | DrawTextBox
-    | DrawSpotlight ShapeType
-    | DrawPixelate
-
-
-type StrokeStyle
-    = SolidThin
-    | SolidMedium
-    | SolidThick
-    | SolidVeryThick
-    | DashedThin
-    | DashedMedium
-    | DashedThick
-    | DashedVeryThick
-
-
-type alias Shape =
-    { start : Position
-    , end : Position
-    , strokeColor : Color
-    , strokeStyle : StrokeStyle
-    }
-
-
-type alias TextArea =
-    { start : Position
-    , end : Position
-    , fill : Color
-    , fontSize : Int
-    , text : String
-    , angle : Float
-    , autoexpand : AutoExpand.State
-    }
 
 
 type AttributeDropdown
@@ -73,106 +28,9 @@ type AttributeDropdown
     | Strokes
 
 
-type LineType
-    = Arrow
-    | StraightLine
-
-
-type ShapeType
-    = Rect
-    | RoundedRect
-    | Ellipse
-
-
-type Vertices
-    = Rectangular
-    | Linear
-
-
-type Annotation
-    = Lines LineType Shape
-    | FreeDraw Shape (List Position)
-    | Shapes ShapeType (Maybe Color) Shape
-    | TextBox TextArea
-    | Spotlight ShapeType Shape
-    | Pixelate StartPosition EndPosition
-
-
-{-| Vertices are classified by their relationship to the `start` and `end`
-mouse positions that created the annotation.
-
-e.g: (assume a top-left to bottom-right draw)
-
-Start StartPlusX
-+----------+
-|**********|
-|**********|
-|**********|
-|**********|
-|**********|
-+----------+
-StartPlusY End
-
--}
-type Vertex
-    = Start
-    | End
-    | StartPlusX
-    | StartPlusY
-
-
 type OperatingSystem
     = MacOS
     | Windows
-
-
-type ResizeDirection
-    = NWSE
-    | NESW
-    | Move
-
-
-type alias ResizingData =
-    { index : Int
-    , start : Position
-    , curPos : Position
-    , vertex : Vertex
-    , originalCoords : ( StartPosition, EndPosition )
-    }
-
-
-type alias AnnotationAttributes =
-    { strokeColor : Color
-    , fill : Maybe Color
-    , strokeStyle : StrokeStyle
-    , fontSize : Int
-    }
-
-
-{-| The finite state machine for annotating.
-See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
--}
-type AnnotationState
-    = ReadyToDraw
-    | DrawingAnnotation StartPosition Position (List Position)
-    | SelectedAnnotation Int AnnotationAttributes
-    | MovingAnnotation Int StartPosition ( Int, Int ) AnnotationAttributes
-    | ResizingAnnotation ResizingData AnnotationAttributes
-    | EditingATextBox Int AnnotationAttributes
-
-
-{-| Annotations are viewed differently based on the kind of selection.
-
-1.  Selected corresponds to annotations that are not in a state for resizing/moving.
-    This is currently only relevant to Textboxes when they are being edited.
-2.  SelectedWithVertices shows vertices on any annotation that allows for resizing/moving
-3.  NotSelected shows the unadorned annotation
-
--}
-type SelectState
-    = Selected
-    | SelectedWithVertices
-    | NotSelected
 
 
 type alias AnnotationMenu =
@@ -184,7 +42,7 @@ type alias AnnotationMenu =
 type alias Model =
     { -- Annotation Editing State
       edits : UndoList (Array Annotation)
-    , annotationState : AnnotationState
+    , editState : EditState
     , clipboard : Maybe Annotation
 
     -- Control UI State
@@ -215,35 +73,18 @@ type alias Model =
     }
 
 
-shapes : List Drawing
-shapes =
-    [ DrawShape RoundedRect
-    , DrawShape Rect
-    , DrawShape Ellipse
-    , DrawLine StraightLine
-    ]
-
-
-spotlights : List Drawing
-spotlights =
-    [ DrawSpotlight RoundedRect
-    , DrawSpotlight Rect
-    , DrawSpotlight Ellipse
-    ]
-
-
 init : Flags -> ( Model, List (Cmd msg) )
 init { isMac, inZendesk } =
     { edits = UndoList.fresh Array.empty
-    , annotationState = ReadyToDraw
+    , editState = EditState.initialState
     , clipboard = Nothing
-    , drawing = DrawLine Arrow
-    , shape = DrawShape RoundedRect
-    , spotlight = DrawSpotlight RoundedRect
+    , drawing = defaultDrawing
+    , shape = defaultShape
+    , spotlight = defaultSpotlight
     , waitingForDropdownToggle = Nothing
     , fill = Nothing
     , strokeColor = Color.rgb 255 0 212
-    , strokeStyle = SolidMedium
+    , strokeStyle = defaultStroke
     , fontSize = 20
     , currentDropdown = Nothing
     , annotationMenu = Nothing

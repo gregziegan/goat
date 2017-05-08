@@ -4,11 +4,15 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
+import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea)
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, ResizingInfo, SelectingInfo, StrokeStyle, Vertex)
+import Goat.EditState as EditState exposing (EditState, KeyboardConfig)
 import Goat.Flags exposing (Image)
-import Goat.Model exposing (..)
+import Goat.Model exposing (AttributeDropdown(..), Model, OperatingSystem(..))
 import Goat.Ports as Ports
-import Goat.Utils exposing (calcLinePos, calcShapePos, currentAnnotationAttributes, drawingsAreEqual, getAnnotationAttributes, getPositions, isDrawingTooSmall, isEmptyTextBox, isSpotlightDrawing, mapAtIndex, positionMap, positionMapX, removeItem, removeItemIf, shiftPosition, fontSizeToLineHeight)
+import Goat.Utils exposing (mapAtIndex, removeItemIf, removeItem)
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp))
+import List.Extra
 import List.Zipper exposing (Zipper)
 import Mouse exposing (Position, position)
 import Rocket exposing ((=>))
@@ -102,7 +106,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
             model
                 |> startEditingText index
                 |> closeDropdown
-                => []
+                => [ Ports.selectText ("text-box-edit--" ++ toString index) ]
 
         PreventTextMouseDown ->
             model
@@ -156,33 +160,37 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
             model
                 |> changeDrawing drawing
                 |> closeDropdown
-                |> resetToReadyToDraw
+                |> resetEditState
                 => []
 
         SelectFill fill ->
-            model
-                |> updateAnySelectedAnnotations (updateFill fill)
+            model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateFill fill) model)
+                |> Maybe.withDefault model
                 |> setFill fill
                 |> closeDropdown
                 => []
 
         SelectStrokeColor strokeColor ->
-            model
-                |> updateAnySelectedAnnotations (updateStrokeColor strokeColor)
+            model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateStrokeColor strokeColor) model)
+                |> Maybe.withDefault model
                 |> setStrokeColor strokeColor
                 |> closeDropdown
                 => []
 
         SelectStrokeStyle strokeStyle ->
-            model
-                |> updateAnySelectedAnnotations (updateStrokeStyle strokeStyle)
+            model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateStrokeStyle strokeStyle) model)
+                |> Maybe.withDefault model
                 |> setStrokeStyle strokeStyle
                 |> closeDropdown
                 => []
 
         SelectFontSize fontSize ->
-            model
-                |> updateAnySelectedAnnotations (updateFontSize fontSize)
+            model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateFontSize fontSize) model)
+                |> Maybe.withDefault model
                 |> setFontSize fontSize
                 |> closeDropdown
                 => []
@@ -222,18 +230,18 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
         SelectAndMoveAnnotation index start ->
             model
                 |> selectAnnotation index
-                |> startMovingAnnotation index start
+                |> startMovingAnnotation start
                 => []
 
         ResetToReadyToDraw ->
             model
-                |> resetToReadyToDraw
+                |> resetEditState
                 => []
 
         StartMovingAnnotation index start ->
             model
                 |> selectAnnotation index
-                |> startMovingAnnotation index start
+                |> startMovingAnnotation start
                 |> closeDropdown
                 => []
 
@@ -297,7 +305,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
 
         Save ->
             model
-                |> resetToReadyToDraw
+                |> resetEditState
                 => [ case model.images of
                         Just images ->
                             Ports.exportToImage (List.Zipper.current images).id
@@ -311,7 +319,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
                 => [ Ports.requestImages () ]
 
 
-{-| Do not add this annotations array change change to undo history
+{-| Do not add this annotations array change to undo history
 -}
 skipChange : Model -> Array Annotation -> Model
 skipChange model annotations =
@@ -324,331 +332,181 @@ skipChange model annotations =
 
 startDrawing : StartPosition -> Model -> Model
 startDrawing start model =
-    { model
-        | annotationState = DrawingAnnotation start start []
-    }
+    case EditState.startDrawing start model.editState of
+        Just newEditState ->
+            { model | editState = newEditState }
+
+        Nothing ->
+            model
 
 
 continueDrawing : Position -> Model -> Model
 continueDrawing pos model =
-    case model.annotationState of
-        DrawingAnnotation start _ freeDrawPositions ->
-            { model
-                | annotationState =
-                    case model.drawing of
-                        DrawFreeHand ->
-                            DrawingAnnotation start pos <|
-                                case freeDrawPositions of
-                                    [] ->
-                                        [ pos ]
+    case EditState.continueDrawing pos (model.drawing == DrawFreeHand) model.editState of
+        Just newEditState ->
+            { model | editState = newEditState }
 
-                                    lastPos :: rest ->
-                                        if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
-                                            freeDrawPositions
-                                        else
-                                            pos :: freeDrawPositions
-
-                        _ ->
-                            DrawingAnnotation start pos []
-            }
-
-        _ ->
+        Nothing ->
             model
 
 
+finishValidDrawing : Model -> DrawingInfo -> Model
+finishValidDrawing model drawingInfo =
+    case Annotation.fromDrawing (List.member Shift model.pressedKeys) model.drawing (extractAnnotationAttributes model) drawingInfo of
+        Just annotation ->
+            addAnnotation annotation model
+
+        Nothing ->
+            model
+
+
+finishNonTextDrawing : EditState -> DrawingInfo -> Model -> Model
+finishNonTextDrawing finishedEditState ({ start, curPos } as drawingInfo) model =
+    if isDrawingTooSmall (isSpotlightDrawing model.drawing) start curPos then
+        resetEditState model
+    else
+        finishValidDrawing { model | editState = finishedEditState } drawingInfo
+
+
+finishTextDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
+finishTextDrawing pos model =
+    let
+        numAnnotations =
+            Array.length model.edits.present
+
+        attributes =
+            AnnotationAttributes model.strokeColor model.fill model.strokeStyle model.fontSize
+    in
+        case EditState.finishTextDrawing pos numAnnotations attributes model.editState of
+            Just ( newEditState, drawingInfo ) ->
+                { model | editState = newEditState }
+                    |> addAnnotation (Annotation.newTextBox TextBoxInput numAnnotations attributes drawingInfo)
+                    => [ "text-box-edit--"
+                            ++ toString numAnnotations
+                            |> Dom.focus
+                            |> Task.attempt (tryToEdit numAnnotations)
+                       ]
+
+            Nothing ->
+                model => []
+
+
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
-finishDrawing pos ({ fill, strokeColor, strokeStyle, fontSize } as model) =
-    case model.annotationState of
-        DrawingAnnotation start _ freeDrawPositions ->
-            if isDrawingTooSmall (isSpotlightDrawing model.drawing) start pos then
-                model
-                    |> cancelDrawing
-                    => []
-            else
-                case model.drawing of
-                    DrawLine lineType ->
-                        finishLineDrawing start pos lineType model
-                            => []
-
-                    DrawFreeHand ->
-                        finishFreeDrawing start pos freeDrawPositions model
-                            => []
-
-                    DrawShape shapeType ->
-                        finishShapeDrawing start pos shapeType model
-                            => []
-
-                    DrawTextBox ->
-                        let
-                            numAnnotations =
-                                Array.length model.edits.present
-                        in
-                            finishTextBoxDrawing start pos model
-                                => [ "text-box-edit--"
-                                        ++ toString numAnnotations
-                                        |> Dom.focus
-                                        |> Task.attempt (tryToEdit numAnnotations)
-                                   ]
-
-                    DrawSpotlight shapeType ->
-                        finishSpotlightDrawing start pos shapeType model
-                            => []
-
-                    DrawPixelate ->
-                        finishPixelateDrawing start pos model
-                            => []
+finishDrawing pos model =
+    case model.drawing of
+        DrawTextBox ->
+            finishTextDrawing pos model
 
         _ ->
-            model => []
+            case EditState.finishDrawing pos model.editState of
+                Just ( newEditState, drawingInfo ) ->
+                    finishNonTextDrawing newEditState drawingInfo model
+                        => []
+
+                Nothing ->
+                    model => []
 
 
-resetToReadyToDraw : Model -> Model
-resetToReadyToDraw model =
-    { model | annotationState = ReadyToDraw }
+resetEditState : Model -> Model
+resetEditState model =
+    { model | editState = EditState.initialState }
 
 
 finishMovingAnnotation : Model -> Model
 finishMovingAnnotation model =
-    case model.annotationState of
-        MovingAnnotation index _ translate _ ->
-            { model | edits = UndoList.new (mapAtIndex index (move translate) model.edits.present) model.edits }
-                |> selectAnnotation index
+    case EditState.finishMoving model.editState of
+        Just ( newEditState, { id, translate } ) ->
+            { model
+                | edits = UndoList.new (mapAtIndex id (Annotation.move translate) model.edits.present) model.edits
+                , editState = newEditState
+            }
 
-        _ ->
+        Nothing ->
             model
 
 
-updateAnySelectedAnnotations : (Annotation -> Annotation) -> Model -> Model
-updateAnySelectedAnnotations fn model =
-    case model.annotationState of
-        SelectedAnnotation index _ ->
-            { model
-                | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
-            }
-
-        EditingATextBox index _ ->
-            { model
-                | edits = UndoList.mapPresent (mapAtIndex index fn) model.edits
-            }
-
-        _ ->
-            model
+updateAnySelectedAnnotationsHelper : (Annotation -> Annotation) -> Model -> Int -> Model
+updateAnySelectedAnnotationsHelper fn model index =
+    { model
+        | edits = UndoList.new (mapAtIndex index fn model.edits.present) model.edits
+    }
 
 
-autoExpandAnnotation : AutoExpand.State -> String -> Annotation -> Annotation
-autoExpandAnnotation state textValue annotation =
-    case annotation of
-        TextBox textBox ->
-            TextBox { textBox | autoexpand = state, text = textValue }
-
-        _ ->
-            annotation
+annotationAttributesInModel : Model -> AnnotationAttributes
+annotationAttributesInModel { strokeColor, fill, strokeStyle, fontSize } =
+    AnnotationAttributes strokeColor fill strokeStyle fontSize
 
 
 selectAnnotation : Int -> Model -> Model
 selectAnnotation index model =
-    case Array.get index model.edits.present of
-        Just annotation ->
-            { model | annotationState = SelectedAnnotation index (getAnnotationAttributes annotation (currentAnnotationAttributes model)) }
-
-        Nothing ->
-            model
+    model.edits.present
+        |> Array.get index
+        |> Maybe.andThen (\annotation -> EditState.selectAnnotation index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState)
+        |> Maybe.map (\newEditState -> { model | editState = newEditState })
+        |> Maybe.withDefault model
 
 
 addAnnotation : Annotation -> Model -> Model
 addAnnotation annotation model =
     { model
         | edits = UndoList.new (Array.push annotation model.edits.present) model.edits
-        , annotationState = ReadyToDraw
     }
-
-
-finishLineDrawing : StartPosition -> EndPosition -> LineType -> Model -> Model
-finishLineDrawing start end lineType model =
-    model
-        |> addAnnotation (Lines lineType (Shape start (calcLinePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
-
-
-finishFreeDrawing : StartPosition -> EndPosition -> List Position -> Model -> Model
-finishFreeDrawing start end positions model =
-    model
-        |> addAnnotation (FreeDraw (Shape start end model.strokeColor model.strokeStyle) positions)
-
-
-finishPixelateDrawing : StartPosition -> EndPosition -> Model -> Model
-finishPixelateDrawing start end model =
-    model
-        |> addAnnotation (Pixelate start end)
-
-
-finishShapeDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
-finishShapeDrawing start end shapeType model =
-    model
-        |> addAnnotation (Shapes shapeType model.fill (Shape start (calcShapePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
-
-
-finishTextBoxDrawing : StartPosition -> EndPosition -> Model -> Model
-finishTextBoxDrawing start end model =
-    let
-        numAnnotations =
-            Array.length model.edits.present
-    in
-        model
-            |> addAnnotation (TextBox (TextArea start end model.strokeColor model.fontSize "Text" 0 (AutoExpand.initState (autoExpandConfig numAnnotations model.fontSize))))
-            |> startEditingText numAnnotations
-
-
-finishSpotlightDrawing : StartPosition -> EndPosition -> ShapeType -> Model -> Model
-finishSpotlightDrawing start end shapeType model =
-    model
-        |> addAnnotation (Spotlight shapeType (Shape start (calcShapePos (List.member Shift model.pressedKeys) start end) model.strokeColor model.strokeStyle))
 
 
 startEditingText : Int -> Model -> Model
 startEditingText index model =
-    case Array.get index model.edits.present of
-        Just annotation ->
-            { model | annotationState = EditingATextBox index (getAnnotationAttributes annotation (currentAnnotationAttributes model)) }
-
-        Nothing ->
-            model
+    model.edits.present
+        |> Array.get index
+        |> Maybe.andThen (\annotation -> EditState.startEditingText index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState)
+        |> Maybe.map (\newEditState -> { model | editState = newEditState })
+        |> Maybe.withDefault model
 
 
 editTextBoxAnnotation : Int -> AutoExpand.State -> String -> Model -> Model
 editTextBoxAnnotation index autoExpandState autoExpandText model =
     model.edits.present
-        |> mapAtIndex index (autoExpandAnnotation autoExpandState autoExpandText)
+        |> mapAtIndex index (Annotation.updateTextArea autoExpandState autoExpandText)
         |> skipChange model
-
-
-updateStrokeColor : Color -> Annotation -> Annotation
-updateStrokeColor strokeColor annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType { line | strokeColor = strokeColor }
-
-        FreeDraw shape positions ->
-            FreeDraw { shape | strokeColor = strokeColor } positions
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill { shape | strokeColor = strokeColor }
-
-        TextBox textBox ->
-            TextBox { textBox | fill = strokeColor }
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType { shape | strokeColor = strokeColor }
-
-        Pixelate _ _ ->
-            annotation
-
-
-updateFill : Maybe Color -> Annotation -> Annotation
-updateFill fill annotation =
-    case annotation of
-        Lines _ _ ->
-            annotation
-
-        FreeDraw _ _ ->
-            annotation
-
-        Shapes shapeType _ shape ->
-            Shapes shapeType fill shape
-
-        TextBox textBox ->
-            annotation
-
-        Spotlight shapeType shape ->
-            annotation
-
-        Pixelate _ _ ->
-            annotation
-
-
-updateStrokeStyle : StrokeStyle -> Annotation -> Annotation
-updateStrokeStyle strokeStyle annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType { line | strokeStyle = strokeStyle }
-
-        FreeDraw shape positions ->
-            FreeDraw { shape | strokeStyle = strokeStyle } positions
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill { shape | strokeStyle = strokeStyle }
-
-        TextBox textBox ->
-            annotation
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType { shape | strokeStyle = strokeStyle }
-
-        Pixelate _ _ ->
-            annotation
-
-
-updateFontSize : Int -> Annotation -> Annotation
-updateFontSize fontSize annotation =
-    case annotation of
-        TextBox textBox ->
-            TextBox { textBox | fontSize = fontSize }
-
-        _ ->
-            annotation
 
 
 setFill : Maybe Color -> Model -> Model
 setFill fill model =
-    case model.annotationState of
-        SelectedAnnotation index annotationAttrs ->
-            { model | annotationState = SelectedAnnotation index { annotationAttrs | fill = fill }, fill = fill }
-
-        _ ->
-            { model | fill = fill }
+    { model
+        | editState = EditState.updateSelectedAttributes (Annotation.setFill fill) model.editState
+        , fill = fill
+    }
 
 
 setFontSize : Int -> Model -> Model
 setFontSize fontSize model =
-    case model.annotationState of
-        SelectedAnnotation index annotationAttrs ->
-            { model | annotationState = SelectedAnnotation index { annotationAttrs | fontSize = fontSize }, fontSize = fontSize }
-
-        EditingATextBox index annotationAttrs ->
-            { model | annotationState = EditingATextBox index { annotationAttrs | fontSize = fontSize }, fontSize = fontSize }
-
-        _ ->
-            { model | fontSize = fontSize }
+    { model
+        | editState = EditState.updateSelectedAttributes (Annotation.setFontSize fontSize) model.editState
+        , fontSize = fontSize
+    }
 
 
 setStrokeStyle : StrokeStyle -> Model -> Model
 setStrokeStyle strokeStyle model =
-    case model.annotationState of
-        SelectedAnnotation index annotationAttrs ->
-            { model | annotationState = SelectedAnnotation index { annotationAttrs | strokeStyle = strokeStyle }, strokeStyle = strokeStyle }
-
-        _ ->
-            { model | strokeStyle = strokeStyle }
+    { model
+        | editState = EditState.updateSelectedAttributes (Annotation.setStrokeStyle strokeStyle) model.editState
+        , strokeStyle = strokeStyle
+    }
 
 
 setStrokeColor : Color -> Model -> Model
 setStrokeColor strokeColor model =
-    case model.annotationState of
-        SelectedAnnotation index annotationAttrs ->
-            { model | annotationState = SelectedAnnotation index { annotationAttrs | strokeColor = strokeColor }, strokeColor = strokeColor }
-
-        EditingATextBox index annotationAttrs ->
-            { model | annotationState = EditingATextBox index { annotationAttrs | strokeColor = strokeColor }, strokeColor = strokeColor }
-
-        _ ->
-            { model | strokeColor = strokeColor }
+    { model
+        | editState = EditState.updateSelectedAttributes (Annotation.setStrokeColor strokeColor) model.editState
+        , strokeColor = strokeColor
+    }
 
 
-startMovingAnnotation : Int -> Position -> Model -> Model
-startMovingAnnotation index newPos model =
-    case Array.get index model.edits.present of
-        Just annotation ->
+startMovingAnnotation : Position -> Model -> Model
+startMovingAnnotation newPos model =
+    case EditState.startMoving newPos model.editState of
+        Just newEditState ->
             { model
-                | annotationState = MovingAnnotation index newPos ( 0, 0 ) (getAnnotationAttributes annotation (currentAnnotationAttributes model))
+                | editState = newEditState
             }
 
         Nothing ->
@@ -657,120 +515,47 @@ startMovingAnnotation index newPos model =
 
 moveAnnotation : Position -> Model -> Model
 moveAnnotation newPos model =
-    case model.annotationState of
-        MovingAnnotation index start ( dx, dy ) annotationAttrs ->
-            { model | annotationState = MovingAnnotation index start ( newPos.x - start.x, newPos.y - start.y ) annotationAttrs }
-
-        _ ->
-            model
-
-
-startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
-startResizingAnnotation index vertex start model =
-    case Array.get index model.edits.present of
-        Just annotation ->
-            { model | annotationState = ResizingAnnotation (ResizingData index start start vertex (getPositions annotation)) (getAnnotationAttributes annotation (currentAnnotationAttributes model)) }
+    case EditState.continueMoving newPos model.editState of
+        Just ( newEditState, _ ) ->
+            { model | editState = newEditState }
 
         Nothing ->
             model
 
 
+startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
+startResizingAnnotation index vertex start model =
+    model.edits.present
+        |> Array.get index
+        |> Maybe.andThen (\annotation -> EditState.startResizing start vertex (Annotation.positions annotation) model.editState)
+        |> Maybe.map (\newEditState -> { model | editState = newEditState })
+        |> Maybe.withDefault model
+
+
 resizeAnnotation : Position -> Model -> Model
 resizeAnnotation curPos model =
-    case model.annotationState of
-        ResizingAnnotation resizingData annotationAttrs ->
+    case EditState.continueResizing curPos model.editState of
+        Just ( newEditState, resizingData ) ->
             { model
-                | edits = UndoList.mapPresent (mapAtIndex resizingData.index (resize (List.member Shift model.pressedKeys) { resizingData | curPos = curPos })) model.edits
-                , annotationState = ResizingAnnotation { resizingData | curPos = curPos } annotationAttrs
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (Annotation.resize (List.member Shift model.pressedKeys) resizingData)) model.edits
+                , editState = newEditState
             }
 
-        _ ->
+        Nothing ->
             model
 
 
 finishResizingAnnotation : Model -> Model
 finishResizingAnnotation model =
-    case model.annotationState of
-        ResizingAnnotation { index } _ ->
-            selectAnnotation index model
+    case EditState.finishResizing model.editState of
+        Just ( newEditState, resizingData ) ->
+            { model
+                | edits = UndoList.mapPresent (mapAtIndex resizingData.id (Annotation.resize (List.member Shift model.pressedKeys) resizingData)) model.edits
+                , editState = newEditState
+            }
 
-        _ ->
+        Nothing ->
             model
-
-
-resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingData -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
-resizeVertices constrain { curPos, vertex, originalCoords } annotation =
-    let
-        ( start, end ) =
-            originalCoords
-    in
-        case vertex of
-            Start ->
-                { annotation | start = constrain annotation.end curPos }
-
-            Goat.Model.End ->
-                { annotation | end = constrain annotation.start curPos }
-
-            StartPlusX ->
-                { annotation | start = constrain annotation.end curPos, end = Position start.x end.y }
-
-            StartPlusY ->
-                { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
-
-
-resize : Bool -> ResizingData -> Annotation -> Annotation
-resize constrain resizingData annotation =
-    case annotation of
-        Lines lineType shape ->
-            Lines lineType (resizeVertices (calcLinePos constrain) resizingData shape)
-
-        FreeDraw _ _ ->
-            annotation
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill (resizeVertices (calcShapePos constrain) resizingData shape)
-
-        TextBox textArea ->
-            TextBox (resizeVertices (calcShapePos False) resizingData textArea)
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType (resizeVertices (calcShapePos constrain) resizingData shape)
-
-        Pixelate start end ->
-            Pixelate (resizeVertices (calcShapePos constrain) resizingData { start = start, end = end }).start (resizeVertices (calcShapePos constrain) resizingData { start = start, end = end }).end
-
-
-shift :
-    ( Int, Int )
-    -> { a | start : Position, end : Position }
-    -> { a | end : Position, start : Position }
-shift ( dx, dy ) drawing =
-    { drawing
-        | start = shiftPosition dx dy drawing.start
-        , end = shiftPosition dx dy drawing.end
-    }
-
-
-move : ( Int, Int ) -> Annotation -> Annotation
-move translate annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType (shift translate line)
-
-        FreeDraw shape positions ->
-            FreeDraw (shift translate shape) (List.map (shiftPosition (Tuple.first translate) (Tuple.second translate)) positions)
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill (shift translate shape)
-
-        TextBox textArea ->
-            TextBox (shift translate textArea)
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType (shift translate shape)
-
-        Pixelate start end ->
-            Pixelate (shiftPosition (Tuple.first translate) (Tuple.second translate) start) (shiftPosition (Tuple.first translate) (Tuple.second translate) end)
 
 
 closeDropdown : Model -> Model
@@ -840,84 +625,79 @@ toggleDropdown attributeDropdown model =
     }
 
 
-cancelDrawing : Model -> Model
-cancelDrawing model =
-    { model | annotationState = ReadyToDraw }
-
-
 finishEditingText : Int -> Model -> Model
 finishEditingText index model =
-    { model
-        | annotationState = ReadyToDraw
-        , edits = UndoList.new (removeItemIf isEmptyTextBox index model.edits.present) model.edits
-    }
-
-
-alterToolbarWithKeyboard : Bool -> Maybe KeyChange -> Model -> Model
-alterToolbarWithKeyboard ctrlPressed keyChangeMaybe model =
-    case keyChangeMaybe of
-        Just keyChange ->
-            case keyChange of
-                KeyDown key ->
-                    case key of
-                        Escape ->
-                            closeDropdown model
-
-                        CharA ->
-                            { model | drawing = DrawLine Arrow }
-
-                        CharH ->
-                            { model | drawing = DrawFreeHand }
-
-                        CharL ->
-                            { model | drawing = DrawLine StraightLine }
-
-                        CharR ->
-                            { model | drawing = DrawShape Rect }
-
-                        CharO ->
-                            { model | drawing = DrawShape RoundedRect }
-
-                        CharE ->
-                            { model | drawing = DrawShape Ellipse }
-
-                        CharT ->
-                            { model | drawing = DrawTextBox }
-
-                        CharG ->
-                            { model | drawing = DrawSpotlight Rect }
-
-                        CharC ->
-                            if ctrlPressed then
-                                model
-                            else
-                                { model | drawing = DrawSpotlight RoundedRect }
-
-                        CharI ->
-                            { model | drawing = DrawSpotlight Ellipse }
-
-                        CharP ->
-                            { model | drawing = DrawPixelate }
-
-                        CharN ->
-                            toggleDropdown Fonts model
-
-                        CharK ->
-                            toggleDropdown StrokeColors model
-
-                        CharF ->
-                            toggleDropdown Fills model
-
-                        CharS ->
-                            toggleDropdown Strokes model
-
-                        _ ->
-                            model
-
-                KeyUp _ ->
-                    model
+    case EditState.finishEditingText model.editState of
+        Just ( newEditState, _ ) ->
+            { model
+                | editState = newEditState
+                , edits = UndoList.new (removeItemIf Annotation.isEmptyTextBox index model.edits.present) model.edits
+            }
 
         Nothing ->
+            model
+
+
+alterToolbarWithKeyboard : Bool -> KeyChange -> Model -> Model
+alterToolbarWithKeyboard ctrlPressed keyChange model =
+    case keyChange of
+        KeyDown key ->
+            case key of
+                Escape ->
+                    closeDropdown model
+
+                CharA ->
+                    { model | drawing = DrawLine Arrow }
+
+                CharH ->
+                    { model | drawing = DrawFreeHand }
+
+                CharL ->
+                    { model | drawing = DrawLine StraightLine }
+
+                CharR ->
+                    { model | drawing = DrawShape Rect }
+
+                CharO ->
+                    { model | drawing = DrawShape RoundedRect }
+
+                CharE ->
+                    { model | drawing = DrawShape Ellipse }
+
+                CharT ->
+                    { model | drawing = DrawTextBox }
+
+                CharG ->
+                    { model | drawing = DrawSpotlight Rect }
+
+                CharC ->
+                    if ctrlPressed then
+                        model
+                    else
+                        { model | drawing = DrawSpotlight RoundedRect }
+
+                CharI ->
+                    { model | drawing = DrawSpotlight Ellipse }
+
+                CharP ->
+                    { model | drawing = DrawPixelate }
+
+                CharN ->
+                    toggleDropdown Fonts model
+
+                CharK ->
+                    toggleDropdown StrokeColors model
+
+                CharF ->
+                    toggleDropdown Fills model
+
+                CharS ->
+                    toggleDropdown Strokes model
+
+                _ ->
+                    model
+
+        KeyUp _ ->
             model
 
 
@@ -959,6 +739,12 @@ handleSelectedAnnotationKeyboard index ctrlPressed keyChange model =
     case keyChange of
         KeyDown key ->
             case key of
+                Delete ->
+                    deleteSelectedDrawing index model
+
+                BackSpace ->
+                    deleteSelectedDrawing index model
+
                 CharC ->
                     if ctrlPressed then
                         copySelectedAnnotation index model
@@ -987,35 +773,13 @@ handleSelectedAnnotationKeyboard index ctrlPressed keyChange model =
             model
 
 
-shiftForPaste : Annotation -> Annotation
-shiftForPaste annotation =
-    case annotation of
-        Lines lineType line ->
-            Lines lineType { line | start = shiftPosition 10 10 line.start, end = shiftPosition 10 10 line.end }
-
-        FreeDraw shape positions ->
-            FreeDraw { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end } (List.map (shiftPosition 10 10) positions)
-
-        Shapes shapeType fill shape ->
-            Shapes shapeType fill { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
-
-        TextBox textArea ->
-            TextBox { textArea | start = shiftPosition 10 10 textArea.start, end = shiftPosition 10 10 textArea.end }
-
-        Spotlight shapeType shape ->
-            Spotlight shapeType { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
-
-        Pixelate start end ->
-            Pixelate (shiftPosition 10 10 start) (shiftPosition 10 10 end)
-
-
 pasteAnnotation : Model -> Model
 pasteAnnotation model =
     case model.clipboard of
         Just annotation ->
             { model
-                | edits = UndoList.new (Array.push (shiftForPaste annotation) model.edits.present) model.edits
-                , clipboard = Just (shiftForPaste annotation)
+                | edits = UndoList.new (Array.push (Annotation.shiftForPaste annotation) model.edits.present) model.edits
+                , clipboard = Just (Annotation.shiftForPaste annotation)
             }
                 |> selectAnnotation (Array.length model.edits.present)
 
@@ -1060,58 +824,6 @@ handlePaste ctrlPressed keyChange model =
             model
 
 
-handleKeyboardInteractions : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
-handleKeyboardInteractions maybeKeyChange ({ pressedKeys } as model) =
-    let
-        controlKeys =
-            case model.operatingSystem of
-                MacOS ->
-                    [ Super, ContextMenu ]
-
-                Windows ->
-                    [ Control ]
-
-        ctrlPressed =
-            List.any (\key -> List.member key pressedKeys) controlKeys
-    in
-        case maybeKeyChange of
-            Just keyChange ->
-                case model.annotationState of
-                    ReadyToDraw ->
-                        alterDrawing ctrlPressed keyChange model
-                            |> alterToolbarWithKeyboard ctrlPressed maybeKeyChange
-                            |> handlePaste ctrlPressed keyChange
-                            => []
-
-                    DrawingAnnotation _ _ _ ->
-                        alterDrawing ctrlPressed keyChange model
-                            |> alterToolbarWithKeyboard ctrlPressed maybeKeyChange
-                            => []
-
-                    SelectedAnnotation index _ ->
-                        alterDrawing ctrlPressed keyChange model
-                            |> alterToolbarWithKeyboard ctrlPressed maybeKeyChange
-                            |> handleSelectedAnnotationKeyboard index ctrlPressed keyChange
-                            |> handlePaste ctrlPressed keyChange
-                            => []
-
-                    MovingAnnotation _ _ _ _ ->
-                        alterDrawing ctrlPressed keyChange model
-                            |> alterToolbarWithKeyboard ctrlPressed maybeKeyChange
-                            => []
-
-                    ResizingAnnotation _ _ ->
-                        alterDrawing ctrlPressed keyChange model
-                            |> alterToolbarWithKeyboard ctrlPressed maybeKeyChange
-                            => []
-
-                    EditingATextBox index _ ->
-                        alterTextBoxDrawing keyChange index model
-
-            Nothing ->
-                model => []
-
-
 alterTextBoxDrawing : KeyChange -> Int -> Model -> ( Model, List (Cmd Msg) )
 alterTextBoxDrawing keyChange index model =
     case keyChange of
@@ -1132,17 +844,12 @@ alterTextBoxDrawing keyChange index model =
             model => []
 
 
-deleteSelectedDrawing : Model -> Model
-deleteSelectedDrawing model =
-    case model.annotationState of
-        SelectedAnnotation index _ ->
-            { model
-                | edits = UndoList.new (removeItem index model.edits.present) model.edits
-                , annotationState = ReadyToDraw
-            }
-
-        _ ->
-            model
+deleteSelectedDrawing : Int -> Model -> Model
+deleteSelectedDrawing index model =
+    { model
+        | edits = UndoList.new (removeItem index model.edits.present) model.edits
+        , editState = EditState.initialState
+    }
 
 
 changeShapeAndSpotlightDropdowns : Drawing -> Model -> Model
@@ -1199,13 +906,7 @@ alterDrawing ctrlPressed keyChange ({ pressedKeys } as model) =
         KeyDown key ->
             case key of
                 Escape ->
-                    cancelDrawing model
-
-                Delete ->
-                    deleteSelectedDrawing model
-
-                BackSpace ->
-                    deleteSelectedDrawing model
+                    resetEditState model
 
                 CharZ ->
                     if List.member Shift pressedKeys && ctrlPressed then
@@ -1284,14 +985,14 @@ toggleAnnotationMenu selectedIndex position model =
             { model
                 | annotationMenu = Just { index = selectedIndex, position = position }
                 , showingAnyMenu = True
-                , annotationState =
+                , editState =
                     case selectedIndex of
                         Just index ->
                             selectAnnotation index model
-                                |> .annotationState
+                                |> .editState
 
                         Nothing ->
-                            model.annotationState
+                            model.editState
             }
 
 
@@ -1309,7 +1010,7 @@ bringAnnotationToFront : Int -> Model -> Model
 bringAnnotationToFront index model =
     { model
         | edits = UndoList.new (bringToFront index model.edits.present) model.edits
-        , annotationState = ReadyToDraw
+        , editState = EditState.initialState
     }
         |> closeAllMenus
 
@@ -1328,7 +1029,7 @@ sendAnnotationToBack : Int -> Model -> Model
 sendAnnotationToBack index model =
     { model
         | edits = UndoList.new (sendToBack index model.edits.present) model.edits
-        , annotationState = ReadyToDraw
+        , editState = EditState.initialState
     }
         |> closeAllMenus
 
@@ -1364,14 +1065,179 @@ returnToImageSelection model =
     { model | imageSelected = False, edits = UndoList.reset model.edits }
 
 
-autoExpandConfig : Int -> Int -> AutoExpand.Config Msg
-autoExpandConfig index fontSize =
-    AutoExpand.config
-        { onInput = TextBoxInput index
-        , padding = 2
-        , minRows = 1
-        , maxRows = 4
-        , lineHeight = fontSizeToLineHeight fontSize
-        }
-        |> AutoExpand.withId ("text-box-edit--" ++ toString index)
-        |> AutoExpand.withClass "text-box-textarea"
+controlKeys : OperatingSystem -> List Key
+controlKeys os =
+    case os of
+        MacOS ->
+            [ Super, ContextMenu ]
+
+        Windows ->
+            [ Control ]
+
+
+keyboardConfig : KeyChange -> KeyboardConfig Model Model
+keyboardConfig keyChange =
+    { notSelecting = whenNotSelectingKeyboard keyChange
+    , drawing = whenDrawingKeyboard keyChange
+    , selecting = whenSelectingKeyboard keyChange
+    , moving = whenMovingKeyboard keyChange
+    , resizing = whenResizingKeyboard keyChange
+    , editingText = whenEditingTextKeyboard keyChange
+    }
+
+
+handleKeyboardInteractions : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg) )
+handleKeyboardInteractions maybeKeyChange model =
+    case maybeKeyChange of
+        Just keyChange ->
+            EditState.keyboard (keyboardConfig keyChange) model.editState model
+                => []
+
+        Nothing ->
+            model
+                => []
+
+
+isCtrlPressed : List Key -> OperatingSystem -> Bool
+isCtrlPressed pressedKeys os =
+    List.any (\key -> List.member key pressedKeys) (controlKeys os)
+
+
+whenNotSelectingKeyboard : KeyChange -> Model -> Model
+whenNotSelectingKeyboard keyChange model =
+    let
+        ctrlPressed =
+            isCtrlPressed model.pressedKeys model.operatingSystem
+    in
+        alterDrawing ctrlPressed keyChange model
+            |> alterToolbarWithKeyboard ctrlPressed keyChange
+            |> handlePaste ctrlPressed keyChange
+
+
+whenDrawingKeyboard : KeyChange -> DrawingInfo -> Model -> Model
+whenDrawingKeyboard keyChange _ model =
+    let
+        ctrlPressed =
+            isCtrlPressed model.pressedKeys model.operatingSystem
+    in
+        alterDrawing ctrlPressed keyChange model
+            |> alterToolbarWithKeyboard ctrlPressed keyChange
+
+
+whenSelectingKeyboard : KeyChange -> SelectingInfo -> Model -> Model
+whenSelectingKeyboard keyChange { id } model =
+    let
+        ctrlPressed =
+            isCtrlPressed model.pressedKeys model.operatingSystem
+    in
+        alterDrawing ctrlPressed keyChange model
+            |> alterToolbarWithKeyboard ctrlPressed keyChange
+            |> handleSelectedAnnotationKeyboard id ctrlPressed keyChange
+            |> handlePaste ctrlPressed keyChange
+
+
+whenMovingKeyboard : KeyChange -> a -> Model -> Model
+whenMovingKeyboard keyChange _ model =
+    let
+        ctrlPressed =
+            isCtrlPressed model.pressedKeys model.operatingSystem
+    in
+        alterDrawing ctrlPressed keyChange model
+            |> alterToolbarWithKeyboard ctrlPressed keyChange
+
+
+whenResizingKeyboard : KeyChange -> a -> Model -> Model
+whenResizingKeyboard =
+    whenMovingKeyboard
+
+
+whenEditingTextKeyboard : KeyChange -> a -> Model -> Model
+whenEditingTextKeyboard keyChange _ model =
+    let
+        ctrlPressed =
+            isCtrlPressed model.pressedKeys model.operatingSystem
+    in
+        model
+
+
+getFirstSpotlightIndex : Array Annotation -> Int
+getFirstSpotlightIndex annotations =
+    annotations
+        |> Array.toList
+        |> List.Extra.findIndex Annotation.isSpotlightShape
+        |> Maybe.withDefault 0
+
+
+isSpotlightDrawing : Drawing -> Bool
+isSpotlightDrawing drawing =
+    case drawing of
+        DrawSpotlight _ ->
+            True
+
+        _ ->
+            False
+
+
+drawingsAreEqual : Drawing -> Drawing -> Bool
+drawingsAreEqual drawing drawing2 =
+    case drawing of
+        DrawLine lineType ->
+            case drawing2 of
+                DrawLine lineType2 ->
+                    lineType == lineType2
+
+                _ ->
+                    False
+
+        DrawFreeHand ->
+            drawing2 == DrawFreeHand
+
+        DrawShape shapeType ->
+            case drawing2 of
+                DrawShape shapeType2 ->
+                    shapeType == shapeType2
+
+                _ ->
+                    False
+
+        DrawTextBox ->
+            case drawing2 of
+                DrawTextBox ->
+                    True
+
+                _ ->
+                    False
+
+        DrawSpotlight shapeType ->
+            case drawing2 of
+                DrawSpotlight shapeType2 ->
+                    shapeType == shapeType2
+
+                _ ->
+                    False
+
+        DrawPixelate ->
+            drawing2 == DrawPixelate
+
+
+extractAnnotationAttributes : Model -> AnnotationAttributes
+extractAnnotationAttributes { strokeColor, fill, strokeStyle, fontSize } =
+    AnnotationAttributes strokeColor fill strokeStyle fontSize
+
+
+minDrawingDistance : number
+minDrawingDistance =
+    4
+
+
+minSpotlightDrawingDistance : number
+minSpotlightDrawingDistance =
+    8
+
+
+isDrawingTooSmall : Bool -> StartPosition -> EndPosition -> Bool
+isDrawingTooSmall isSpotlight start end =
+    if isSpotlight then
+        abs (start.x - end.x) < minSpotlightDrawingDistance && abs (start.y - end.y) < minSpotlightDrawingDistance
+    else
+        abs (start.x - end.x) < minDrawingDistance && abs (start.y - end.y) < minDrawingDistance

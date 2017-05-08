@@ -2,54 +2,54 @@ module Goat.View.DrawingArea.Definitions exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
-import Goat.Model exposing (..)
-import Goat.Update exposing (Msg(..), autoExpandConfig)
+import Goat.Annotation exposing (Annotation, ShapeType, Shape, spotlightToMaskCutout)
+import Goat.EditState as EditState exposing (EditState)
+import Goat.Update exposing (Msg(..))
 import Goat.View.DrawingArea.Annotation as Annotation
-import Goat.View.Utils exposing (..)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
 
 
-viewNonSpotlightAnnotations : AnnotationState -> Array Annotation -> List (Svg Msg)
-viewNonSpotlightAnnotations annotationState annotations =
+viewNonSpotlightAnnotations : EditState -> Array Annotation -> List (Svg Msg)
+viewNonSpotlightAnnotations editState annotations =
     let
         annotationsAndVertices =
             annotations
                 |> Array.toList
-                |> List.indexedMap (Annotation.viewAnnotation annotationState)
+                |> List.indexedMap (Annotation.viewAnnotation editState)
     in
         List.map Tuple.first annotationsAndVertices
             ++ List.filterMap Tuple.second annotationsAndVertices
 
 
-viewMaskCutOut : AnnotationState -> ( Int, ShapeType, Shape ) -> Svg Msg
-viewMaskCutOut annotationState ( index, shapeType, shape ) =
-    Annotation.viewShape (Annotation.annotationStateEvents index annotationState) shapeType (Just Color.black) shape
+viewMaskCutOut : EditState -> ( Int, ShapeType, Shape ) -> Svg Msg
+viewMaskCutOut editState ( index, shapeType, shape ) =
+    Annotation.viewShape (EditState.annotationEvents (Annotation.annotationConfig index) index editState) shapeType (Just Color.black) shape
 
 
-viewSpotlights : AnnotationState -> Array Annotation -> List (Svg Msg)
-viewSpotlights annotationState annotations =
+viewSpotlights : EditState -> Array Annotation -> List (Svg Msg)
+viewSpotlights editState annotations =
     annotations
         |> Array.toIndexedList
-        |> List.filterMap (Maybe.map (viewMaskCutOut annotationState) << spotlightToMaskCutout)
+        |> List.filterMap (Maybe.map (viewMaskCutOut editState) << spotlightToMaskCutout)
 
 
-viewPixelates : AnnotationState -> Array Annotation -> List (Svg Msg)
-viewPixelates annotationState annotations =
+viewPixelates : EditState -> Array Annotation -> List (Svg Msg)
+viewPixelates editState annotations =
     annotations
         |> Array.toIndexedList
-        |> List.filterMap (uncurry (Annotation.viewPixelate annotationState))
+        |> List.filterMap (uncurry (Annotation.viewPixelate editState))
         |> List.concat
 
 
-maskDefinition : Float -> Float -> List (Svg Msg) -> Svg Msg
-maskDefinition width height shapes =
+maskDefinition : List (Svg Msg) -> Svg Msg
+maskDefinition shapes =
     rect
         ([ Attr.x "0"
          , Attr.y "0"
-         , Attr.width <| toString width
-         , Attr.height <| toString height
+         , Attr.width "100%"
+         , Attr.height "100%"
          , Attr.opacity "0.5"
          , Attr.fill "white"
          ]
@@ -74,8 +74,6 @@ pixelateMaskDefinition shapes =
         |> Svg.mask [ Attr.id "pixelateMask" ]
 
 
-{-| TODO: fix these filters for lines. Lines/Arrows render very strangely with this filter.
--}
 viewSvgFilters : List (Svg Msg)
 viewSvgFilters =
     [ Svg.filter [ id "pixelate", Attr.x "0", Attr.y "0" ]
@@ -99,13 +97,13 @@ viewSvgFilters =
     ]
 
 
-viewDefinitions : Float -> Float -> List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg)
-viewDefinitions width height spotlightCutOuts blurCutOuts =
+viewDefinitions : List (Svg Msg) -> List (Svg Msg) -> List (Svg Msg)
+viewDefinitions spotlightCutOuts blurCutOuts =
     [ Svg.linearGradient [ id "striped", Attr.x1 "50%", Attr.x2 "50%", Attr.y1 "0%", Attr.y2 "100%" ]
         [ Svg.stop [ Attr.offset "0%", Attr.stopColor "#FFF", Attr.stopOpacity ".5" ] []
         , Svg.stop [ Attr.offset "100%", Attr.stopOpacity ".5" ] []
         ]
-    , maskDefinition width height spotlightCutOuts
+    , maskDefinition spotlightCutOuts
     , pixelateMaskDefinition blurCutOuts
     , Svg.path [ Attr.d "M0 0h28v28H0V0zm6 7v14h16V7H6z", id "rect" ] []
     , Svg.mask [ Attr.fill "#fff", id "rectMask" ]

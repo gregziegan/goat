@@ -1,7 +1,8 @@
 module Goat.ControlOptions exposing (strokeColors, fills, strokeStyles, fontSizes, controlUIWidth)
 
 import Color exposing (Color)
-import Goat.Model exposing (Drawing(DrawPixelate, DrawLine, DrawShape, DrawTextBox, DrawSpotlight), StrokeStyle(SolidThin, SolidMedium, SolidThick, SolidVeryThick, DashedThin, DashedMedium, DashedThick, DashedVeryThick), LineType(Arrow, StraightLine), ShapeType(Rect, RoundedRect, Ellipse))
+import Goat.Annotation as Annotation
+import Goat.Annotation.Shared exposing (StrokeStyle)
 
 
 strokeColors : List Color
@@ -35,15 +36,7 @@ fills =
 
 strokeStyles : List StrokeStyle
 strokeStyles =
-    [ SolidThin
-    , SolidMedium
-    , SolidThick
-    , SolidVeryThick
-    , DashedThin
-    , DashedMedium
-    , DashedThick
-    , DashedVeryThick
-    ]
+    Annotation.strokeStyles
 
 
 fontSizes : List Int

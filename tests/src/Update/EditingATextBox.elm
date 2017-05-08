@@ -3,9 +3,10 @@ module Update.EditingATextBox exposing (all)
 import Array.Hamt as Array
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, autoExpand, end, model, start)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..), Annotation(TextBox))
-import Goat.Update exposing (addAnnotation, autoExpandAnnotation, editTextBoxAnnotation, finishEditingText, startEditingText)
-import Goat.Utils exposing (currentAnnotationAttributes)
+import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..))
+import Goat.EditState as EditState
+import Goat.Model exposing (Drawing(..))
+import Goat.Update exposing (addAnnotation, editTextBoxAnnotation, finishEditingText, startEditingText, annotationAttributesInModel)
 import Test exposing (..)
 import TestUtil exposing (getAnnotationText, getFirstAnnotation)
 
@@ -19,6 +20,10 @@ all =
         ]
 
 
+curAttributes =
+    annotationAttributesInModel model
+
+
 startEditingTextTests : Test
 startEditingTextTests =
     describe "startEditingText"
@@ -27,8 +32,10 @@ startEditingTextTests =
                 model
                     |> addAnnotation (TextBox aTextArea)
                     |> startEditingText 0
-                    |> .annotationState
-                    |> Expect.equal (EditingATextBox 0 (currentAnnotationAttributes model))
+                    |> .editState
+                    |> EditState.whenEditingText
+                        (Expect.equal { id = 0, attributes = curAttributes })
+                        (Expect.fail "Should be editing text")
         ]
 
 
@@ -67,10 +74,9 @@ finishEditingTextTests =
                     |> startEditingText 0
                     |> editTextBoxAnnotation 0 autoExpand "goats"
                     |> finishEditingText 0
-                    |> Expect.all
-                        [ Expect.equal ReadyToDraw << .annotationState
-                        , Expect.equal (Just (autoExpandAnnotation autoExpand "goats" (TextBox aTextArea))) << getFirstAnnotation
-                        ]
+                    |> EditState.whenNotSelecting
+                        (Expect.equal (Just (Annotation.autoExpand autoExpand "goats" (TextBox aTextArea))) << getFirstAnnotation)
+                        (Expect.fail "should return to not selecting")
         , test "should remove textbox if text is empty" <|
             \() ->
                 model

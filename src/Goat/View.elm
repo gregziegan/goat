@@ -1,15 +1,17 @@
 module Goat.View exposing (view)
 
+import Goat.EditState exposing (currentAnnotationAttributes)
 import Goat.Flags exposing (Image)
-import Goat.Model exposing (..)
-import Goat.Update exposing (Msg(..), autoExpandConfig)
-import Goat.Utils exposing (..)
+import Goat.Model exposing (Model, Platform(Web, Zendesk))
+import Goat.Update exposing (Msg(..), extractAnnotationAttributes)
 import Goat.View.Controls as Controls
 import Goat.View.DrawingArea as DrawingArea
+import Goat.View.DrawingArea.Annotation exposing (DrawingModifiers)
 import Goat.View.ImageSelector as ImageSelector
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)
+import Keyboard.Extra exposing (Key(Shift))
 import List.Zipper exposing (Zipper)
 
 
@@ -88,11 +90,16 @@ viewInfoScreen =
         ]
 
 
+toDrawingModifiers : Model -> DrawingModifiers
+toDrawingModifiers model =
+    DrawingModifiers model.drawing (List.member Shift model.pressedKeys) model.editState
+
+
 viewImageAnnotator : Model -> Image -> Html Msg
 viewImageAnnotator model selectedImage =
     let
         annotationAttrs =
-            (annotationStateAttributes model)
+            currentAnnotationAttributes model.editState (extractAnnotationAttributes model)
     in
         div
             [ class "annotation-app"
@@ -100,7 +107,7 @@ viewImageAnnotator model selectedImage =
             [ viewModals model
             , viewModalMask model.showingAnyMenu
             , Controls.viewControls model annotationAttrs (Controls.viewDropdownMenu model.currentDropdown model.drawing annotationAttrs)
-            , DrawingArea.viewDrawingArea model annotationAttrs selectedImage
+            , DrawingArea.viewDrawingArea (toDrawingModifiers model) model.edits.present annotationAttrs selectedImage
             ]
 
 

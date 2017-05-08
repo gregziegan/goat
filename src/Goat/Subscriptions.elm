@@ -1,35 +1,27 @@
 module Goat.Subscriptions exposing (subscriptions)
 
-import Goat.Model exposing (AnnotationState(..), Model)
+import Goat.EditState as EditState exposing (SubscriptionConfig)
+import Goat.Model exposing (Model)
 import Goat.Ports as Ports
 import Goat.Update exposing (Msg(..))
-import Goat.Utils exposing (toDrawingPosition)
-import Keyboard.Extra as Keyboard
-import Mouse
 import Time exposing (second)
 
 
-imageAnnotationSubscriptions : Model -> List (Sub Msg)
+editStateConfig : SubscriptionConfig Msg
+editStateConfig =
+    { drawToMsg = ContinueDrawing
+    , resizeToMsg = ResizeAnnotation
+    , moveToMsg = MoveAnnotation
+    , keyboardToMsg = KeyboardMsg
+    }
+
+
+imageAnnotationSubscriptions : Model -> Sub Msg
 imageAnnotationSubscriptions model =
     if model.imageSelected then
-        case model.annotationState of
-            DrawingAnnotation _ _ _ ->
-                [ Mouse.moves (ContinueDrawing << toDrawingPosition)
-                , Sub.map KeyboardMsg Keyboard.subscriptions
-                ]
-
-            ResizingAnnotation _ _ ->
-                [ Mouse.moves (ResizeAnnotation << toDrawingPosition)
-                , Sub.map KeyboardMsg Keyboard.subscriptions
-                ]
-
-            MovingAnnotation _ _ _ _ ->
-                [ Mouse.moves (MoveAnnotation << toDrawingPosition) ]
-
-            _ ->
-                [ Sub.map KeyboardMsg Keyboard.subscriptions ]
+        EditState.subscriptions editStateConfig model.editState
     else
-        []
+        Sub.none
 
 
 subscriptions : Model -> Sub Msg
@@ -38,7 +30,7 @@ subscriptions model =
         [ Ports.setImages SetImages
         , Ports.newImage SelectImage
         , Ports.reset (\_ -> Reset)
-        , Sub.batch (imageAnnotationSubscriptions model)
+        , imageAnnotationSubscriptions model
         , case model.waitingForDropdownToggle of
             Nothing ->
                 Sub.none
