@@ -1,4 +1,4 @@
-port module Goat.Ports exposing (exportToImage, listenForUpload, setImages, newImage, reset, requestImages)
+port module Goat.Ports exposing (exportToImage, listenForUpload, setImages, newImage, reset, requestImages, selectText)
 
 import Goat.Flags exposing (Image)
 
@@ -13,6 +13,9 @@ port listenForUpload : () -> Cmd msg
 
 
 port requestImages : () -> Cmd msg
+
+
+port selectText : String -> Cmd msg
 
 
 

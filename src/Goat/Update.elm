@@ -106,7 +106,7 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
             model
                 |> startEditingText index
                 |> closeDropdown
-                => []
+                => [ Ports.selectText ("text-box-edit--" ++ toString index) ]
 
         PreventTextMouseDown ->
             model
