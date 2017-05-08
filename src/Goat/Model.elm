@@ -1,4 +1,4 @@
-module Goat.Model exposing (..)
+module Goat.Model exposing (Model, Platform(..), AttributeDropdown(..), OperatingSystem(..), AnnotationMenu, init)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)

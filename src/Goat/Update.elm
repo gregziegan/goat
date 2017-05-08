@@ -8,7 +8,7 @@ import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), EndPosit
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, ResizingInfo, SelectingInfo, StrokeStyle, Vertex)
 import Goat.EditState as EditState exposing (EditState, KeyboardConfig)
 import Goat.Flags exposing (Image)
-import Goat.Model exposing (..)
+import Goat.Model exposing (AttributeDropdown(..), Model, OperatingSystem(..))
 import Goat.Ports as Ports
 import Goat.Utils exposing (mapAtIndex, removeItemIf, removeItem)
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp))
