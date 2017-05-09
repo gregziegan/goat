@@ -11,7 +11,7 @@
   "scripts": {
     "start": "zendency development",
     "dev": "elm-live src/Main.elm --output=elm.js --debug --open",
-    "bundle": "zendency bundle $1",
+    "bundle": "elm-make src/Main.elm --output=elm.js && uglifyjs -c -m -o elm.js elm.js && zendency bundle $1",
     "test": "elm-test"
   },
   "main": "./",
