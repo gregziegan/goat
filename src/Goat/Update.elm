@@ -656,28 +656,28 @@ alterToolbarWithKeyboard ctrlPressed keyChange model =
                     { model | drawing = DrawLine StraightLine }
 
                 CharR ->
-                    { model | drawing = DrawShape Rect }
+                    { model | drawing = DrawShape Rect, shape = DrawShape Rect }
 
                 CharO ->
-                    { model | drawing = DrawShape RoundedRect }
+                    { model | drawing = DrawShape RoundedRect, shape = DrawShape RoundedRect }
 
                 CharE ->
-                    { model | drawing = DrawShape Ellipse }
+                    { model | drawing = DrawShape Ellipse, shape = DrawShape Ellipse }
 
                 CharT ->
                     { model | drawing = DrawTextBox }
 
                 CharG ->
-                    { model | drawing = DrawSpotlight Rect }
+                    { model | drawing = DrawSpotlight Rect, spotlight = DrawSpotlight Rect }
 
                 CharC ->
                     if ctrlPressed then
                         model
                     else
-                        { model | drawing = DrawSpotlight RoundedRect }
+                        { model | drawing = DrawSpotlight RoundedRect, spotlight = DrawSpotlight RoundedRect }
 
                 CharI ->
-                    { model | drawing = DrawSpotlight Ellipse }
+                    { model | drawing = DrawSpotlight Ellipse, spotlight = DrawSpotlight Ellipse }
 
                 CharP ->
                     { model | drawing = DrawPixelate }

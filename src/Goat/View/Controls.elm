@@ -43,7 +43,7 @@ viewHistoryControls os edits =
             , title <|
                 case os of
                     MacOS ->
-                        "Undo (⌘ + Z)"
+                        "Undo (Cmd-Z)"
 
                     Windows ->
                         "Undo (Ctrl + Z)"
@@ -56,10 +56,10 @@ viewHistoryControls os edits =
             , title <|
                 case os of
                     MacOS ->
-                        "Redo (⌘ + ⇧ Shift + Z)"
+                        "Redo (Cmd-Shift-Z)"
 
                     Windows ->
-                        "Redo (Ctrl + ⇧ Shift + Z)"
+                        "Redo (Ctrl + Shift + Z)"
             ]
             [ Icons.viewUndoArrow ]
         ]
@@ -89,15 +89,9 @@ viewShapesDropdown toDropdownMenu selectedDrawing curShape os =
             , onMouseUp CancelDropdownWait
             , classList
                 [ "drawing-button" => True
-                , "drawing-button--selected" => List.member selectedDrawing shapes --List.isEmpty (List.filter (drawingsAreEqual drawing) shapes)
+                , "drawing-button--selected" => List.member selectedDrawing shapes
                 ]
-            , title <|
-                case os of
-                    MacOS ->
-                        "Font Sizes (N)"
-
-                    Windows ->
-                        "Fon̲t Sizes"
+            , title (drawingToTitle os curShape)
             ]
             [ viewShapeSvg curShape
             , Icons.viewCornerArrow
@@ -117,13 +111,7 @@ viewSpotlightsDropdown toDropdownMenu selectedDrawing curSpotlight os =
                 , "drawing-button--selected" => List.member selectedDrawing spotlights
                 , "drawing-button--spotlight" => True
                 ]
-            , title <|
-                case os of
-                    MacOS ->
-                        "Font Sizes (N)"
-
-                    Windows ->
-                        "Fon̲t Sizes"
+            , title (drawingToTitle os curSpotlight)
             ]
             [ viewShapeSvg curSpotlight
             , Icons.viewCornerArrow
@@ -219,7 +207,7 @@ viewStrokeStyleDropdown toDropdownMenu strokeStyle os =
             , title <|
                 case os of
                     MacOS ->
-                        "Stroke Styles"
+                        "Stroke Styles (S)"
 
                     Windows ->
                         "S̲troke Styles"
@@ -447,7 +435,7 @@ macDrawingToTitle drawing =
         DrawSpotlight shapeType ->
             case shapeType of
                 Rect ->
-                    "Spotlight Rectangle (P)"
+                    "Spotlight Rectangle (G)"
 
                 RoundedRect ->
                     "Spotlight Rounded Rectangle (C)"
