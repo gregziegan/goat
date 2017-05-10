@@ -1,5 +1,13 @@
 module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
 
+{-| The finite state machine for annotating.
+See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
+
+EditState's constructors are not exposed so that we force transitions via these top-level
+functions, with the exception of `initialState`.
+
+-}
+
 import Goat.Annotation exposing (SelectState, SelectState(..))
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex)
 import Goat.ControlOptions as ControlOptions
@@ -14,6 +22,18 @@ import Svg.Attributes as Attr
 import Touch as T
 
 
+type EditState
+    = NotSelecting
+    | Drawing DrawingInfo
+    | Selecting SelectingInfo
+    | Moving MovingInfo
+    | Resizing ResizingInfo
+    | EditingText EditingTextInfo
+
+
+{-| EditState provides subscriptions for mouse movements and keyboard interactions.
+These subscriptions will be turned on/off depending on the edit state.
+-}
 type alias SubscriptionConfig msg =
     { drawToMsg : Position -> msg
     , resizeToMsg : Position -> msg
@@ -22,6 +42,8 @@ type alias SubscriptionConfig msg =
     }
 
 
+{-| Individual Annotations (svgs) are moved on mouse/touch interaction.
+-}
 type alias AnnotationConfig msg =
     { selectAndMove : Position -> msg
     , contextMenu : Position -> msg
@@ -30,6 +52,12 @@ type alias AnnotationConfig msg =
     }
 
 
+{-| This configuration is for the svg drawing area.
+
+This drawing area *should* only need to be used for drawing, but sometimes the selected vertex is not directly under a quickly
+moving mouse. So, we make sure to capture resizing events on the drawspace as the source of truth.
+
+-}
 type alias DrawingConfig msg =
     { startDrawing : Position -> msg
     , continueDrawing : Position -> msg
@@ -43,6 +71,13 @@ type alias DrawingConfig msg =
     }
 
 
+{-| This record is exposing all of the information in the state machine.
+Ths is used by the consuming app handling all keyboard shortcuts, copy/paste, etc.
+
+TODO: investigate what state dependent logic can be done in this module so that we do
+not have to provide this configuration.
+
+-}
 type alias KeyboardConfig a b =
     { notSelecting : a -> b
     , drawing : DrawingInfo -> a -> b
@@ -51,18 +86,6 @@ type alias KeyboardConfig a b =
     , resizing : ResizingInfo -> a -> b
     , editingText : EditingTextInfo -> a -> b
     }
-
-
-{-| The finite state machine for annotating.
-See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
--}
-type EditState
-    = NotSelecting
-    | Drawing DrawingInfo
-    | Selecting SelectingInfo
-    | Moving MovingInfo
-    | Resizing ResizingInfo
-    | EditingText EditingTextInfo
 
 
 initialState : EditState
