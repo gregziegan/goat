@@ -1,8 +1,7 @@
 module Goat.View.DrawingArea exposing (viewDrawingArea, viewAnnotationMenu)
 
 import Array.Hamt as Array exposing (Array)
-import Color
-import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate), ShapeType, Shape, spotlightToMaskCutout)
+import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate))
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo)
 import Goat.EditState as EditState exposing (DrawingConfig, EditState)
 import Goat.Flags exposing (Image)
@@ -131,12 +130,7 @@ viewSpotlights : EditState -> Array Annotation -> List (Svg Msg)
 viewSpotlights editState annotations =
     annotations
         |> Array.toIndexedList
-        |> List.filterMap (Maybe.map (viewMaskCutOut editState) << spotlightToMaskCutout)
-
-
-viewMaskCutOut : EditState -> ( Int, ShapeType, Shape ) -> Svg Msg
-viewMaskCutOut editState ( index, shapeType, shape ) =
-    Annotation.viewShape (EditState.annotationEvents (Annotation.annotationConfig index) index editState) shapeType (Just Color.black) shape
+        |> List.filterMap (Annotation.viewSpotlightInMask editState)
 
 
 viewNonSpotlightAnnotations : EditState -> Array Annotation -> List (Svg Msg)

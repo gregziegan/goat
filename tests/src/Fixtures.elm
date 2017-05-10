@@ -4,7 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color
 import Goat.Annotation as Annotation exposing (EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, autoExpandConfig, shiftPosition)
-import Goat.Annotation.Shared exposing (DrawingInfo, ResizingInfo, StrokeStyle, Vertex(..))
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle, Vertex(..))
 import Goat.EditState as EditState
 import Goat.Flags exposing (Image)
 import Goat.Model exposing (Model, OperatingSystem(MacOS), Platform(Web))
@@ -102,3 +102,8 @@ drawingInfo =
 resizingInfo : ResizingInfo
 resizingInfo =
     ResizingInfo 0 start (shiftPosition -10 -10 start) Start ( start, end ) (extractAnnotationAttributes model)
+
+
+attributes : AnnotationAttributes
+attributes =
+    extractAnnotationAttributes model
