@@ -10,8 +10,9 @@
 </p>
 
 ## Motivation
+I wanted to help Support Agents give more context to their screenshots!
 
-This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/#Compose_&_Edit)
+https://www.zendesk.com/apps/goat/
 
 ## Credits
 
