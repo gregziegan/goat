@@ -151,7 +151,7 @@ isEmptyTextBox : Annotation -> Bool
 isEmptyTextBox annotation =
     case annotation of
         TextBox textArea ->
-            textArea.text == ""
+            (String.trim textArea.text) == ""
 
         _ ->
             False
