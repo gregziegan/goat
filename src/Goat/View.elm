@@ -105,8 +105,8 @@ viewImageAnnotator model selectedImage =
             [ class "annotation-app" ]
             [ viewModals model
             , viewModalMask model.showingAnyMenu
-            , Controls.viewControls model annotationAttrs (Controls.viewDropdownMenu model.currentDropdown model.drawing annotationAttrs)
-            , DrawingArea.viewDrawingArea (toDrawingModifiers model) model.edits.present annotationAttrs selectedImage
+            , Controls.view model annotationAttrs (Controls.viewDropdownMenu model.currentDropdown model.drawing annotationAttrs)
+            , DrawingArea.view (toDrawingModifiers model) model.edits.present annotationAttrs selectedImage
             ]
 
 

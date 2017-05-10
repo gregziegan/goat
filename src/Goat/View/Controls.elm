@@ -1,10 +1,9 @@
-module Goat.View.Controls exposing (viewControls, viewDropdownMenu)
+module Goat.View.Controls exposing (view, viewDropdownMenu)
 
 import Array.Hamt exposing (Array)
 import Color exposing (Color)
 import Goat.Annotation exposing (Annotation, Drawing(..), LineType(..), ShapeType(..), shapes, spotlights)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, StrokeStyle(..))
-import Goat.ControlOptions as ControlOptions exposing (fontSizes)
 import Goat.Model exposing (AttributeDropdown(..), Model, OperatingSystem(..))
 import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing)
 import Goat.View.Icons as Icons
@@ -13,10 +12,58 @@ import Html.Attributes exposing (attribute, class, classList, disabled, id, src,
 import Html.Events exposing (onClick, onMouseDown, onMouseUp, onWithOptions)
 import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
+import Color exposing (Color)
+import Goat.Annotation as Annotation
+import Goat.Annotation.Shared exposing (StrokeStyle)
 
 
-viewControls : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewControls model annotationAttrs toDropdownMenu =
+strokeColors : List Color
+strokeColors =
+    [ Color.rgb 255 0 212
+    , Color.rgb 255 0 0
+    , Color.rgb 73 0 255
+    , Color.rgb 0 202 255
+    , Color.rgb 16 255 0
+    , Color.rgb 255 226 0
+    , Color.rgb 255 129 0
+    , Color.black
+    , Color.white
+    ]
+
+
+fills : List (Maybe Color)
+fills =
+    [ Nothing
+    , Just (Color.rgb 255 0 212)
+    , Just (Color.rgb 255 0 0)
+    , Just (Color.rgb 73 0 255)
+    , Just (Color.rgb 0 202 255)
+    , Just (Color.rgb 16 255 0)
+    , Just (Color.rgb 255 226 0)
+    , Just (Color.rgb 255 129 0)
+    , Just Color.black
+    , Just Color.white
+    ]
+
+
+strokeStyles : List StrokeStyle
+strokeStyles =
+    Annotation.strokeStyles
+
+
+fontSizes : List Int
+fontSizes =
+    [ 14
+    , 16
+    , 20
+    , 26
+    , 32
+    , 40
+    ]
+
+
+view : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
+view model annotationAttrs toDropdownMenu =
     div
         [ class "controls" ]
         [ viewNavigationControls
@@ -142,21 +189,21 @@ viewFontSizeDropdown toDropdownMenu os =
 
 viewFontSizeOptions : Int -> Html Msg
 viewFontSizeOptions fontSize =
-    ControlOptions.fontSizes
+    fontSizes
         |> List.map (viewFontSizeOption fontSize)
         |> div [ class "dropdown-options" ]
 
 
 viewFillOptions : Maybe Color -> Html Msg
 viewFillOptions fill =
-    ControlOptions.fills
+    fills
         |> List.map (viewFillOption fill)
         |> div [ class "dropdown-options" ]
 
 
 viewStrokeColorOptions : Color -> Html Msg
 viewStrokeColorOptions strokeColor =
-    ControlOptions.strokeColors
+    strokeColors
         |> List.map (viewStrokeColorOption strokeColor)
         |> div [ class "dropdown-options" ]
 
@@ -262,7 +309,7 @@ viewStrokeColorDropdown toDropdownMenu strokeColor os =
 
 viewStrokeStyleOptions : StrokeStyle -> Html Msg
 viewStrokeStyleOptions strokeStyle =
-    ControlOptions.strokeStyles
+    strokeStyles
         |> List.map (viewStrokeStyleOption strokeStyle)
         |> div [ class "dropdown-options" ]
 

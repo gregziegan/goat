@@ -10,7 +10,6 @@ functions, with the exception of `initialState`.
 
 import Goat.Annotation exposing (SelectState, SelectState(..))
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex)
-import Goat.ControlOptions as ControlOptions
 import Goat.View.EventUtils exposing (defaultPrevented, onMouseDown, onMouseUp, stopPropagation)
 import Html.Events exposing (onWithOptions)
 import Json.Decode as Json
@@ -266,9 +265,18 @@ updateSelectedAttributes updateAttrs editState =
             editState
 
 
+{-| The sidebar is a hard-coded width. This offset is used to shift the incoming mouse position.
+TODO: investigate whether this can be skipped by using position: relative, or some
+other CSS rule.
+-}
+controlUIWidth : number
+controlUIWidth =
+    83
+
+
 toDrawingPosition : Mouse.Position -> Mouse.Position
 toDrawingPosition mouse =
-    { mouse | x = mouse.x - ControlOptions.controlUIWidth, y = mouse.y - 10 }
+    { mouse | x = mouse.x - controlUIWidth, y = mouse.y - 10 }
 
 
 toPosition : ST.SingleTouch -> Position

@@ -1,4 +1,4 @@
-module Goat.View.DrawingArea exposing (viewDrawingArea, viewAnnotationMenu, viewImage, viewPixelatedImage)
+module Goat.View.DrawingArea exposing (view, viewAnnotationMenu, viewImage, viewPixelatedImage)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate))
@@ -79,38 +79,26 @@ viewAnnotations annotations spotlights nonSpotlights isDrawingSpotlight =
                 ++ (viewMask :: List.drop firstSpotlightIndex nonSpotlights)
 
 
-type alias Spotlights =
-    List (Svg Msg)
-
-
-type alias Pixelates =
-    List (Svg Msg)
-
-
-type alias Annotations =
-    List (Svg Msg)
-
-
 type alias IsInMask =
     Bool
 
 
-viewDrawingAndAnnotations :
-    Image
-    -> Spotlights
-    -> Pixelates
-    -> Annotations
-    -> Bool
-    -> (IsInMask -> Svg Msg)
-    -> List (Svg Msg)
-viewDrawingAndAnnotations image spotlights pixelates annotations isSpotlight toDrawing =
-    if isSpotlight then
+type alias MaskInsertsAndAnnotations =
+    { spotlights : List (Svg Msg)
+    , pixelates : List (Svg Msg)
+    , imagesAndAnnotations : List (Svg Msg)
+    }
+
+
+viewDrawingAndAnnotations : MaskInsertsAndAnnotations -> Bool -> (IsInMask -> Svg Msg) -> List (Svg Msg)
+viewDrawingAndAnnotations { spotlights, pixelates, imagesAndAnnotations } isSpotlightDrawing toDrawing =
+    if isSpotlightDrawing then
         [ Definitions.view (spotlights ++ [ toDrawing True ]) pixelates ]
-            ++ (viewPixelatedImage image :: viewImage image :: annotations)
+            ++ imagesAndAnnotations
             ++ [ toDrawing False ]
     else
         [ Definitions.view spotlights pixelates ]
-            ++ (viewPixelatedImage image :: viewImage image :: annotations)
+            ++ imagesAndAnnotations
             ++ [ toDrawing False ]
 
 
@@ -153,12 +141,9 @@ viewPixelates editState annotations =
         |> List.concat
 
 
-viewDrawingArea : Annotation.DrawingModifiers -> Array Annotation -> AnnotationAttributes -> Image -> Html Msg
-viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotations annotationAttrs image =
+maskInsertsAndAnnotations : Image -> Drawing -> EditState -> Array Annotation -> MaskInsertsAndAnnotations
+maskInsertsAndAnnotations image drawing editState annotations =
     let
-        toDrawing =
-            Annotation.viewDrawing editState drawingModifiers annotationAttrs
-
         spotlights =
             viewSpotlights editState annotations
 
@@ -170,18 +155,30 @@ viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotati
 
         nonSpotlights =
             viewNonSpotlightAnnotations editState annotations
+
+        imagesAndAnnotations =
+            viewPixelatedImage image :: viewImage image :: svgAnnotations
     in
-        div
-            (canvasAttributes drawing editState)
-            [ svg
-                [ Attr.id "drawing"
-                , Attr.class "drawing"
-                , Attr.width (toString (round image.width))
-                , Attr.height (toString (round image.height))
-                , attribute "xmlns" "http://www.w3.org/2000/svg"
-                ]
-                (viewDrawingAndAnnotations image spotlights pixelates svgAnnotations (isSpotlightDrawing drawing) toDrawing)
+        MaskInsertsAndAnnotations spotlights pixelates imagesAndAnnotations
+
+
+view : Annotation.DrawingModifiers -> Array Annotation -> AnnotationAttributes -> Image -> Html Msg
+view ({ drawing, constrain, editState } as drawingModifiers) annotations annotationAttrs image =
+    div
+        (canvasAttributes drawing editState)
+        [ svg
+            [ Attr.id "drawing"
+            , Attr.class "drawing"
+            , Attr.width (toString (round image.width))
+            , Attr.height (toString (round image.height))
+            , attribute "xmlns" "http://www.w3.org/2000/svg"
             ]
+            (viewDrawingAndAnnotations
+                (maskInsertsAndAnnotations image drawing editState annotations)
+                (isSpotlightDrawing drawing)
+                (Annotation.viewDrawing editState drawingModifiers annotationAttrs)
+            )
+        ]
 
 
 viewMask : Svg msg
