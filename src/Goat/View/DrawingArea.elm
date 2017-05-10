@@ -1,7 +1,8 @@
 module Goat.View.DrawingArea exposing (viewDrawingArea, viewAnnotationMenu)
 
 import Array.Hamt as Array exposing (Array)
-import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate))
+import Color
+import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate), ShapeType, Shape, spotlightToMaskCutout)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo)
 import Goat.EditState as EditState exposing (DrawingConfig, EditState)
 import Goat.Flags exposing (Image)
@@ -105,11 +106,11 @@ viewDrawingAndAnnotations :
     -> List (Svg Msg)
 viewDrawingAndAnnotations image spotlights pixelates annotations isSpotlight toDrawing =
     if isSpotlight then
-        Definitions.viewDefinitions (spotlights ++ [ toDrawing True ]) pixelates
+        [ Definitions.view (spotlights ++ [ toDrawing True ]) pixelates ]
             ++ (viewPixelatedImage image :: viewImage image :: annotations)
             ++ [ toDrawing False ]
     else
-        Definitions.viewDefinitions spotlights pixelates
+        [ Definitions.view spotlights pixelates ]
             ++ (viewPixelatedImage image :: viewImage image :: annotations)
             ++ [ toDrawing False ]
 
@@ -126,6 +127,38 @@ insertIfPixelate annotations spotlights nonSpotlights drawing { start, curPos } 
             ( annotations, viewAnnotations annotations spotlights nonSpotlights (isSpotlightDrawing drawing) )
 
 
+viewSpotlights : EditState -> Array Annotation -> List (Svg Msg)
+viewSpotlights editState annotations =
+    annotations
+        |> Array.toIndexedList
+        |> List.filterMap (Maybe.map (viewMaskCutOut editState) << spotlightToMaskCutout)
+
+
+viewMaskCutOut : EditState -> ( Int, ShapeType, Shape ) -> Svg Msg
+viewMaskCutOut editState ( index, shapeType, shape ) =
+    Annotation.viewShape (EditState.annotationEvents (Annotation.annotationConfig index) index editState) shapeType (Just Color.black) shape
+
+
+viewNonSpotlightAnnotations : EditState -> Array Annotation -> List (Svg Msg)
+viewNonSpotlightAnnotations editState annotations =
+    let
+        annotationsAndVertices =
+            annotations
+                |> Array.toList
+                |> List.indexedMap (Annotation.viewAnnotation editState)
+    in
+        List.map Tuple.first annotationsAndVertices
+            ++ List.filterMap Tuple.second annotationsAndVertices
+
+
+viewPixelates : EditState -> Array Annotation -> List (Svg Msg)
+viewPixelates editState annotations =
+    annotations
+        |> Array.toIndexedList
+        |> List.filterMap (uncurry (Annotation.viewPixelate editState))
+        |> List.concat
+
+
 viewDrawingArea : Annotation.DrawingModifiers -> Array Annotation -> AnnotationAttributes -> Image -> Html Msg
 viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotations annotationAttrs image =
     let
@@ -133,16 +166,16 @@ viewDrawingArea ({ drawing, constrain, editState } as drawingModifiers) annotati
             Annotation.viewDrawing editState drawingModifiers annotationAttrs
 
         spotlights =
-            Definitions.viewSpotlights editState annotations
+            viewSpotlights editState annotations
 
         ( pixelates, svgAnnotations ) =
             editState
                 |> EditState.viewDrawing (insertIfPixelate annotations spotlights nonSpotlights drawing)
                 |> Maybe.withDefault ( annotations, viewAnnotations annotations spotlights nonSpotlights False )
-                |> Tuple.mapFirst (Definitions.viewPixelates editState)
+                |> Tuple.mapFirst (viewPixelates editState)
 
         nonSpotlights =
-            Definitions.viewNonSpotlightAnnotations editState annotations
+            viewNonSpotlightAnnotations editState annotations
     in
         div
             (canvasAttributes drawing editState)
