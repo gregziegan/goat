@@ -5,7 +5,9 @@
 </p>
 
 ## Demo
-![goat-demo](https://cloud.githubusercontent.com/assets/3099999/25797188/0afd1206-3391-11e7-9a6f-06e82f07affe.gif)
+<p align="center">
+ <img src="https://cloud.githubusercontent.com/assets/3099999/25921130/28d9c5ea-3589-11e7-9292-aad812cc9a85.gif" alt="G.O.A.T. Demo"/>
+</p>
 
 ## Motivation
 
