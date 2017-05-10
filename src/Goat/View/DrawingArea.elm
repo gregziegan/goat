@@ -167,8 +167,7 @@ view ({ drawing, constrain, editState } as drawingModifiers) annotations annotat
     div
         (canvasAttributes drawing editState)
         [ svg
-            [ Attr.id "drawing"
-            , Attr.class "drawing"
+            [ Attr.class "drawing-area"
             , Attr.width (toString (round image.width))
             , Attr.height (toString (round image.height))
             , attribute "xmlns" "http://www.w3.org/2000/svg"
