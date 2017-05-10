@@ -1,9 +1,10 @@
 module Update exposing (all)
 
+import Array.Hamt as Array
 import Color
 import Expect exposing (Expectation)
-import Fixtures exposing (aShape, autoExpand, drawingInfo, end, model, resizingInfo, start, testColor)
-import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), shiftPosition)
+import Fixtures exposing (aShape, autoExpand, drawingInfo, end, model, resizingInfo, start, testColor, aTextArea)
+import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), shiftPosition, LineType(..), ShapeType(..))
 import Goat.Annotation.Shared exposing (Vertex(Start))
 import Goat.Model exposing (Model)
 import Goat.Update exposing (Msg(..), Msg(SelectStrokeColor), extractAnnotationAttributes, moveAnnotation, selectAnnotation)
@@ -99,4 +100,47 @@ all =
                 modelWithGoatsText
                     |> getFirstAnnotation
                     |> Expect.equal (Just goatsTextArea)
+        , test "should cancel drawing if it is too small" <|
+            \() ->
+                model
+                    |> update (ChangeDrawing (DrawLine Arrow))
+                    |> update (StartDrawing start)
+                    |> update (FinishDrawing (shiftPosition 2 2 start))
+                    |> .edits
+                    |> .present
+                    |> Array.isEmpty
+                    |> Expect.true "drawing should not be added to array"
+        , test "should cancel drawing if it is too small, with more tolerance for spotlights" <|
+            \() ->
+                model
+                    |> update (ChangeDrawing (DrawSpotlight Rect))
+                    |> update (StartDrawing start)
+                    |> update (FinishDrawing (shiftPosition 6 6 start))
+                    |> .edits
+                    |> .present
+                    |> Array.isEmpty
+                    |> Expect.true "spotlight drawing should not be added to array"
+        , test "editing a textbox's text should not add to the undo history" <|
+            \() ->
+                model
+                    |> update (ChangeDrawing (DrawTextBox))
+                    |> update (StartDrawing start)
+                    |> update (FinishDrawing end)
+                    |> update (TextBoxInput 0 { state = aTextArea.autoexpand, textValue = "New Text" })
+                    |> .edits
+                    |> .past
+                    |> List.length
+                    |> Expect.equal 1
+        , test "should remove textbox if text only has spaces/empty" <|
+            \() ->
+                model
+                    |> update (ChangeDrawing (DrawTextBox))
+                    |> update (StartDrawing start)
+                    |> update (FinishDrawing end)
+                    |> update (TextBoxInput 0 { state = aTextArea.autoexpand, textValue = " " })
+                    |> update (FinishEditingText 0)
+                    |> .edits
+                    |> .present
+                    |> Array.isEmpty
+                    |> Expect.true "the empty textbox should be gone!"
         ]

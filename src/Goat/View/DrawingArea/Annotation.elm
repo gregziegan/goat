@@ -1,4 +1,4 @@
-module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotation, viewShape, viewPixelate, viewDrawing, annotationConfig)
+module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotation, viewShape, viewPixelate, viewSpotlightInMask, viewDrawing, annotationConfig, linePath, arrowPath, arrowHeadPath)
 
 import AutoExpand
 import Color exposing (Color)
@@ -561,7 +561,7 @@ viewPixelate : EditState -> Int -> Annotation -> Maybe (List (Svg Msg))
 viewPixelate editState index annotation =
     case annotation of
         Pixelate start end ->
-            Just [ Svg.rect (EditState.annotationEvents (annotationConfig index) index editState ++ rectAttrs start end ++ [ Attr.fill "black", Attr.style "all" ]) [] ]
+            Just [ Svg.rect (EditState.annotationEvents (annotationConfig index) index editState ++ rectAttrs start end ++ [ Attr.fill (Color.Convert.colorToHex Color.black) ]) [] ]
 
         _ ->
             Nothing
@@ -606,3 +606,24 @@ viewAnnotation editState index annotation =
             Pixelate start end ->
                 Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ editStateAttrs) []
                     => vertices Rectangular { start = start, end = end }
+
+
+viewSpotlightInMask : EditState -> ( Int, Annotation ) -> Maybe (Svg Msg)
+viewSpotlightInMask editState annotationById =
+    spotlightToMaskCutout annotationById
+        |> Maybe.map (viewSpotlightInMaskHelper editState)
+
+
+viewSpotlightInMaskHelper : EditState -> ( Int, ShapeType, Shape ) -> Svg Msg
+viewSpotlightInMaskHelper editState ( index, shapeType, shape ) =
+    viewShape (EditState.annotationEvents (annotationConfig index) index editState) shapeType (Just Color.black) shape
+
+
+spotlightToMaskCutout : ( Int, Annotation ) -> Maybe ( Int, ShapeType, Shape )
+spotlightToMaskCutout ( index, annotation ) =
+    case annotation of
+        Spotlight shapeType shape ->
+            Just ( index, shapeType, shape )
+
+        _ ->
+            Nothing

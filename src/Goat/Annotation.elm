@@ -1,4 +1,4 @@
-module Goat.Annotation exposing (Annotation(..), Drawing(..), SelectState(..), LineType(..), Shape, ShapeType(..), TextArea, defaultStroke, defaultDrawing, defaultShape, defaultSpotlight, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, spotlightToMaskCutout, shiftPosition, move, shiftForPaste, setFill, setStrokeColor, setStrokeStyle, setFontSize, shapes, spotlights, StartPosition, EndPosition, newTextBox, fromDrawing, resize, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, stepMouse)
+module Goat.Annotation exposing (Annotation(..), Drawing(..), SelectState(..), LineType(..), Shape, ShapeType(..), TextArea, defaultStroke, defaultDrawing, defaultShape, defaultSpotlight, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, shiftPosition, move, shiftForPaste, setFill, setStrokeColor, setStrokeStyle, setFontSize, shapes, spotlights, StartPosition, EndPosition, newTextBox, fromDrawing, resize, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, stepMouse)
 
 import AutoExpand
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle(..), Vertex(..))
@@ -151,7 +151,7 @@ isEmptyTextBox : Annotation -> Bool
 isEmptyTextBox annotation =
     case annotation of
         TextBox textArea ->
-            textArea.text == ""
+            (String.trim textArea.text) == ""
 
         _ ->
             False
@@ -269,16 +269,6 @@ toStrokeWidth strokeStyle =
 
         DashedVeryThick ->
             8
-
-
-spotlightToMaskCutout : ( Int, Annotation ) -> Maybe ( Int, ShapeType, Shape )
-spotlightToMaskCutout ( index, annotation ) =
-    case annotation of
-        Spotlight shapeType shape ->
-            Just ( index, shapeType, shape )
-
-        _ ->
-            Nothing
 
 
 arrowAngle : Position -> Position -> Float

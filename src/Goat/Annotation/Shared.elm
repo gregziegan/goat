@@ -1,6 +1,12 @@
 module Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, StrokeStyle(..), Vertex(..), Vertices(..))
 
-import AutoExpand
+{-| This module includes data shared by both the EditState module and the Annotation module.
+
+TODO: investigate whether we can provide type variables to EditState to eliminate the need for
+this Shared module.
+
+-}
+
 import Color exposing (Color)
 import Mouse exposing (Position)
 
