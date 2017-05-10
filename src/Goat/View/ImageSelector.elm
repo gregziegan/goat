@@ -2,7 +2,7 @@ module Goat.View.ImageSelector exposing (view)
 
 import Goat.Flags exposing (Image)
 import Goat.View.Icons as Icons
-import Goat.Update exposing (Msg(..))
+import Goat.Update exposing (Msg(SelectImage))
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onWithOptions)

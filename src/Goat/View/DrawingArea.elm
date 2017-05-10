@@ -6,7 +6,7 @@ import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo)
 import Goat.EditState as EditState exposing (DrawingConfig, EditState)
 import Goat.Flags exposing (Image)
 import Goat.Update exposing (Msg(..), getFirstSpotlightIndex, isSpotlightDrawing)
-import Goat.View.DrawingArea.Annotation as Annotation exposing (viewAnnotation)
+import Goat.View.DrawingArea.Annotation as Annotation exposing (DrawingModifiers, viewAnnotation)
 import Goat.View.DrawingArea.Definitions as Definitions
 import Goat.View.Utils exposing (toPx)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
@@ -162,7 +162,7 @@ maskInsertsAndAnnotations image drawing editState annotations =
         MaskInsertsAndAnnotations spotlights pixelates imagesAndAnnotations
 
 
-view : Annotation.DrawingModifiers -> Array Annotation -> AnnotationAttributes -> Image -> Html Msg
+view : DrawingModifiers -> Array Annotation -> AnnotationAttributes -> Image -> Html Msg
 view ({ drawing, constrain, editState } as drawingModifiers) annotations annotationAttrs image =
     div
         (canvasAttributes drawing editState)
