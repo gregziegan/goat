@@ -1,6 +1,5 @@
 # G.O.A.T. ![Travis](https://travis-ci.org/thebritican/goat.svg?branch=master)
-### Graphics Ornamentation and Annotation Tool
-### a.k.a. Greatest Of All Time
+### Graphic Ornamentation and Annotation Tool
 
 ## Demo
 ![goat-demo](https://cloud.githubusercontent.com/assets/3099999/25797188/0afd1206-3391-11e7-9a6f-06e82f07affe.gif)
@@ -11,9 +10,10 @@ This will soon be a [Zendesk Editor App](https://www.zendesk.com/apps/directory/
 
 ## Credits
 
+Epic 🐐-ing to [Alan Hogan](https://github.com/alanhogan) for the acronym behind the 🐐, some bugfixes, and more icons!
+
 👏 Huge thanks to [Jian Wei Liau](https://twitter.com/madebyjw) for some beautiful icons and logo! 👏
 
-Epic 🐐-ing to [Alan Hogan](https://github.com/alanhogan) for the acronym behind the 🐐, some bugfixes, and more icons!
 
 ## Development
 
