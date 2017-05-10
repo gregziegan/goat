@@ -1,6 +1,8 @@
 # G.O.A.T. ![Travis](https://travis-ci.org/thebritican/goat.svg?branch=master)
 ### Graphic Ornamentation and Annotation Tool
 
+![logo](https://github.com/thebritican/goat/blob/master/images/logo.png)
+
 ## Demo
 ![goat-demo](https://cloud.githubusercontent.com/assets/3099999/25797188/0afd1206-3391-11e7-9a6f-06e82f07affe.gif)
 
