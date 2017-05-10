@@ -12,10 +12,7 @@ import Update
 
 import Utils
 import Test exposing (..)
-
-
--- import View.DrawingArea.Annotation
-
+import View.DrawingArea.Annotation
 import View.DrawingArea.Definitions
 
 
@@ -28,8 +25,8 @@ all =
           -- , Update.MovingAnnotation.all
           -- , Update.ResizingAnnotation.all
           -- , Update.EditingATextBox.all
-          -- , View.DrawingArea.Annotation.all
-          View.DrawingArea.Definitions.all
+          View.DrawingArea.Annotation.all
+        , View.DrawingArea.Definitions.all
         , Update.all
         , Utils.all
         ]

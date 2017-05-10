@@ -1,4 +1,4 @@
-module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotation, viewShape, viewPixelate, viewSpotlightInMask, viewDrawing, annotationConfig)
+module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotation, viewShape, viewPixelate, viewSpotlightInMask, viewDrawing, annotationConfig, linePath, arrowPath, arrowHeadPath)
 
 import AutoExpand
 import Color exposing (Color)

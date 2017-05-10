@@ -4,13 +4,12 @@ import Color exposing (Color)
 import Color.Convert
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, end, goat, model, start, testColor)
+import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, toLineStyle, fontSizeToLineHeight)
+import Goat.EditState as EditState
 import Goat.Flags exposing (Image)
-import Goat.Model exposing (Annotation(..), AnnotationState(..), Drawing(..), LineType(..), Shape, ShapeType(..), TextArea)
 import Goat.Update exposing (Msg)
-import Goat.Utils exposing (arrowAngle, fontSizeToLineHeight)
 import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
-import Goat.View.DrawingArea.Annotation exposing (viewAnnotation)
-import Goat.View.Utils exposing (arrowHeadPath, arrowPath, linePath, toLineStyle, toStrokeWidth)
+import Goat.View.DrawingArea.Annotation exposing (arrowPath, arrowHeadPath, viewAnnotation, linePath)
 import Html exposing (Html)
 import Test exposing (..)
 import Test.Html.Query as Query
@@ -31,7 +30,7 @@ lineSelector : Shape -> List Selector
 lineSelector shape =
     [ attribute "stroke" "none"
     , attribute "fill" (Color.Convert.colorToHex shape.strokeColor)
-    , attribute "d" (linePath (toStrokeWidth shape.strokeStyle) shape.start shape.end)
+    , attribute "d" (linePath 4 shape.start shape.end)
     ]
 
 
@@ -54,7 +53,7 @@ arrowHeadSelector ( dx, dy ) { start, end, strokeColor } =
         [ attribute "d" (arrowHeadPath end)
         , attribute "fill" <| Color.Convert.colorToHex strokeColor
         , attribute "stroke" "none"
-        , attribute "transform" ("translate(" ++ toString dx ++ "," ++ toString dy ++ ") rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
+        , attribute "transform" ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
         , attribute "filter" "url(#dropShadow)"
         ]
 
@@ -142,7 +141,7 @@ imageTests =
 viewFirstAnnotation : Annotation -> Html Msg
 viewFirstAnnotation annotation =
     annotation
-        |> viewAnnotation ReadyToDraw 0
+        |> viewAnnotation EditState.initialState 0
         |> Tuple.first
         |> List.singleton
         |> svgDrawspace

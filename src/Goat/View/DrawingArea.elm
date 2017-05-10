@@ -1,4 +1,4 @@
-module Goat.View.DrawingArea exposing (viewDrawingArea, viewAnnotationMenu)
+module Goat.View.DrawingArea exposing (viewDrawingArea, viewAnnotationMenu, viewImage, viewPixelatedImage)
 
 import Array.Hamt as Array exposing (Array)
 import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate))
