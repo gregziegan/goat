@@ -5,7 +5,6 @@
 
   <body>
     <div id="root"></div>
-    <div id="export-image"></div>
     <script src="elm.js"></script>
     <script src="dist/goat-app_v1-0-1.min.js"></script>
     <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
@@ -57,7 +56,11 @@
           }
           loadImage(file)
             .then(function(loadedImage) {
-              app.ports.newImage.send(loadedImage);
+              if (loadedImage === null) {
+                alert('does not support this image type, please provide either a PNG');
+              } else {
+                app.ports.newImage.send(loadedImage);
+              }
             })
         }, true);
       });
@@ -94,10 +97,6 @@
       var DOMURL = window.URL || window.webkitURL || window;
 
       // helper functions
-      function hasClass(element, cls) {
-          return (' ' + element.className + ' ').indexOf(' ' + cls + ' ') > -1;
-      }
-
       function loadImageDataIntoCache(imageObject) {
         var newImg = new Image();
         newImg.width = imageObject.width;
@@ -126,28 +125,48 @@
         });
       }
 
+      function getContentType(url) {
+        if (url.indexOf('image/png') !== -1) {
+          return 'image/png';
+        } else if (url.indexOf('image/jpeg') !== -1) {
+          return 'image/jpeg'; //TODO: support jpeg
+          // return null;
+        } else {
+          return null;
+        }
+      }
+
       function loadImage(src) {
         return imageFileToB64(src)
           .then(function(e) {
-            b64ImageDict['0'] = e.target.result;
-            var contentType = 'image/png';
-            var blob = b64toBlob(e.target.result.replace('data:image/png;base64,', ''), contentType);
+            var b64Url = e.target.result;
+            b64ImageDict['0'] = b64Url;
+            var contentType = getContentType(b64Url);
+            if (contentType === null) {
+              return null;
+            }
+            var b64String = e.target.result.replace('data:' + contentType + ';base64,', '');
+            var blob = b64toBlob(b64String, contentType);
             var imageUrl = DOMURL.createObjectURL(blob);
             var newImage = new Image();
             return createImage(newImage, imageUrl)
           }).then(function(img) {
-            return {
-              id: '0',
-              url: img.src,
-              width: img.naturalWidth,
-              height: img.naturalHeight,
-              originalWidth: img.naturalWidth,
-              originalHeight: img.naturalHeight
+            if (img === null) {
+              return null;
+            } else {
+              return {
+                id: '0',
+                url: img.src,
+                width: img.naturalWidth,
+                height: img.naturalHeight,
+                originalWidth: img.naturalWidth,
+                originalHeight: img.naturalHeight
+              }
             }
           });
       }
 
-      function b64toBlob(b64Data) {
+      function b64toBlob(b64Data, contentType) {
         var contentType = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
         var sliceSize = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 512;
 
@@ -182,7 +201,7 @@
       }
 
       function exportImage() {
-        var svg = document.getElementById("drawing");
+        var svg = document.getElementById("drawing-area");
         var svgCopy = svg.cloneNode(true);
         var sanitizedSvg = encodeSvgBlobs(svgCopy);
         getPng(sanitizedSvg)
@@ -249,8 +268,12 @@
       }
 
       function exportToWeb(image) {
-        image.id = 'export-image';
-        document.body.replaceChild(image, document.getElementById('export-image'));
+        var a = document.createElement('a');
+        a.href = image.src;
+        a.download = "output.png";
+        document.body.append(a);
+        a.click();
+        document.body.removeChild(a);
       }
 
       function getPng(svg) {
