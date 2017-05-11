@@ -40,8 +40,8 @@ app.ports.requestImages.subscribe(function () {
     readInImagesFromZendesk();
   } else {
     var goats = [
-      { id: '0', url: 'images/goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
-      { id: '1', url: 'images/goat2.jpg', width: 294, height: 220, originalWidth: 800, originalHeight: 600}
+      { id: '0', url: GOAT_PATH + 'goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
+      { id: '1', url: GOAT_PATH + 'goat2.jpg', width: 294, height: 220, originalWidth: 800, originalHeight: 600}
     ];
     app.ports.setImages.send(goats);
     Array.prototype.forEach.call(goats, loadImageDataIntoCache);

@@ -114,8 +114,11 @@ freeDrawPathHelper positions pathString =
         [] ->
             pathString
 
-        pos :: rest ->
-            freeDrawPathHelper rest (pathString ++ " L " ++ posToString pos)
+        lastPos :: [] ->
+            pathString ++ " L " ++ posToString lastPos
+
+        pos :: nextPos :: rest ->
+            freeDrawPathHelper rest (pathString ++ " S " ++ posToString pos ++ " " ++ posToString nextPos)
 
 
 freeDrawPath : StartPosition -> List Position -> String
