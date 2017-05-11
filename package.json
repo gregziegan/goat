@@ -20,16 +20,16 @@
     "translations": "./translations"
   },
   "files": [
-    "./images/logo.png",
-    "./images/logo-small.png",
-    "./images/screenshot-0.png",
-    "./images/screenshot-1.png",
-    "./images/screenshot-2.png",
-    "./images/goat.jpg",
-    "./images/goat2.jpg",
-    "./images/icon_ticket_editor.svg",
+    "./docs/images/logo.png",
+    "./docs/images/logo-small.png",
+    "./docs/images/screenshot-0.png",
+    "./docs/images/screenshot-1.png",
+    "./docs/images/screenshot-2.png",
+    "./docs/images/goat.jpg",
+    "./docs/images/goat2.jpg",
+    "./docs/images/icon_ticket_editor.svg",
     "./elm.js",
     "./index.html",
-    "./style.css"
+    "./docs/style.css"
   ]
 }
