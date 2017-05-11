@@ -1,7 +1,7 @@
 # G.O.A.T. (Graphic Ornamentation and Annotation Tool) ![Travis](https://travis-ci.org/thebritican/goat.svg?branch=master)
 
 <p align="center">
- <img src="https://github.com/thebritican/goat/blob/master/images/logo.png" alt="G.O.A.T. Logo"/>
+ <img src="https://github.com/thebritican/goat/blob/master/docs/images/logo.png" alt="G.O.A.T. Logo"/>
 </p>
 
 ## Demo
