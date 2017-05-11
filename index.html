@@ -57,7 +57,7 @@
           loadImage(file)
             .then(function(loadedImage) {
               if (loadedImage === null) {
-                alert('does not support this image type, please provide either a PNG');
+                alert('does not support this image type, please provide a PNG file');
               } else {
                 app.ports.newImage.send(loadedImage);
               }
