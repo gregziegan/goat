@@ -15,6 +15,7 @@ import Html.Events exposing (onClick, onMouseEnter, onWithOptions)
 import Mouse exposing (Position)
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
+import Svg.Lazy as Svg
 
 
 viewPixelatedImage : Image -> Svg Msg
@@ -157,7 +158,7 @@ maskInsertsAndAnnotations image drawing editState annotations =
             viewNonSpotlightAnnotations editState annotations
 
         imagesAndAnnotations =
-            viewPixelatedImage image :: viewImage image :: svgAnnotations
+            (Svg.lazy viewPixelatedImage image) :: (Svg.lazy viewImage image) :: svgAnnotations
     in
         MaskInsertsAndAnnotations spotlights pixelates imagesAndAnnotations
 
