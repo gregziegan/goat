@@ -61,7 +61,6 @@ button:active, button:focus, button:hover {
 .image-edit {
   padding: 10px;
   position: relative;
-  border-right: 1px solid rgb(230, 230, 230);
 }
 
 image {
