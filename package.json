@@ -1,6 +1,7 @@
 {
   "name": "G.O.A.T.",
   "version": "1.0.2",
+  "main": "electron-start.js",
   "repository": "https://github.com/thebritican/goat",
   "description": "Graphics Ornamentation and Annotation Tool",
   "author": "greg.ziegan@gmail.com",
@@ -10,11 +11,11 @@
   },
   "scripts": {
     "start": "zendency development",
+    "desktop": "electron .",
     "dev": "elm-live src/Main.elm --output=elm.js --debug --open",
     "bundle": "elm-make src/Main.elm --output=elm.js && uglifyjs -c -m -o elm.js elm.js && zendency bundle $1",
     "test": "elm-test"
   },
-  "main": "./",
   "compiler": [],
   "directories": {
     "translations": "./translations"

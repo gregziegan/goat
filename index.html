@@ -1,14 +1,22 @@
 <!doctype html>
-  <link rel="stylesheet" href="docs/style.css" />
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<html>
+  <head>
+    <script type="text/javascript" src="./elm.js"></script>
+    <script>window.Elm = require('./elm.js');</script>
+    <script type="text/javascript" src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
+    <script type="text/javascript">
+      var GOAT_PATH = './docs/images/';
+    </script>
+    <!-- <script type="text/javascript" src="./docs/index.js"></script> -->
+    <link rel="stylesheet" href="./docs/style.css" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  </head>
 
   <body>
     <div id="root"></div>
-    <script src="elm.js"></script>
-    <script src="https://assets.zendesk.com/apps/sdk/2.0/zaf_sdk.js"></script>
-    <script>
-      var GOAT_PATH = './docs/images/';
-    </script>
-    <script src="docs/index.js"></script>
   </body>
+  <script>
+    require('./docs/index.js')
+  </script>
+</html>
