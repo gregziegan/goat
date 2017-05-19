@@ -31,5 +31,8 @@
     "./elm.js",
     "./index.html",
     "./docs/style.css"
-  ]
+  ],
+  "devDependencies": {
+    "zendency": "zendesk/zendency#v3.3.0"
+  }
 }

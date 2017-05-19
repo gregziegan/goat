@@ -42,6 +42,11 @@ elm-live src/Main.elm --output=elm.js --open --debug
 
 This will open a browser tab with CSS hot reloading and page refreshing on Elm code changes.
 
+#### Working on the Zendesk App
+
+`npm install` will install the necessary dev tools.
+
+`npm start` will run a development server, you can preview your changes on Zendesk by adding the query string: `?zat=true` to the end of the Zendesk Support url.
 
 #### Testing
 
