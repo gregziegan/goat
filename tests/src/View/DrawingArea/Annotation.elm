@@ -6,7 +6,7 @@ import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, end, goat, model, start, testColor)
 import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, toLineStyle, fontSizeToLineHeight)
 import Goat.EditState as EditState
-import Goat.Flags exposing (Image)
+import Goat.Model exposing (Image)
 import Goat.Update exposing (Msg)
 import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
 import Goat.View.DrawingArea.Annotation exposing (arrowPath, arrowHeadPath, viewAnnotation, linePath)
