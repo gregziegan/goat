@@ -7,9 +7,9 @@ import Dom
 import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, ResizingInfo, SelectingInfo, StrokeStyle, Vertex)
 import Goat.EditState as EditState exposing (EditState, KeyboardConfig)
-import Goat.Flags exposing (Image)
-import Goat.Model exposing (AttributeDropdown(..), Model, OperatingSystem(..))
+import Goat.Model exposing (Image, Model, AttributeDropdown(..))
 import Goat.Ports as Ports
+import Goat.Environment exposing (OperatingSystem(..))
 import Goat.Utils exposing (mapAtIndex, removeItemIf, removeItem)
 import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp))
 import List.Extra
@@ -65,8 +65,8 @@ type Msg
     | Save
       -- Image Selection updates
     | Reset
-    | SelectImage Image
-    | SetImages (List Image)
+    | SelectImage (Result String Image)
+    | SetImages (Result String (List Image))
     | ReturnToImageSelection
       -- Keyboard updates
     | KeyboardMsg Keyboard.Msg
@@ -123,9 +123,14 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
                 |> finishEditingText index
                 => []
 
-        SetImages images ->
-            { model | images = List.Zipper.fromList images, imageSelected = False }
-                => []
+        SetImages resultImages ->
+            case resultImages of
+                Ok images ->
+                    { model | images = List.Zipper.fromList images, imageSelected = False }
+                        => []
+
+                Err _ ->
+                    model => []
 
         Reset ->
             { model
@@ -151,10 +156,15 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
                 |> closeAllMenus
                 => []
 
-        SelectImage image ->
-            model
-                |> selectImage image
-                => []
+        SelectImage resultImage ->
+            case resultImage of
+                Ok image ->
+                    model
+                        |> selectImage image
+                        => []
+
+                Err _ ->
+                    model => []
 
         ChangeDrawing drawing ->
             model
