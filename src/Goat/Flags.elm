@@ -10,6 +10,7 @@ type alias Flags =
     }
 
 
+isMacToOS : Bool -> OperatingSystem
 isMacToOS isMac =
     if isMac then
         MacOS
@@ -17,6 +18,7 @@ isMacToOS isMac =
         Windows
 
 
+isZendeskToPlatform : Bool -> Platform
 isZendeskToPlatform inZendesk =
     if inZendesk then
         Zendesk
@@ -24,6 +26,7 @@ isZendeskToPlatform inZendesk =
         Web
 
 
+decodeFlagsHelper : Json.Decoder Flags
 decodeFlagsHelper =
     Json.map2 Flags
         (Json.map isMacToOS (Json.field "isMac" Json.bool))
