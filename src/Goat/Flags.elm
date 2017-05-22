@@ -35,5 +35,4 @@ decodeFlagsHelper =
 
 decodeFlags : Json.Value -> Result String Flags
 decodeFlags =
-    Json.decodeValue
-        decodeFlagsHelper
+    Json.decodeValue decodeFlagsHelper
