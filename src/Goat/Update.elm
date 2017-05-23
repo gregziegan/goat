@@ -1108,11 +1108,6 @@ handleKeyboardInteractions maybeKeyChange model =
                 => []
 
 
-isCtrlPressed : List Key -> OperatingSystem -> Bool
-isCtrlPressed pressedKeys os =
-    List.any (\key -> List.member key pressedKeys) (controlKeys os)
-
-
 whenNotSelectingKeyboard : KeyChange -> Model -> Model
 whenNotSelectingKeyboard keyChange model =
     let
@@ -1251,3 +1246,8 @@ isDrawingTooSmall isSpotlight start end =
         abs (start.x - end.x) < minSpotlightDrawingDistance && abs (start.y - end.y) < minSpotlightDrawingDistance
     else
         abs (start.x - end.x) < minDrawingDistance && abs (start.y - end.y) < minDrawingDistance
+
+
+isCtrlPressed : List Key -> OperatingSystem -> Bool
+isCtrlPressed pressedKeys os =
+    List.any (\key -> List.member key pressedKeys) (controlKeys os)

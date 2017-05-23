@@ -8,6 +8,8 @@ import Goat.Environment exposing (OperatingSystem(..))
 import Goat.Model exposing (AttributeDropdown(..), Model)
 import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing)
 import Goat.View.Icons as Icons
+import Goat.View.EventUtils exposing (stopPropagationAndDefault)
+import Json.Decode as Json
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style, title)
 import Html.Events exposing (onClick, onMouseDown, onMouseUp, onWithOptions)
@@ -114,33 +116,38 @@ viewHistoryControls os edits =
 
 
 viewDrawingButtons : Model -> AnnotationAttributes -> (AttributeDropdown -> Html Msg) -> Html Msg
-viewDrawingButtons { operatingSystem, drawing, shape, spotlight } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
-    div [ class "columns" ]
-        [ viewDrawingButton operatingSystem drawing (DrawLine Arrow)
-        , viewDrawingButton operatingSystem drawing DrawFreeHand
-        , viewDrawingButton operatingSystem drawing DrawTextBox
-        , viewShapesDropdown toDropdownMenu drawing shape operatingSystem
-        , viewSpotlightsDropdown toDropdownMenu drawing spotlight operatingSystem
-        , viewDrawingButton operatingSystem drawing DrawPixelate
-        , viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
-        , viewFillDropdown toDropdownMenu fill operatingSystem
-        , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
-        , viewFontSizeDropdown toDropdownMenu operatingSystem
-        ]
+viewDrawingButtons { operatingSystem, drawing, shape, spotlight, pressedKeys } { strokeColor, fill, strokeStyle, fontSize } toDropdownMenu =
+    let
+        ctrlPressed =
+            isCtrlPressed pressedKeys operatingSystem
+    in
+        div [ class "columns" ]
+            [ viewDrawingButton operatingSystem drawing (DrawLine Arrow)
+            , viewDrawingButton operatingSystem drawing DrawFreeHand
+            , viewDrawingButton operatingSystem drawing DrawTextBox
+            , viewShapesDropdown ctrlPressed toDropdownMenu drawing shape operatingSystem
+            , viewSpotlightsDropdown ctrlPressed toDropdownMenu drawing spotlight operatingSystem
+            , viewDrawingButton operatingSystem drawing DrawPixelate
+            , viewStrokeColorDropdown toDropdownMenu strokeColor operatingSystem
+            , viewFillDropdown toDropdownMenu fill operatingSystem
+            , viewStrokeStyleDropdown toDropdownMenu strokeStyle operatingSystem
+            , viewFontSizeDropdown toDropdownMenu operatingSystem
+            ]
 
 
-viewShapesDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
-viewShapesDropdown toDropdownMenu selectedDrawing curShape os =
+viewShapesDropdown : Bool -> (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
+viewShapesDropdown ctrlPressed toDropdownMenu selectedDrawing curShape os =
     div [ class "dropdown-things" ]
         [ button
-            [ onMouseDown (WaitForDropdownToggle ShapesDropdown)
-            , onMouseUp CancelDropdownWait
-            , classList
+            ([ onWithOptions "contextmenu" stopPropagationAndDefault (Json.succeed (ToggleDropdown ShapesDropdown))
+             , classList
                 [ "drawing-button" => True
                 , "drawing-button--selected" => List.member selectedDrawing shapes
                 ]
-            , title (drawingToTitle os curShape)
-            ]
+             , title (drawingToTitle os curShape)
+             ]
+                ++ delayedToggleAttributes ctrlPressed ShapesDropdown
+            )
             [ viewShapeSvg curShape
             , Icons.viewCornerArrow
             ]
@@ -148,19 +155,30 @@ viewShapesDropdown toDropdownMenu selectedDrawing curShape os =
         ]
 
 
-viewSpotlightsDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
-viewSpotlightsDropdown toDropdownMenu selectedDrawing curSpotlight os =
+delayedToggleAttributes : Bool -> AttributeDropdown -> List (Attribute Msg)
+delayedToggleAttributes ctrlPressed attributeDropdown =
+    if ctrlPressed then
+        [ onClick (ToggleDropdown attributeDropdown) ]
+    else
+        [ onMouseDown (WaitForDropdownToggle attributeDropdown)
+        , onMouseUp CancelDropdownWait
+        ]
+
+
+viewSpotlightsDropdown : Bool -> (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
+viewSpotlightsDropdown ctrlPressed toDropdownMenu selectedDrawing curSpotlight os =
     div [ class "dropdown-things" ]
         [ button
-            [ onMouseDown (WaitForDropdownToggle SpotlightsDropdown)
-            , onMouseUp CancelDropdownWait
-            , classList
+            ([ onWithOptions "contextmenu" stopPropagationAndDefault (Json.succeed (ToggleDropdown SpotlightsDropdown))
+             , classList
                 [ "drawing-button" => True
                 , "drawing-button--selected" => List.member selectedDrawing spotlights
                 , "drawing-button--spotlight" => True
                 ]
-            , title (drawingToTitle os curSpotlight)
-            ]
+             , title (drawingToTitle os curSpotlight)
+             ]
+                ++ delayedToggleAttributes ctrlPressed SpotlightsDropdown
+            )
             [ viewShapeSvg curSpotlight
             , Icons.viewCornerArrow
             ]
