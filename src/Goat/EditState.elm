@@ -92,24 +92,29 @@ initialState =
     NotSelecting
 
 
-startDrawing : Position -> EditState -> Maybe EditState
+errorMessage : EditState -> String
+errorMessage editState =
+    editStateToString editState ++ " is not a valid state to start this transition."
+
+
+startDrawing : Position -> EditState -> Result String EditState
 startDrawing start editState =
     case editState of
         NotSelecting ->
-            Just (Drawing (DrawingInfo start start []))
+            Ok (Drawing (DrawingInfo start start []))
 
         Selecting selectingInfo ->
-            Just (Drawing (DrawingInfo start start []))
+            Ok (Drawing (DrawingInfo start start []))
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-continueDrawing : Position -> Bool -> EditState -> Maybe EditState
+continueDrawing : Position -> Bool -> EditState -> Result String EditState
 continueDrawing pos trackPositions editState =
     case editState of
         Drawing { start, positions } ->
-            Just <|
+            Ok <|
                 if trackPositions then
                     Drawing
                         (DrawingInfo start pos <|
@@ -127,129 +132,151 @@ continueDrawing pos trackPositions editState =
                     Drawing (DrawingInfo start pos [])
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-finishDrawing : Position -> EditState -> Maybe ( EditState, DrawingInfo )
+editStateToString : EditState -> String
+editStateToString editState =
+    case editState of
+        NotSelecting ->
+            "NotSelecting"
+
+        Drawing drawingInfo ->
+            "Drawing"
+
+        Selecting selectingInfo ->
+            "Selecting"
+
+        Moving movingInfo ->
+            "Moving"
+
+        Resizing resizingInfo ->
+            "Resizing"
+
+        EditingText editingTextInfo ->
+            "EditingText"
+
+
+finishDrawing : Position -> EditState -> Result String ( EditState, DrawingInfo )
 finishDrawing end editState =
     case editState of
         Drawing drawingInfo ->
-            Just ( NotSelecting, { drawingInfo | curPos = end } )
+            Ok ( NotSelecting, { drawingInfo | curPos = end } )
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-finishTextDrawing : Position -> Int -> AnnotationAttributes -> EditState -> Maybe ( EditState, DrawingInfo )
+finishTextDrawing : Position -> Int -> AnnotationAttributes -> EditState -> Result String ( EditState, DrawingInfo )
 finishTextDrawing end id attributes editState =
     case editState of
         Drawing drawingInfo ->
-            Just ( EditingText (EditingTextInfo id attributes), { drawingInfo | curPos = end } )
+            Ok ( EditingText (EditingTextInfo id attributes), { drawingInfo | curPos = end } )
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-selectAnnotation : Int -> AnnotationAttributes -> EditState -> Maybe EditState
+selectAnnotation : Int -> AnnotationAttributes -> EditState -> Result String EditState
 selectAnnotation id annotationAttrs editState =
     case editState of
         NotSelecting ->
-            Just (Selecting (SelectingInfo id annotationAttrs))
+            Ok (Selecting (SelectingInfo id annotationAttrs))
 
         Selecting selectingInfo ->
-            Just (Selecting (SelectingInfo id annotationAttrs))
+            Ok (Selecting (SelectingInfo id annotationAttrs))
 
         Moving movingInfo ->
-            Just (Selecting (SelectingInfo id annotationAttrs))
+            Ok (Selecting (SelectingInfo id annotationAttrs))
 
         Resizing resizingInfo ->
-            Just (Selecting (SelectingInfo id annotationAttrs))
+            Ok (Selecting (SelectingInfo id annotationAttrs))
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-startMoving : Position -> EditState -> Maybe EditState
+startMoving : Position -> EditState -> Result String EditState
 startMoving start editState =
     case editState of
         Selecting { id, attributes } ->
-            Just (Moving (MovingInfo id start ( 0, 0 ) attributes))
+            Ok (Moving (MovingInfo id start ( 0, 0 ) attributes))
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-continueMoving : Position -> EditState -> Maybe ( EditState, MovingInfo )
+continueMoving : Position -> EditState -> Result String ( EditState, MovingInfo )
 continueMoving newPos editState =
     case editState of
         Moving movingInfo ->
-            Just ( Moving { movingInfo | translate = ( newPos.x - movingInfo.start.x, newPos.y - movingInfo.start.y ) }, movingInfo )
+            Ok ( Moving { movingInfo | translate = ( newPos.x - movingInfo.start.x, newPos.y - movingInfo.start.y ) }, movingInfo )
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-finishMoving : EditState -> Maybe ( EditState, MovingInfo )
+finishMoving : EditState -> Result String ( EditState, MovingInfo )
 finishMoving editState =
     case editState of
         Moving ({ id, attributes } as movingInfo) ->
-            Just ( Selecting (SelectingInfo id attributes), movingInfo )
+            Ok ( Selecting (SelectingInfo id attributes), movingInfo )
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-startResizing : Position -> Vertex -> ( Position, Position ) -> EditState -> Maybe EditState
+startResizing : Position -> Vertex -> ( Position, Position ) -> EditState -> Result String EditState
 startResizing start vertex originalCoords editState =
     case editState of
         Selecting { id, attributes } ->
-            Just (Resizing (ResizingInfo id start start vertex originalCoords attributes))
+            Ok (Resizing (ResizingInfo id start start vertex originalCoords attributes))
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-continueResizing : Position -> EditState -> Maybe ( EditState, ResizingInfo )
+continueResizing : Position -> EditState -> Result String ( EditState, ResizingInfo )
 continueResizing curPos editState =
     case editState of
         Resizing resizingData ->
-            Just ( Resizing { resizingData | curPos = curPos }, resizingData )
+            Ok ( Resizing { resizingData | curPos = curPos }, resizingData )
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-finishResizing : EditState -> Maybe ( EditState, ResizingInfo )
+finishResizing : EditState -> Result String ( EditState, ResizingInfo )
 finishResizing editState =
     case editState of
         Resizing ({ id, attributes } as resizingInfo) ->
-            Just ( Selecting (SelectingInfo id attributes), resizingInfo )
+            Ok ( Selecting (SelectingInfo id attributes), resizingInfo )
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-startEditingText : Int -> AnnotationAttributes -> EditState -> Maybe EditState
+startEditingText : Int -> AnnotationAttributes -> EditState -> Result String EditState
 startEditingText index attributes editState =
     case editState of
         Drawing _ ->
-            Just (EditingText (EditingTextInfo index attributes))
+            Ok (EditingText (EditingTextInfo index attributes))
 
         Selecting { id, attributes } ->
-            Just (EditingText (EditingTextInfo id attributes))
+            Ok (EditingText (EditingTextInfo id attributes))
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
-finishEditingText : EditState -> Maybe ( EditState, EditingTextInfo )
+finishEditingText : EditState -> Result String ( EditState, EditingTextInfo )
 finishEditingText editState =
     case editState of
         EditingText editingTextInfo ->
-            Just ( NotSelecting, editingTextInfo )
+            Ok ( NotSelecting, editingTextInfo )
 
         _ ->
-            Nothing
+            Err (errorMessage editState)
 
 
 updateSelectedAttributes : (AnnotationAttributes -> AnnotationAttributes) -> EditState -> EditState

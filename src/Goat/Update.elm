@@ -343,20 +343,20 @@ skipChange model annotations =
 startDrawing : StartPosition -> Model -> Model
 startDrawing start model =
     case EditState.startDrawing start model.editState of
-        Just newEditState ->
+        Ok newEditState ->
             { model | editState = newEditState }
 
-        Nothing ->
+        Err _ ->
             model
 
 
 continueDrawing : Position -> Model -> Model
 continueDrawing pos model =
     case EditState.continueDrawing pos (model.drawing == DrawFreeHand) model.editState of
-        Just newEditState ->
+        Ok newEditState ->
             { model | editState = newEditState }
 
-        Nothing ->
+        Err _ ->
             model
 
 
@@ -388,7 +388,7 @@ finishTextDrawing pos model =
             AnnotationAttributes model.strokeColor model.fill model.strokeStyle model.fontSize
     in
         case EditState.finishTextDrawing pos numAnnotations attributes model.editState of
-            Just ( newEditState, drawingInfo ) ->
+            Ok ( newEditState, drawingInfo ) ->
                 { model | editState = newEditState }
                     |> addAnnotation (Annotation.newTextBox TextBoxInput numAnnotations attributes drawingInfo)
                     => [ "text-box-edit--"
@@ -397,7 +397,7 @@ finishTextDrawing pos model =
                             |> Task.attempt (tryToEdit numAnnotations)
                        ]
 
-            Nothing ->
+            Err _ ->
                 model => []
 
 
@@ -409,11 +409,11 @@ finishDrawing pos model =
 
         _ ->
             case EditState.finishDrawing pos model.editState of
-                Just ( newEditState, drawingInfo ) ->
+                Ok ( newEditState, drawingInfo ) ->
                     finishNonTextDrawing newEditState drawingInfo model
                         => []
 
-                Nothing ->
+                Err _ ->
                     model => []
 
 
@@ -425,13 +425,13 @@ resetEditState model =
 finishMovingAnnotation : Model -> Model
 finishMovingAnnotation model =
     case EditState.finishMoving model.editState of
-        Just ( newEditState, { id, translate } ) ->
+        Ok ( newEditState, { id, translate } ) ->
             { model
                 | edits = UndoList.new (mapAtIndex id (Annotation.move translate) model.edits.present) model.edits
                 , editState = newEditState
             }
 
-        Nothing ->
+        Err _ ->
             model
 
 
@@ -451,7 +451,7 @@ selectAnnotation : Int -> Model -> Model
 selectAnnotation index model =
     model.edits.present
         |> Array.get index
-        |> Maybe.andThen (\annotation -> EditState.selectAnnotation index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState)
+        |> Maybe.andThen (\annotation -> Result.toMaybe <| EditState.selectAnnotation index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState)
         |> Maybe.map (\newEditState -> { model | editState = newEditState })
         |> Maybe.withDefault model
 
@@ -467,7 +467,7 @@ startEditingText : Int -> Model -> Model
 startEditingText index model =
     model.edits.present
         |> Array.get index
-        |> Maybe.andThen (\annotation -> EditState.startEditingText index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState)
+        |> Maybe.andThen (\annotation -> Result.toMaybe <| EditState.startEditingText index (Annotation.attributes annotation (annotationAttributesInModel model)) model.editState)
         |> Maybe.map (\newEditState -> { model | editState = newEditState })
         |> Maybe.withDefault model
 
@@ -514,22 +514,22 @@ setStrokeColor strokeColor model =
 startMovingAnnotation : Position -> Model -> Model
 startMovingAnnotation newPos model =
     case EditState.startMoving newPos model.editState of
-        Just newEditState ->
+        Ok newEditState ->
             { model
                 | editState = newEditState
             }
 
-        Nothing ->
+        Err _ ->
             model
 
 
 moveAnnotation : Position -> Model -> Model
 moveAnnotation newPos model =
     case EditState.continueMoving newPos model.editState of
-        Just ( newEditState, _ ) ->
+        Ok ( newEditState, _ ) ->
             { model | editState = newEditState }
 
-        Nothing ->
+        Err _ ->
             model
 
 
@@ -537,7 +537,7 @@ startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
 startResizingAnnotation index vertex start model =
     model.edits.present
         |> Array.get index
-        |> Maybe.andThen (\annotation -> EditState.startResizing start vertex (Annotation.positions annotation) model.editState)
+        |> Maybe.andThen (\annotation -> Result.toMaybe <| EditState.startResizing start vertex (Annotation.positions annotation) model.editState)
         |> Maybe.map (\newEditState -> { model | editState = newEditState })
         |> Maybe.withDefault model
 
@@ -545,26 +545,26 @@ startResizingAnnotation index vertex start model =
 resizeAnnotation : Position -> Model -> Model
 resizeAnnotation curPos model =
     case EditState.continueResizing curPos model.editState of
-        Just ( newEditState, resizingData ) ->
+        Ok ( newEditState, resizingData ) ->
             { model
                 | edits = UndoList.mapPresent (mapAtIndex resizingData.id (Annotation.resize (List.member Shift model.pressedKeys) resizingData)) model.edits
                 , editState = newEditState
             }
 
-        Nothing ->
+        Err _ ->
             model
 
 
 finishResizingAnnotation : Model -> Model
 finishResizingAnnotation model =
     case EditState.finishResizing model.editState of
-        Just ( newEditState, resizingData ) ->
+        Ok ( newEditState, resizingData ) ->
             { model
                 | edits = UndoList.mapPresent (mapAtIndex resizingData.id (Annotation.resize (List.member Shift model.pressedKeys) resizingData)) model.edits
                 , editState = newEditState
             }
 
-        Nothing ->
+        Err _ ->
             model
 
 
@@ -638,13 +638,13 @@ toggleDropdown attributeDropdown model =
 finishEditingText : Int -> Model -> Model
 finishEditingText index model =
     case EditState.finishEditingText model.editState of
-        Just ( newEditState, _ ) ->
+        Ok ( newEditState, _ ) ->
             { model
                 | editState = newEditState
                 , edits = UndoList.new (removeItemIf Annotation.isEmptyTextBox index model.edits.present) model.edits
             }
 
-        Nothing ->
+        Err _ ->
             model
 
 
