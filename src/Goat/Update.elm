@@ -104,7 +104,6 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
 
         StartEditingText index ->
             model
-                |> startEditingText index
                 |> closeDropdown
                 => [ Ports.selectText ("text-box-edit--" ++ toString index) ]
 
