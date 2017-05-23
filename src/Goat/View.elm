@@ -1,8 +1,8 @@
 module Goat.View exposing (view)
 
 import Goat.EditState exposing (currentAnnotationAttributes)
-import Goat.Flags exposing (Image)
-import Goat.Model exposing (Model, Platform(Web, Zendesk))
+import Goat.Environment exposing (Platform(Web, Zendesk))
+import Goat.Model exposing (Model, Image)
 import Goat.Update exposing (Msg(CloseAllMenus, ShowMeTheGoats), extractAnnotationAttributes)
 import Goat.View.Controls as Controls
 import Goat.View.DrawingArea as DrawingArea

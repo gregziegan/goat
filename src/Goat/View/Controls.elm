@@ -4,8 +4,9 @@ import Array.Hamt exposing (Array)
 import Color exposing (Color)
 import Goat.Annotation exposing (Annotation, Drawing(..), LineType(..), ShapeType(..), shapes, spotlights)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, StrokeStyle(..))
-import Goat.Model exposing (AttributeDropdown(..), Model, OperatingSystem(..))
-import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing, isCtrlPressed)
+import Goat.Environment exposing (OperatingSystem(..))
+import Goat.Model exposing (AttributeDropdown(..), Model)
+import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing)
 import Goat.View.Icons as Icons
 import Goat.View.EventUtils exposing (stopPropagationAndDefault)
 import Json.Decode as Json

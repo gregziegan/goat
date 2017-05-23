@@ -6,8 +6,8 @@ import Color
 import Goat.Annotation as Annotation exposing (EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, autoExpandConfig, shiftPosition)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle, Vertex(..))
 import Goat.EditState as EditState
-import Goat.Flags exposing (Image)
-import Goat.Model exposing (Model, OperatingSystem(MacOS), Platform(Web))
+import Goat.Environment exposing (OperatingSystem(MacOS), Platform(Web))
+import Goat.Model exposing (Model, Image)
 import Goat.Update exposing (Msg(..), extractAnnotationAttributes)
 import List.Zipper
 import Mouse exposing (Position)
