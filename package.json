@@ -2,7 +2,7 @@
   "name": "G.O.A.T.",
   "version": "1.0.2",
   "repository": "https://github.com/thebritican/goat",
-  "description": "Graphics Ornamentation and Annotation Tool",
+  "description": "Graphic Ornamentation and Annotation Tool",
   "author": "greg.ziegan@gmail.com",
   "license": "MIT",
   "config": {
@@ -14,7 +14,7 @@
     "bundle": "elm-make src/Main.elm --output=elm.js && uglifyjs -c -m -o elm.js elm.js && zendency bundle $1",
     "test": "elm-test"
   },
-  "main": "./",
+  "main": "./zendesk-app",
   "compiler": [],
   "directories": {
     "translations": "./translations"
@@ -25,11 +25,10 @@
     "./docs/images/screenshot-0.png",
     "./docs/images/screenshot-1.png",
     "./docs/images/screenshot-2.png",
-    "./docs/images/goat.jpg",
-    "./docs/images/goat2.jpg",
     "./docs/images/icon_ticket_editor.svg",
     "./elm.js",
-    "./index.html",
+    "./zendesk-app/index.html",
+    "./docs/index.js",
     "./docs/style.css"
   ],
   "devDependencies": {
