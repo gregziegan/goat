@@ -6,7 +6,7 @@ import Goat.Annotation exposing (Annotation, Drawing(..), LineType(..), ShapeTyp
 import Goat.Annotation.Shared exposing (AnnotationAttributes, StrokeStyle(..))
 import Goat.Environment exposing (OperatingSystem(..))
 import Goat.Model exposing (AttributeDropdown(..), Model)
-import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing)
+import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing, isCtrlPressed)
 import Goat.View.Icons as Icons
 import Goat.View.EventUtils exposing (stopPropagationAndDefault)
 import Json.Decode as Json
