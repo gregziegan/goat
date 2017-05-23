@@ -10,7 +10,7 @@ functions, with the exception of `initialState`.
 
 import Goat.Annotation exposing (SelectState, SelectState(..))
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex)
-import Goat.View.EventUtils exposing (defaultPrevented, onMouseDown, onMouseUp, stopPropagation)
+import Goat.View.EventUtils exposing (defaultPrevented, stopPropagationAndDefault, onMouseDown, onMouseUp, stopPropagation)
 import Html.Events exposing (onWithOptions)
 import Json.Decode as Json
 import Keyboard.Extra as Keyboard exposing (KeyChange)
@@ -373,7 +373,7 @@ annotationEvents config candidateId editState =
         NotSelecting ->
             [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (config.selectAndMove << toDrawingPosition) Mouse.position
             , Attr.class "pointerCursor"
-            , onWithOptions "contextmenu" (Html.Events.Options True True) (Json.map (config.contextMenu) Mouse.position)
+            , onWithOptions "contextmenu" stopPropagationAndDefault (Json.map (config.contextMenu) Mouse.position)
             ]
 
         Drawing drawingInfo ->
