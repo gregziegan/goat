@@ -26,6 +26,7 @@ type Msg
     | FinishDrawing Position
       -- TextArea Updates
     | FocusTextArea Int
+    | SelectText Int
     | StartEditingText Int
     | PreventTextMouseDown
     | TextBoxInput Int { textValue : String, state : AutoExpand.State }
@@ -101,6 +102,10 @@ update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, dra
                         |> Dom.focus
                         |> Task.attempt (tryToEdit index)
                    ]
+
+        SelectText index ->
+            model
+                => [ Ports.selectText ("text-box-edit--" ++ toString index) ]
 
         StartEditingText index ->
             model
@@ -412,11 +417,21 @@ finishTextDrawing pos model =
                     => [ "text-box-edit--"
                             ++ toString numAnnotations
                             |> Dom.focus
-                            |> Task.attempt (tryToEdit numAnnotations)
+                            |> Task.attempt (selectText numAnnotations)
                        ]
 
             Err _ ->
                 model => []
+
+
+selectText : Int -> Result Dom.Error () -> Msg
+selectText index result =
+    case result of
+        Ok _ ->
+            SelectText index
+
+        Err _ ->
+            Undo
 
 
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
