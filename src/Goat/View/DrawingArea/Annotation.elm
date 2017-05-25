@@ -3,9 +3,9 @@ module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotati
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
-import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), LineType(..), SelectState(..), Shape, ShapeType(..), TextArea, arrowAngle, isFreeHand, toLineStyle, toStrokeWidth, shiftPosition, autoExpandConfig, EndPosition, StartPosition, calcLinePos, calcShapePos, fontSizeToLineHeight)
-import Goat.Annotation.Shared exposing (AnnotationAttributes, StrokeStyle, Vertex, Vertices(..), DrawingInfo, MovingInfo, ResizingInfo)
-import Goat.EditState as EditState exposing (AnnotationConfig, EditState)
+import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), EndPosition, LineType(..), SelectState(..), Shape, ShapeType(..), StartPosition, TextArea, arrowAngle, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, isFreeHand, shiftPosition, toLineStyle, toStrokeWidth)
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, MovingInfo, ResizingInfo, StrokeStyle, Vertex, Vertices(..))
+import Goat.EditState as EditState exposing (AnnotationConfig, EditState, controlUIWidth)
 import Goat.Update exposing (Msg(..))
 import Goat.View.DrawingArea.Vertices as Vertices
 import Goat.View.EventUtils exposing (defaultPrevented, onMouseUp, stopPropagation)
@@ -503,8 +503,8 @@ viewTextArea index ({ start, end, fill, fontSize, autoexpand } as textArea) =
     div
         [ class "text-box-container"
         , style
-            [ "top" => toPx (Basics.min start.y end.y)
-            , "left" => toPx (Basics.min start.x end.x)
+            [ "top" => toPx (10 + (Basics.min start.y end.y))
+            , "left" => toPx (controlUIWidth + (Basics.min start.x end.x))
             , "width" => toPx (abs (end.x - start.x))
             , "font-size" => toPx fontSize
             , "color" => Color.Convert.colorToHex fill
