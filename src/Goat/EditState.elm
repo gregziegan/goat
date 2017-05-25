@@ -567,6 +567,9 @@ ifMoving editState =
             Nothing
 
 
+{-| TODO: remove this function when virtual dom issue is fixed with textareas in foreignobjects.
+-}
+getEditingTextInfo : EditState -> Maybe EditingTextInfo
 getEditingTextInfo editState =
     case editState of
         EditingText info ->

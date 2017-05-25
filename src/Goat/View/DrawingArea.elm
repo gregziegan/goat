@@ -179,23 +179,30 @@ view ({ drawing, constrain, editState } as drawingModifiers) annotations annotat
                 (isSpotlightDrawing drawing)
                 (Annotation.viewDrawing editState drawingModifiers annotationAttrs)
             )
-        , case EditState.getEditingTextInfo editState of
-            Just { id } ->
-                case Array.get id annotations of
-                    Just textbox ->
-                        case textbox of
-                            Goat.Annotation.TextBox textArea ->
-                                viewTextArea id textArea
-
-                            _ ->
-                                text ""
-
-                    Nothing ->
-                        text ""
-
-            Nothing ->
-                text ""
+        , viewTextAreaWhenEditing annotations editState
         ]
+
+
+{-| TODO: remove this function when virtual dom issue is fixed with textareas in foreignobjects.
+-}
+viewTextAreaWhenEditing : Array Annotation -> EditState -> Html Msg
+viewTextAreaWhenEditing annotations editState =
+    case EditState.getEditingTextInfo editState of
+        Just { id } ->
+            case Array.get id annotations of
+                Just textbox ->
+                    case textbox of
+                        Goat.Annotation.TextBox textArea ->
+                            viewTextArea id textArea
+
+                        _ ->
+                            text ""
+
+                Nothing ->
+                    text ""
+
+        Nothing ->
+            text ""
 
 
 viewMask : Svg msg
