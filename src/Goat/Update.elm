@@ -4,7 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import AutoExpand
 import Color exposing (Color)
 import Dom
-import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea)
+import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, calcDistance)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, ResizingInfo, SelectingInfo, StrokeStyle, Vertex)
 import Goat.EditState as EditState exposing (EditState, KeyboardConfig)
 import Goat.Model exposing (Image, Model, AttributeDropdown(..))
@@ -374,6 +374,25 @@ finishValidDrawing model drawingInfo =
             model
 
 
+foldDistance : Position -> ( Float, Position ) -> ( Float, Position )
+foldDistance position ( distance, previousPosition ) =
+    distance
+        + (calcDistance position previousPosition)
+        => position
+
+
+finishFreeHandDrawing : EditState -> DrawingInfo -> Model -> Model
+finishFreeHandDrawing finishedEditState ({ start, curPos, positions } as drawingInfo) model =
+    let
+        ( distance, _ ) =
+            List.foldl foldDistance ( 0.0, start ) (positions ++ [ curPos ])
+    in
+        if distance < minDrawingDistance then
+            resetEditState model
+        else
+            finishValidDrawing { model | editState = finishedEditState } drawingInfo
+
+
 finishNonTextDrawing : EditState -> DrawingInfo -> Model -> Model
 finishNonTextDrawing finishedEditState ({ start, curPos } as drawingInfo) model =
     if isDrawingTooSmall (isSpotlightDrawing model.drawing) start curPos then
@@ -418,6 +437,15 @@ selectText index result =
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
 finishDrawing pos model =
     case model.drawing of
+        DrawFreeHand ->
+            case EditState.finishDrawing pos model.editState of
+                Ok ( newEditState, drawingInfo ) ->
+                    finishFreeHandDrawing newEditState drawingInfo model
+                        => []
+
+                Err _ ->
+                    model => []
+
         DrawTextBox ->
             finishTextDrawing pos model
 
