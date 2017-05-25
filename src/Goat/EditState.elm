@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
+module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes, getEditingTextInfo)
 
 {-| The finite state machine for annotating.
 See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
@@ -328,6 +328,9 @@ subscriptions config editState =
             Moving _ ->
                 [ Mouse.moves (config.moveToMsg << toDrawingPosition) ]
 
+            EditingText _ ->
+                []
+
             _ ->
                 [ Sub.map config.keyboardToMsg Keyboard.subscriptions ]
 
@@ -559,6 +562,15 @@ ifMoving editState =
     case editState of
         Moving movingInfo ->
             Just movingInfo
+
+        _ ->
+            Nothing
+
+
+getEditingTextInfo editState =
+    case editState of
+        EditingText info ->
+            Just info
 
         _ ->
             Nothing

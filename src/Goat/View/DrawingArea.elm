@@ -1,12 +1,12 @@
 module Goat.View.DrawingArea exposing (view, viewAnnotationMenu, viewImage, viewPixelatedImage)
 
 import Array.Hamt as Array exposing (Array)
-import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate))
+import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate), TextArea)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo)
-import Goat.EditState as EditState exposing (DrawingConfig, EditState)
+import Goat.EditState as EditState exposing (DrawingConfig, EditState, getEditingTextInfo)
 import Goat.Model exposing (Image)
 import Goat.Update exposing (Msg(..), getFirstSpotlightIndex, isSpotlightDrawing)
-import Goat.View.DrawingArea.Annotation as Annotation exposing (DrawingModifiers, viewAnnotation)
+import Goat.View.DrawingArea.Annotation as Annotation exposing (DrawingModifiers, viewAnnotation, viewTextArea)
 import Goat.View.DrawingArea.Definitions as Definitions
 import Goat.View.Utils exposing (toPx)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
@@ -179,6 +179,22 @@ view ({ drawing, constrain, editState } as drawingModifiers) annotations annotat
                 (isSpotlightDrawing drawing)
                 (Annotation.viewDrawing editState drawingModifiers annotationAttrs)
             )
+        , case EditState.getEditingTextInfo editState of
+            Just { id } ->
+                case Array.get id annotations of
+                    Just textbox ->
+                        case textbox of
+                            Goat.Annotation.TextBox textArea ->
+                                viewTextArea id textArea
+
+                            _ ->
+                                text ""
+
+                    Nothing ->
+                        text ""
+
+            Nothing ->
+                text ""
         ]
 
 

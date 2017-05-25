@@ -1,4 +1,4 @@
-module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotation, viewShape, viewPixelate, viewSpotlightInMask, viewDrawing, annotationConfig, linePath, arrowPath, arrowHeadPath)
+module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotation, viewShape, viewPixelate, viewSpotlightInMask, viewDrawing, annotationConfig, linePath, arrowPath, arrowHeadPath, viewTextArea)
 
 import AutoExpand
 import Color exposing (Color)
@@ -498,23 +498,20 @@ viewShape attrs shapeType fill shape =
             Svg.ellipse (shapeAttributes shapeType shape fill ++ attrs) []
 
 
-viewTextArea : Int -> TextArea -> Svg Msg
+viewTextArea : Int -> TextArea -> Html Msg
 viewTextArea index ({ start, end, fill, fontSize, autoexpand } as textArea) =
-    foreignObject
-        []
-        [ div
-            [ class "text-box-container"
-            , style
-                [ "top" => toPx (Basics.min start.y end.y)
-                , "left" => toPx (Basics.min start.x end.x)
-                , "width" => toPx (abs (end.x - start.x))
-                , "font-size" => toPx fontSize
-                , "color" => Color.Convert.colorToHex fill
-                ]
-            , Html.Events.onWithOptions "mousedown" stopPropagation (Json.succeed PreventTextMouseDown)
+    div
+        [ class "text-box-container"
+        , style
+            [ "top" => toPx (Basics.min start.y end.y)
+            , "left" => toPx (Basics.min start.x end.x)
+            , "width" => toPx (abs (end.x - start.x))
+            , "font-size" => toPx fontSize
+            , "color" => Color.Convert.colorToHex fill
             ]
-            [ AutoExpand.view (autoExpandConfig TextBoxInput index fontSize) autoexpand textArea.text
-            ]
+        , Html.Events.onWithOptions "mousedown" stopPropagation (Json.succeed PreventTextMouseDown)
+        ]
+        [ AutoExpand.view (autoExpandConfig TextBoxInput index fontSize) autoexpand textArea.text
         ]
 
 
@@ -522,7 +519,7 @@ viewTextBox : List (Svg.Attribute Msg) -> SelectState -> Int -> TextArea -> Svg 
 viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) =
     case selectState of
         Selected ->
-            viewTextArea index textBox
+            text ""
 
         NotSelected ->
             textBox.text
