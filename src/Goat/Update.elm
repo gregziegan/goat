@@ -411,12 +411,8 @@ selectText index result =
         Ok _ ->
             SelectText index
 
-        Err str ->
-            let
-                logStr =
-                    Debug.log "log" str
-            in
-                Undo
+        Err _ ->
+            Undo
 
 
 finishDrawing : Position -> Model -> ( Model, List (Cmd Msg) )
@@ -983,12 +979,8 @@ tryToEdit index result =
         Ok _ ->
             StartEditingText index
 
-        Err str ->
-            let
-                logStr =
-                    Debug.log "logEdit" str
-            in
-                Undo
+        Err _ ->
+            Undo
 
 
 tryToBlur : Result Dom.Error () -> Msg
