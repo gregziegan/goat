@@ -217,7 +217,7 @@ image {
 }
 
 .text-box-container {
-  position: absolute;
+  position: fixed;
 }
 
 .text-box-textarea {

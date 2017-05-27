@@ -1,4 +1,4 @@
-module Goat.Annotation exposing (Annotation(..), Drawing(..), SelectState(..), LineType(..), Shape, ShapeType(..), TextArea, defaultStroke, defaultDrawing, defaultShape, defaultSpotlight, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, shiftPosition, move, shiftForPaste, setFill, setStrokeColor, setStrokeStyle, setFontSize, shapes, spotlights, StartPosition, EndPosition, newTextBox, fromDrawing, resize, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, stepMouse, calcDistance)
+module Goat.Annotation exposing (Annotation(..), Drawing(..), SelectState(..), LineType(..), Shape, ShapeType(..), TextArea, defaultStroke, defaultDrawing, defaultShape, defaultSpotlight, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, shiftPosition, move, shiftForPaste, setFill, setStrokeColor, setStrokeStyle, setFontSize, shapes, spotlights, StartPosition, EndPosition, newTextBox, fromDrawing, resize, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, stepMouse, calcDistance, textareaPadding)
 
 import AutoExpand
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle(..), Vertex(..))
@@ -560,7 +560,7 @@ autoExpandConfig : (Int -> { state : AutoExpand.State, textValue : String } -> m
 autoExpandConfig onInput index fontSize =
     AutoExpand.config
         { onInput = onInput index
-        , padding = 2
+        , padding = textareaPadding
         , minRows = 1
         , maxRows = 4
         , lineHeight = fontSizeToLineHeight fontSize
@@ -572,3 +572,7 @@ autoExpandConfig onInput index fontSize =
 fontSizeToLineHeight : Int -> Float
 fontSizeToLineHeight fontSize =
     toFloat fontSize * 1.2
+
+
+textareaPadding =
+    2

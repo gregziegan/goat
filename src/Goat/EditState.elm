@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes, getEditingTextInfo, controlUIWidth)
+module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
 
 {-| The finite state machine for annotating.
 See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
@@ -562,18 +562,6 @@ ifMoving editState =
     case editState of
         Moving movingInfo ->
             Just movingInfo
-
-        _ ->
-            Nothing
-
-
-{-| TODO: remove this function when virtual dom issue is fixed with textareas in foreignobjects.
--}
-getEditingTextInfo : EditState -> Maybe EditingTextInfo
-getEditingTextInfo editState =
-    case editState of
-        EditingText info ->
-            Just info
 
         _ ->
             Nothing
