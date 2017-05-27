@@ -30,7 +30,7 @@ Get yourself the [Elm programming language](http://elm-lang.org/):
 
 On node 6+: `npm install -g elm && npm install`
 
-Then you can just do `elm-make src/Main.elm --output=elm.js --debug` and open `index.html`.
+Then you can just do `npm run dev` and open `index.html`.
 
 #### Nicer workflow
 
