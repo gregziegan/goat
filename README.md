@@ -30,15 +30,11 @@ Get yourself the [Elm programming language](http://elm-lang.org/):
 
 On node 6+: `npm install -g elm && npm install`
 
-Then you can just do `npm run dev` and open `index.html`.
+Then you can just do `elm-make src/Main.elm --output=elm.js` and open `index.html`.
 
 #### Nicer workflow
 
-Use `elm-live` (`npm install -g elm-live`)
-
-```
-elm-live src/Main.elm --output=elm.js --open --debug
-```
+Use `elm-live` (`npm install -g elm-live`) and then run `npm run dev`.
 
 This will open a browser tab with CSS hot reloading and page refreshing on Elm code changes.
 
