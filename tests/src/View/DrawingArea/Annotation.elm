@@ -6,7 +6,7 @@ import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, end, goat, model, start, testColor)
 import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, toLineStyle, fontSizeToLineHeight)
 import Goat.EditState as EditState
-import Goat.Flags exposing (Image)
+import Goat.Model exposing (Image)
 import Goat.Update exposing (Msg)
 import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
 import Goat.View.DrawingArea.Annotation exposing (arrowPath, arrowHeadPath, viewAnnotation, linePath)
@@ -15,15 +15,6 @@ import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
 import View.TestUtil exposing (svgDrawspace)
-
-
-all : Test
-all =
-    describe "drawing"
-        [ viewAnnotationTests
-        , imageTests
-        , pixelatedImageTests
-        ]
 
 
 lineSelector : Shape -> List Selector
@@ -126,18 +117,6 @@ imageSelector { width, height, url } =
     ]
 
 
-imageTests : Test
-imageTests =
-    describe "viewImage"
-        [ test "original image has appropriate attributes to render" <|
-            \() ->
-                goat
-                    |> viewImage
-                    |> Query.fromHtml
-                    |> Query.has (attribute "mask" "url(#pixelateMask)" :: imageSelector goat)
-        ]
-
-
 viewFirstAnnotation : Annotation -> Html Msg
 viewFirstAnnotation annotation =
     annotation
@@ -147,96 +126,102 @@ viewFirstAnnotation annotation =
         |> svgDrawspace
 
 
-pixelatedImageTests : Test
-pixelatedImageTests =
-    describe "viewPixelatedImage"
-        [ test "pixelated image has the appropriate attributes to render" <|
-            \() ->
-                goat
-                    |> viewPixelatedImage
-                    |> Query.fromHtml
-                    |> Query.has (attribute "filter" "url(#pixelate)" :: imageSelector goat)
-        ]
-
-
-viewAnnotationTests : Test
-viewAnnotationTests =
-    describe "annotations"
-        [ test "A straight line has the appropriate view attributes" <|
-            \() ->
-                aShape
-                    |> Lines StraightLine
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.find [ tag "path" ]
-                    |> Query.has (lineSelector aShape)
-        , test "An arrow has the appropriate view attributes" <|
-            \() ->
-                aShape
-                    |> Lines Arrow
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.findAll [ tag "path" ]
-                    |> Query.index 1
-                    |> Query.has (arrowSelector aShape)
-        , test "An arrow head has the appropriate view attributes" <|
-            \() ->
-                aShape
-                    |> Lines Arrow
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.findAll [ tag "path" ]
-                    |> Query.first
-                    |> Query.has (arrowHeadSelector ( 0, 0 ) aShape)
-        , test "A rectangle has the appropriate view attributes" <|
-            \() ->
-                aShape
-                    |> Shapes Rect (Just testColor)
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.find [ tag "rect" ]
-                    |> Query.has (rectSelector aShape)
-        , test "A rounded rectangle has the appropriate view attributes" <|
-            \() ->
-                aShape
-                    |> Shapes RoundedRect (Just testColor)
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.find [ tag "rect" ]
-                    |> Query.has (roundedRectSelector aShape)
-        , test "An ellipse has the appropriate view attributes" <|
-            \() ->
-                aShape
-                    |> Shapes Ellipse (Just testColor)
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.find [ tag "ellipse" ]
-                    |> Query.has (ellipseSelector aShape)
-        , test "A textbox's unselected svg text has the appropriate view attributes" <|
-            \() ->
-                aTextArea
-                    |> TextBox
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.find [ tag "text" ]
-                    |> Query.has (svgTextSelector aTextArea)
-        , test "A textbox's unselected svg tspans have the appropriate view attributes" <|
-            \() ->
-                aTextArea
-                    |> TextBox
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.findAll [ tag "tspan" ]
-                    |> Query.each
-                        (Expect.all
-                            [ Query.has (tspanSelector aTextArea) ]
-                        )
-        , test "A spotlight has the appropriate view attributes" <|
-            \() ->
-                aShape
-                    |> Spotlight Rect
-                    |> viewFirstAnnotation
-                    |> Query.fromHtml
-                    |> Query.find [ tag "rect" ]
-                    |> Query.has (rectSelector aShape)
+all : Test
+all =
+    describe "drawing"
+        [ describe "annotations"
+            [ test "A straight line has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Lines StraightLine
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.find [ tag "path" ]
+                        |> Query.has (lineSelector aShape)
+            , test "An arrow has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Lines Arrow
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.findAll [ tag "path" ]
+                        |> Query.index 1
+                        |> Query.has (arrowSelector aShape)
+            , test "An arrow head has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Lines Arrow
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.findAll [ tag "path" ]
+                        |> Query.first
+                        |> Query.has (arrowHeadSelector ( 0, 0 ) aShape)
+            , test "A rectangle has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Shapes Rect (Just testColor)
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.find [ tag "rect" ]
+                        |> Query.has (rectSelector aShape)
+            , test "A rounded rectangle has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Shapes RoundedRect (Just testColor)
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.find [ tag "rect" ]
+                        |> Query.has (roundedRectSelector aShape)
+            , test "An ellipse has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Shapes Ellipse (Just testColor)
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.find [ tag "ellipse" ]
+                        |> Query.has (ellipseSelector aShape)
+            , test "A textbox's unselected svg text has the appropriate view attributes" <|
+                \() ->
+                    aTextArea
+                        |> TextBox
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.find [ tag "text" ]
+                        |> Query.has (svgTextSelector aTextArea)
+            , test "A textbox's unselected svg tspans have the appropriate view attributes" <|
+                \() ->
+                    aTextArea
+                        |> TextBox
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.findAll [ tag "tspan" ]
+                        |> Query.each
+                            (Expect.all
+                                [ Query.has (tspanSelector aTextArea) ]
+                            )
+            , test "A spotlight has the appropriate view attributes" <|
+                \() ->
+                    aShape
+                        |> Spotlight Rect
+                        |> viewFirstAnnotation
+                        |> Query.fromHtml
+                        |> Query.find [ tag "rect" ]
+                        |> Query.has (rectSelector aShape)
+            ]
+        , describe "viewImage"
+            [ test "original image has appropriate attributes to render" <|
+                \() ->
+                    goat
+                        |> viewImage
+                        |> Query.fromHtml
+                        |> Query.has (attribute "mask" "url(#pixelateMask)" :: imageSelector goat)
+            ]
+        , describe "viewPixelatedImage"
+            [ test "pixelated image has the appropriate attributes to render" <|
+                \() ->
+                    goat
+                        |> viewPixelatedImage
+                        |> Query.fromHtml
+                        |> Query.has (attribute "filter" "url(#pixelate)" :: imageSelector goat)
+            ]
         ]

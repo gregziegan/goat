@@ -13,12 +13,6 @@ import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, cl
 import View.TestUtil exposing (svgDrawspace)
 
 
-all : Test
-all =
-    describe "svg definitions tests"
-        [ viewDefinitionsTests ]
-
-
 spotlightMaskSelector =
     [ attribute "x" "0"
     , attribute "y" "0"
@@ -88,35 +82,37 @@ maskDefinitions =
         |> Query.fromHtml
 
 
-viewDefinitionsTests : Test
-viewDefinitionsTests =
-    describe "viewDefinitions"
-        [ test "the spotlight mask contains a full size white backdrop" <|
-            \() ->
-                maskDefinitions
-                    |> Query.find [ tag "mask", attribute "id" "Mask" ]
-                    |> Query.children [ tag "rect" ]
-                    |> Query.first
-                    |> Query.has spotlightMaskSelector
-        , test "the spotlight mask contains the correct black cutouts" <|
-            \() ->
-                maskDefinitions
-                    |> Query.find [ tag "mask", attribute "id" "Mask" ]
-                    |> Query.children [ tag "rect" ]
-                    |> Query.index 1
-                    |> Query.has spotlightCutOutSelector
-        , test "the pixelate mask contains a full size white backdrop" <|
-            \() ->
-                maskDefinitions
-                    |> Query.find [ tag "mask", attribute "id" "pixelateMask" ]
-                    |> Query.children [ tag "rect" ]
-                    |> Query.first
-                    |> Query.has pixelateMaskSelector
-        , test "the pixelate mask contains the correct black cutouts" <|
-            \() ->
-                maskDefinitions
-                    |> Query.find [ tag "mask", attribute "id" "pixelateMask" ]
-                    |> Query.children [ tag "rect" ]
-                    |> Query.index 1
-                    |> Query.has pixelateCutoutSelector
+all : Test
+all =
+    describe "svg definitions tests"
+        [ describe "viewDefinitions"
+            [ test "the spotlight mask contains a full size white backdrop" <|
+                \() ->
+                    maskDefinitions
+                        |> Query.find [ tag "mask", attribute "id" "Mask" ]
+                        |> Query.children [ tag "rect" ]
+                        |> Query.first
+                        |> Query.has spotlightMaskSelector
+            , test "the spotlight mask contains the correct black cutouts" <|
+                \() ->
+                    maskDefinitions
+                        |> Query.find [ tag "mask", attribute "id" "Mask" ]
+                        |> Query.children [ tag "rect" ]
+                        |> Query.index 1
+                        |> Query.has spotlightCutOutSelector
+            , test "the pixelate mask contains a full size white backdrop" <|
+                \() ->
+                    maskDefinitions
+                        |> Query.find [ tag "mask", attribute "id" "pixelateMask" ]
+                        |> Query.children [ tag "rect" ]
+                        |> Query.first
+                        |> Query.has pixelateMaskSelector
+            , test "the pixelate mask contains the correct black cutouts" <|
+                \() ->
+                    maskDefinitions
+                        |> Query.find [ tag "mask", attribute "id" "pixelateMask" ]
+                        |> Query.children [ tag "rect" ]
+                        |> Query.index 1
+                        |> Query.has pixelateCutoutSelector
+            ]
         ]

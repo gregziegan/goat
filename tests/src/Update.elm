@@ -110,6 +110,37 @@ all =
                     |> .present
                     |> Array.isEmpty
                     |> Expect.true "drawing should not be added to array"
+        , test "should cancel drawing for tiny free-draw drawing" <|
+            \() ->
+                model
+                    |> update (ChangeDrawing DrawFreeHand)
+                    |> update (StartDrawing start)
+                    |> update (FinishDrawing (shiftPosition 2 2 start))
+                    |> .edits
+                    |> .present
+                    |> Array.isEmpty
+                    |> Expect.true "drawing should not be added to array"
+        , test "should not cancel drawing for big one-step free-draw drawing" <|
+            \() ->
+                model
+                    |> update (ChangeDrawing DrawFreeHand)
+                    |> update (StartDrawing start)
+                    |> update (FinishDrawing (shiftPosition 10 10 start))
+                    |> .edits
+                    |> .present
+                    |> Array.isEmpty
+                    |> Expect.false "annotation should be big enough"
+        , test "should not cancel drawing for big free-draw drawing that ends where it started" <|
+            \() ->
+                model
+                    |> update (ChangeDrawing DrawFreeHand)
+                    |> update (StartDrawing start)
+                    |> update (ContinueDrawing (shiftPosition 10 10 start))
+                    |> update (FinishDrawing start)
+                    |> .edits
+                    |> .present
+                    |> Array.isEmpty
+                    |> Expect.false "annotation should be big enough"
         , test "should cancel drawing if it is too small, with more tolerance for spotlights" <|
             \() ->
                 model

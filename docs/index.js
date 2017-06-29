@@ -21,16 +21,12 @@ app.ports.listenForUpload.subscribe(function () {
   target.addEventListener("drop", function (e) {
     e.preventDefault();
     var file = e.dataTransfer.files[0]
-    if (!file.type.match(/image.*/)) {
+    if (!file && !file.type.match(/image.*/)) {
       return;
     }
     loadImage(file)
       .then(function(loadedImage) {
-        if (loadedImage === null) {
-          alert('does not support this image type, please provide a PNG file');
-        } else {
-          app.ports.newImage.send(loadedImage);
-        }
+        app.ports.newImage.send(loadedImage);
       })
   }, true);
 });
@@ -39,12 +35,14 @@ app.ports.requestImages.subscribe(function () {
   if (isInZendeskAppContext) {
     readInImagesFromZendesk();
   } else {
-    var goats = [
-      { id: '0', url: GOAT_PATH + 'goat.jpg', width: 235, height: 276, originalWidth: 639, originalHeight: 751},
-      { id: '1', url: GOAT_PATH + 'goat2.jpg', width: 294, height: 220, originalWidth: 800, originalHeight: 600}
-    ];
-    app.ports.setImages.send(goats);
-    Array.prototype.forEach.call(goats, loadImageDataIntoCache);
+    var goatUrls = [ GOAT_PATH + 'goat.jpg', GOAT_PATH + 'goat2.jpg' ];
+    Promise.all(Array.prototype.map.call(goatUrls, function (url) {
+      return createImage(new Image(), url);
+    })).then(function (goatImages) {
+       var goats = defaultGoats(goatImages);
+       app.ports.setImages.send(goats);
+       Array.prototype.forEach.call(goats, loadImageDataIntoCache);
+    })
   }
 });
 
@@ -67,6 +65,16 @@ if (isInZendeskAppContext) {
 var DOMURL = window.URL || window.webkitURL || window;
 
 // helper functions
+function defaultGoats(goatImages) {
+  var goats =
+    [{ id: '0', url: null, width: 235, height: 276, originalWidth: 639, originalHeight: 751},
+     { id: '1', url: null, width: 294, height: 220, originalWidth: 800, originalHeight: 600}]
+   Array.prototype.forEach.call(goatImages, function(goatImage, index) {
+     goats[index].url = getB64FromImg(goatImage);
+   })
+  return goats;
+}
+
 function loadImageDataIntoCache(imageObject) {
   var newImg = new Image();
   newImg.width = imageObject.width;
@@ -95,31 +103,12 @@ function createImage(img, imageUrl) {
   });
 }
 
-function getContentType(url) {
-  if (url.indexOf('image/png') !== -1) {
-    return 'image/png';
-  } else if (url.indexOf('image/jpeg') !== -1) {
-    // return 'image/jpeg'; TODO: support jpeg
-    return null;
-  } else {
-    return null;
-  }
-}
-
 function loadImage(src) {
   return imageFileToB64(src)
     .then(function(e) {
       var b64Url = e.target.result;
       b64ImageDict['0'] = b64Url;
-      var contentType = getContentType(b64Url);
-      if (contentType === null) {
-        return null;
-      }
-      var b64String = e.target.result.replace('data:' + contentType + ';base64,', '');
-      var blob = b64toBlob(b64String, contentType);
-      var imageUrl = DOMURL.createObjectURL(blob);
-      var newImage = new Image();
-      return createImage(newImage, imageUrl)
+      return createImage(new Image(), b64Url)
     }).then(function(img) {
       if (img === null) {
         return null;
@@ -134,24 +123,6 @@ function loadImage(src) {
         }
       }
     });
-}
-
-function b64toBlob(b64Data, contentType) {
-  var contentType = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
-  var sliceSize = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 512;
-
-  var byteCharacters = atob(b64Data);
-  var byteArrays = [];
-  for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-    var slice = byteCharacters.slice(offset, offset + sliceSize);
-    var byteNumbers = new Array(slice.length);
-    for (var i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i);
-    }
-    var byteArray = new Uint8Array(byteNumbers);
-    byteArrays.push(byteArray);
-  }
-  return new Blob(byteArrays, { type: contentType });
 }
 
 function toImageObject(image) {
@@ -173,20 +144,12 @@ function toImageObject(image) {
 function exportImage() {
   var svg = document.getElementById("drawing-area");
   var svgCopy = svg.cloneNode(true);
-  var sanitizedSvg = encodeSvgBlobs(svgCopy);
-  getPng(sanitizedSvg)
-    .then(exportHelper);
+  var sanitizedSvg = b64EncodeSvgImages(svgCopy);
+  getImageUrlForSvg(sanitizedSvg)
+    .then(exportToPlatform);
 }
 
-function exportHelper(image) {
-  if (isInZendeskAppContext) {
-    exportToZendesk(image);
-  } else {
-    exportToWeb(image);
-  }
-}
-
-function encodeSvgBlobs(svg) {
+function b64EncodeSvgImages(svg) {
   var imageBlobUrl = svg.querySelector('image').getAttribute('xlink:href');
 
   var b64Url = b64ImageDict[zendeskExportId];
@@ -194,6 +157,14 @@ function encodeSvgBlobs(svg) {
   images[0].setAttribute('xlink:href', b64Url);
   images[1].setAttribute('xlink:href', b64Url);
   return svg;
+}
+
+function exportToPlatform(imageUrl) {
+  if (isInZendeskAppContext) {
+    exportToZendesk(imageUrl);
+  } else {
+    exportToWeb(imageUrl);
+  }
 }
 
 function autoScale(canvas) {
@@ -217,7 +188,7 @@ function autoScale(canvas) {
   }
 }
 
-function exportToZendesk(image) {
+function exportToZendesk(imageUrl) {
   client.get('ticket.comment').then(function (zaf) {
     var div = document.createElement('div');
     var comment = zaf['ticket.comment'].text;
@@ -230,36 +201,33 @@ function exportToZendesk(image) {
       imageToReplace.outerHTML = '';
     }
     client.set('ticket.comment.text', div.innerHTML).then(function () {
-      client.invoke('ticket.editor.inlineImage', image.src);
+      client.invoke('ticket.editor.inlineImage', imageUrl);
       client.invoke('app.close');
       app.ports.reset.send(null);
     });
   });
 }
 
-function exportToWeb(image) {
+function exportToWeb(imageUrl) {
   var a = document.createElement('a');
-  a.href = image.src;
+  a.href = imageUrl;
   a.download = "output.png";
   document.body.append(a);
   a.click();
   document.body.removeChild(a);
 }
 
-function getPng(svg) {
+function getImageUrlForSvg(svg) {
   var svgData = new XMLSerializer().serializeToString(svg);
-  lastSvgString = svgData;
   var width = parseInt(svg.getAttribute('width'), 10);
   var height = parseInt(svg.getAttribute('height'), 10);
 
-  var newImage = document.createElement('img');
+  var newImage = new Image();
   newImage.width = width;
   newImage.height = height;
   return createImage(newImage, "data:image/svg+xml;base64," + btoa(svgData))
     .then(function() {
-      var imageUrl = getB64FromImg(newImage);
-      newImage.src = imageUrl;
-      return newImage;
+      return getB64FromImg(newImage);
     });
 }
 
@@ -290,23 +258,4 @@ function readInImagesFromZendesk() {
       Array.prototype.forEach.call(imageObjects, loadImageDataIntoCache);
     }
   });
-}
-
-
-// polyfills
-if (!HTMLCanvasElement.prototype.toBlob) {
- Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
-  value: function (callback, type, quality) {
-
-    var binStr = atob( this.toDataURL(type, quality).split(',')[1] ),
-        len = binStr.length,
-        arr = new Uint8Array(len);
-
-    for (var i = 0; i < len; i++ ) {
-     arr[i] = binStr.charCodeAt(i);
-    }
-
-    callback( new Blob( [arr], {type: type || 'image/png'} ) );
-  }
- });
 }

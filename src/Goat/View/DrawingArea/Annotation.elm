@@ -3,8 +3,8 @@ module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotati
 import AutoExpand
 import Color exposing (Color)
 import Color.Convert
-import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), LineType(..), SelectState(..), Shape, ShapeType(..), TextArea, arrowAngle, isFreeHand, toLineStyle, toStrokeWidth, shiftPosition, autoExpandConfig, EndPosition, StartPosition, calcLinePos, calcShapePos, fontSizeToLineHeight)
-import Goat.Annotation.Shared exposing (AnnotationAttributes, StrokeStyle, Vertex, Vertices(..), DrawingInfo, MovingInfo, ResizingInfo)
+import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), EndPosition, LineType(..), SelectState(..), Shape, ShapeType(..), StartPosition, TextArea, arrowAngle, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, isFreeHand, shiftPosition, toLineStyle, toStrokeWidth, textareaPadding)
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, MovingInfo, ResizingInfo, StrokeStyle, Vertex, Vertices(..))
 import Goat.EditState as EditState exposing (AnnotationConfig, EditState)
 import Goat.Update exposing (Msg(..))
 import Goat.View.DrawingArea.Vertices as Vertices
@@ -498,15 +498,14 @@ viewShape attrs shapeType fill shape =
             Svg.ellipse (shapeAttributes shapeType shape fill ++ attrs) []
 
 
-viewTextArea : Int -> TextArea -> Svg Msg
+viewTextArea : Int -> TextArea -> Html Msg
 viewTextArea index ({ start, end, fill, fontSize, autoexpand } as textArea) =
-    foreignObject
-        []
+    foreignObject []
         [ div
             [ class "text-box-container"
             , style
-                [ "top" => toPx (Basics.min start.y end.y)
-                , "left" => toPx (Basics.min start.x end.x)
+                [ "top" => toPx (-10 + (Basics.min start.y end.y))
+                , "left" => toPx (-20 + (Basics.min start.x end.x))
                 , "width" => toPx (abs (end.x - start.x))
                 , "font-size" => toPx fontSize
                 , "color" => Color.Convert.colorToHex fill
@@ -518,6 +517,16 @@ viewTextArea index ({ start, end, fill, fontSize, autoexpand } as textArea) =
         ]
 
 
+svgTextOffsetX : Int
+svgTextOffsetX =
+    textareaPadding - 20
+
+
+svgTextOffsetY : Int
+svgTextOffsetY =
+    -20 + textareaPadding + 6
+
+
 viewTextBox : List (Svg.Attribute Msg) -> SelectState -> Int -> TextArea -> Svg Msg
 viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) =
     case selectState of
@@ -527,15 +536,15 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
         NotSelected ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
-                |> Svg.text_ ([ Attr.y <| toString <| Basics.min start.y end.y, Attr.fontFamily "sans-serif" ] ++ attrs)
+                |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| (svgTextOffsetX + Basics.min start.x end.x), Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
+                |> Svg.text_ ([ Attr.y <| toString <| (svgTextOffsetY + Basics.min start.y end.y), Attr.fontFamily "sans-serif" ] ++ attrs)
 
         SelectedWithVertices ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| Basics.min start.x end.x, Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| (svgTextOffsetX + Basics.min start.x end.x), Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
                 |> Svg.text_
-                    ([ Attr.y <| toString <| Basics.min start.y end.y
+                    ([ Attr.y <| toString <| (svgTextOffsetY + Basics.min start.y end.y)
                      , Html.Events.onDoubleClick <| FocusTextArea index
                      , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FocusTextArea index)
                      , Attr.stroke <|

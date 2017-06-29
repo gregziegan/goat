@@ -4,9 +4,12 @@ import Array.Hamt exposing (Array)
 import Color exposing (Color)
 import Goat.Annotation exposing (Annotation, Drawing(..), LineType(..), ShapeType(..), shapes, spotlights)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, StrokeStyle(..))
-import Goat.Model exposing (AttributeDropdown(..), Model, OperatingSystem(..))
-import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing)
+import Goat.Environment exposing (OperatingSystem(..))
+import Goat.Model exposing (AttributeDropdown(..), Model)
+import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing, isCtrlPressed)
 import Goat.View.Icons as Icons
+import Goat.View.EventUtils exposing (stopPropagationAndDefault)
+import Json.Decode as Json
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style, title)
 import Html.Events exposing (onClick, onMouseDown, onMouseUp, onWithOptions)
@@ -128,18 +131,26 @@ viewDrawingButtons { operatingSystem, drawing, shape, spotlight } { strokeColor,
         ]
 
 
+delayedToggleAttributes : AttributeDropdown -> List (Attribute Msg)
+delayedToggleAttributes attributeDropdown =
+    [ onMouseDown (WaitForDropdownToggle attributeDropdown)
+    , onMouseUp CancelDropdownWait
+    ]
+
+
 viewShapesDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> OperatingSystem -> Html Msg
 viewShapesDropdown toDropdownMenu selectedDrawing curShape os =
     div [ class "dropdown-things" ]
         [ button
-            [ onMouseDown (WaitForDropdownToggle ShapesDropdown)
-            , onMouseUp CancelDropdownWait
-            , classList
+            ([ onWithOptions "contextmenu" stopPropagationAndDefault (Json.succeed (ToggleDropdown ShapesDropdown))
+             , classList
                 [ "drawing-button" => True
                 , "drawing-button--selected" => List.member selectedDrawing shapes
                 ]
-            , title (drawingToTitle os curShape)
-            ]
+             , title (drawingToTitle os curShape)
+             ]
+                ++ delayedToggleAttributes ShapesDropdown
+            )
             [ viewShapeSvg curShape
             , Icons.viewCornerArrow
             ]
@@ -151,15 +162,16 @@ viewSpotlightsDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -
 viewSpotlightsDropdown toDropdownMenu selectedDrawing curSpotlight os =
     div [ class "dropdown-things" ]
         [ button
-            [ onMouseDown (WaitForDropdownToggle SpotlightsDropdown)
-            , onMouseUp CancelDropdownWait
-            , classList
+            ([ onWithOptions "contextmenu" stopPropagationAndDefault (Json.succeed (ToggleDropdown SpotlightsDropdown))
+             , classList
                 [ "drawing-button" => True
                 , "drawing-button--selected" => List.member selectedDrawing spotlights
                 , "drawing-button--spotlight" => True
                 ]
-            , title (drawingToTitle os curSpotlight)
-            ]
+             , title (drawingToTitle os curSpotlight)
+             ]
+                ++ delayedToggleAttributes SpotlightsDropdown
+            )
             [ viewShapeSvg curSpotlight
             , Icons.viewCornerArrow
             ]

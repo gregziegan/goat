@@ -1,11 +1,11 @@
-module Goat.Model exposing (Model, Platform(..), AttributeDropdown(..), OperatingSystem(..), AnnotationMenu, init)
+module Goat.Model exposing (Model, AttributeDropdown(..), AnnotationMenu, Image, init)
 
 import Array.Hamt as Array exposing (Array)
 import Color exposing (Color)
 import Goat.Annotation exposing (Annotation, Drawing, defaultDrawing, defaultShape, defaultSpotlight, defaultStroke)
 import Goat.Annotation.Shared exposing (StrokeStyle)
 import Goat.EditState as EditState exposing (EditState)
-import Goat.Flags exposing (Flags, Image)
+import Goat.Environment exposing (OperatingSystem(..), Platform(..))
 import Goat.Ports as Ports
 import Keyboard.Extra as Keyboard exposing (Key)
 import List.Zipper exposing (Zipper)
@@ -14,9 +14,14 @@ import Rocket exposing ((=>))
 import UndoList exposing (UndoList)
 
 
-type Platform
-    = Zendesk
-    | Web
+type alias Image =
+    { id : String
+    , url : String
+    , width : Float
+    , height : Float
+    , originalWidth : Float
+    , originalHeight : Float
+    }
 
 
 type AttributeDropdown
@@ -26,11 +31,6 @@ type AttributeDropdown
     | Fills
     | StrokeColors
     | Strokes
-
-
-type OperatingSystem
-    = MacOS
-    | Windows
 
 
 type alias AnnotationMenu =
@@ -73,8 +73,27 @@ type alias Model =
     }
 
 
-init : Flags -> ( Model, List (Cmd msg) )
-init { isMac, inZendesk } =
+init :
+    Result String { os : OperatingSystem, platform : Platform }
+    -> ( Model, List (Cmd msg) )
+init decodeResult =
+    case decodeResult of
+        Ok { os, platform } ->
+            initialModel os platform
+                => case platform of
+                    Zendesk ->
+                        []
+
+                    Web ->
+                        [ Ports.listenForUpload () ]
+
+        Err _ ->
+            initialModel Windows Web
+                => [ Ports.listenForUpload () ]
+
+
+initialModel : OperatingSystem -> Platform -> Model
+initialModel os platform =
     { edits = UndoList.fresh Array.empty
     , editState = EditState.initialState
     , clipboard = Nothing
@@ -92,18 +111,6 @@ init { isMac, inZendesk } =
     , images = List.Zipper.fromList []
     , imageSelected = False
     , pressedKeys = []
-    , operatingSystem =
-        if isMac then
-            MacOS
-        else
-            Windows
-    , platform =
-        if inZendesk then
-            Zendesk
-        else
-            Web
+    , operatingSystem = os
+    , platform = platform
     }
-        => if inZendesk then
-            []
-           else
-            [ Ports.listenForUpload () ]

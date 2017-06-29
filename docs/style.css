@@ -24,6 +24,8 @@ button:active, button:focus, button:hover {
   align-items: center;
   border-right: 1px solid #f8f8f8;
   padding: 5px 0;
+  position: fixed;
+  background-color: white;
 }
 
 .columns {
@@ -56,12 +58,6 @@ button:active, button:focus, button:hover {
 
 .offscreen-canvas {
   display: none;
-}
-
-.image-edit {
-  padding: 10px;
-  position: relative;
-  border-right: 1px solid rgb(230, 230, 230);
 }
 
 image {
@@ -205,9 +201,8 @@ image {
 }
 
 .drawing-area {
-  position: absolute;
-  top: 10px;
-  left: 10px;
+  margin-top: 10px;
+  margin-left: 82px;
 }
 
 .text-box {
@@ -222,7 +217,7 @@ image {
 }
 
 .text-box-container {
-  position: absolute;
+  position: fixed;
 }
 
 .text-box-textarea {

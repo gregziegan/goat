@@ -1,6 +1,6 @@
 module Goat.View.ImageSelector exposing (view)
 
-import Goat.Flags exposing (Image)
+import Goat.Model exposing (Image)
 import Goat.View.Icons as Icons
 import Goat.Update exposing (Msg(SelectImage))
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
@@ -31,10 +31,10 @@ viewImageOption image =
         [ class "image-option"
         , Html.Attributes.width <| round image.width
         , Html.Attributes.height <| round image.height
-        , onClick <| SelectImage image
+        , onClick <| SelectImage (Ok image)
         ]
         [ img [ src image.url, Html.Attributes.height <| round image.height, Html.Attributes.width <| round image.width ] []
-        , div [ onClick <| SelectImage image, class "image-edit-pencil" ]
+        , div [ onClick <| SelectImage (Ok image), class "image-edit-pencil" ]
             [ Icons.viewPencil
             ]
         ]
