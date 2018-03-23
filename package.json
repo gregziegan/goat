@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "zendency development",
-    "dev": "elm-live src/Main.elm --output=elm.js --debug --open",
+    "dev": "(cpx \"./docs/{elm.js,index.js,index.css}\" zendesk-app/ --watch &) && elm-live src/Main.elm --output=docs/elm.js --debug --open",
     "bundle": "elm-make src/Main.elm --output=elm.js && uglifyjs -c -m -o elm.js elm.js && zendency bundle $1",
     "test": "elm-test"
   },
@@ -32,6 +32,7 @@
     "./docs/style.css"
   ],
   "devDependencies": {
-    "zendency": "zendesk/zendency#v3.3.0"
+    "cpx": "^1.5.0",
+    "zendency": "zendesklabs/zendency#v3.3.0"
   }
 }

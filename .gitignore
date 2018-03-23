@@ -1,3 +1,4 @@
+*.zip
 elm-stuff
 elm.js
 node_modules

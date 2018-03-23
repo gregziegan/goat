@@ -4,7 +4,7 @@ import Color exposing (Color)
 import Color.Convert
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, end, goat, model, start, testColor)
-import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, toLineStyle, fontSizeToLineHeight)
+import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, toLineStyle, fontSizeToLineHeight, textareaPadding)
 import Goat.EditState as EditState
 import Goat.Model exposing (Image)
 import Goat.Update exposing (Msg)
@@ -92,10 +92,15 @@ rectSelector shape =
         :: (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
 
 
+svgTextOffsetX : Int
+svgTextOffsetX =
+    textareaPadding - 20
+
+
 svgTextSelector : TextArea -> List Selector
 svgTextSelector { start, end } =
     [ tag "text"
-    , attribute "x" <| toString <| Basics.min start.y end.y
+    , attribute "x" <| toString <| (svgTextOffsetX + Basics.min start.x end.x)
     ]
 
 
@@ -103,8 +108,8 @@ tspanSelector : TextArea -> List Selector
 tspanSelector { start, end, fontSize, fill } =
     [ tag "tspan"
     , attribute "dy" <| toString <| fontSizeToLineHeight fontSize
-    , attribute "x" <| toString <| Basics.min start.x end.x
     , attribute "fill" <| Color.Convert.colorToHex fill
+    , attribute "x" <| toString <| (svgTextOffsetX + Basics.min start.x end.x)
     ]
 
 

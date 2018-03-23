@@ -72,7 +72,7 @@ viewEmptyImagesScreen : Html Msg
 viewEmptyImagesScreen =
     div
         [ class "no-images-page" ]
-        [ h2 [] [ text "Welcome to G.O.A.T.!" ]
+        [ h2 [] [ text "Welcome to G.O.A.T." ]
         , p [] [ text "Please upload an image to the comment editor. The image will show up here for annotating." ]
         ]
 

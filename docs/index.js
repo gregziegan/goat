@@ -126,7 +126,7 @@ function loadImage(src) {
 }
 
 function toImageObject(image) {
-  var id = image.getAttribute('data-imageuploadid');
+  var id = image.getAttribute('data-image-uuid');
   var originalWidth = parseFloat(image.getAttribute('data-original-width'));
   var originalHeight = parseFloat(image.getAttribute('data-original-height'));
   var width = parseFloat(image.style.width.replace('px', ''));
@@ -194,7 +194,8 @@ function exportToZendesk(imageUrl) {
     var comment = zaf['ticket.comment'].text;
     div.innerHTML = comment;
     var selectionBox = div.querySelector('span.zd-editor--rich-text-comment--resize-box');
-    var imageToReplace = div.querySelector('img[data-imageuploadid="' + zendeskExportId + '"]');
+
+    var imageToReplace = div.querySelector('img[data-image-uuid="' + zendeskExportId + '"]');
     if (selectionBox && imageToReplace) {
       selectionBox.outerHTML = '';
     } else {
