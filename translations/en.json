@@ -1,6 +1,8 @@
 {
   "app": {
     "name": "G.O.A.T.",
-    "description": "Annotate Images"
+    "description": "Annotate Images",
+    "installation_instructions": "Just click install!",
+    "long_description": "Annotate important images with a variety of graphics: rectangles, ovals, text, spotlights, pixelation and more!"
   }
 }
