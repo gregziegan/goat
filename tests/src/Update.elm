@@ -1,13 +1,12 @@
 module Update exposing (all)
 
-import Array.Hamt as Array
-import Color
+import Array exposing (Array)
 import Expect exposing (Expectation)
-import Fixtures exposing (aShape, autoExpand, drawingInfo, end, model, resizingInfo, start, testColor, aTextArea)
-import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), shiftPosition, LineType(..), ShapeType(..))
+import Fixtures exposing (aShape, aTextArea, autoExpand, drawingInfo, end, model, resizingInfo, start, testColor)
+import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), LineType(..), ShapeType(..), shiftPosition)
 import Goat.Annotation.Shared exposing (Vertex(Start))
 import Goat.Model exposing (Model)
-import Goat.Update exposing (Msg(..), Msg(SelectStrokeColor), extractAnnotationAttributes, moveAnnotation, selectAnnotation)
+import Goat.Update exposing (Msg(..), extractAnnotationAttributes, moveAnnotation, selectAnnotation)
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
 
@@ -154,7 +153,7 @@ all =
         , test "editing a textbox's text should not add to the undo history" <|
             \() ->
                 model
-                    |> update (ChangeDrawing (DrawTextBox))
+                    |> update (ChangeDrawing DrawTextBox)
                     |> update (StartDrawing start)
                     |> update (FinishDrawing end)
                     |> update (TextBoxInput 0 { state = aTextArea.autoexpand, textValue = "New Text" })
@@ -165,7 +164,7 @@ all =
         , test "should remove textbox if text only has spaces/empty" <|
             \() ->
                 model
-                    |> update (ChangeDrawing (DrawTextBox))
+                    |> update (ChangeDrawing DrawTextBox)
                     |> update (StartDrawing start)
                     |> update (FinishDrawing end)
                     |> update (TextBoxInput 0 { state = aTextArea.autoexpand, textValue = " " })

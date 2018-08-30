@@ -1,17 +1,16 @@
-module Fixtures exposing (..)
+module Fixtures exposing (aShape, aTextArea, attributes, autoExpand, drawingInfo, end, firstFreeDrawPosition, goat, line, model, resizingInfo, secondFreeDrawPosition, start, testColor)
 
-import Array.Hamt as Array exposing (Array)
+import Array exposing (Array)
 import AutoExpand
-import Color
 import Goat.Annotation as Annotation exposing (EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, autoExpandConfig, shiftPosition)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle, Vertex(..))
 import Goat.EditState as EditState
 import Goat.Environment exposing (OperatingSystem(MacOS), Platform(Web))
-import Goat.Model exposing (Model, Image)
+import Goat.Model exposing (Image, Model)
 import Goat.Update exposing (Msg(..), extractAnnotationAttributes)
-import List.Zipper
 import Mouse exposing (Position)
 import UndoList
+import ZipList
 
 
 goat : Image
@@ -35,7 +34,7 @@ model =
     , strokeStyle = Annotation.defaultStroke
     , fontSize = 14
     , pressedKeys = []
-    , images = List.Zipper.fromList [ goat ]
+    , images = ZipList.fromList [ goat ]
     , imageSelected = True
     , currentDropdown = Nothing
     , drawing = Annotation.defaultDrawing

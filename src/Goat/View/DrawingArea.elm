@@ -1,7 +1,7 @@
 module Goat.View.DrawingArea exposing (view, viewAnnotationMenu, viewImage, viewPixelatedImage)
 
-import Array.Hamt as Array exposing (Array)
-import Goat.Annotation exposing (Annotation(Pixelate), Drawing(DrawPixelate), TextArea)
+import Array exposing (Array)
+import Goat.Annotation exposing (Annotation(..), Drawing(..), TextArea)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo)
 import Goat.EditState as EditState exposing (DrawingConfig, EditState)
 import Goat.Model exposing (Image)
@@ -11,7 +11,7 @@ import Goat.View.DrawingArea.Definitions as Definitions
 import Goat.View.Utils exposing (toPx)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
-import Html.Events exposing (onClick, onMouseEnter, onWithOptions)
+import Html.Events exposing (onClick, onMouseEnter)
 import Mouse exposing (Position)
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
@@ -21,8 +21,8 @@ import Svg.Lazy as Svg
 viewPixelatedImage : Image -> Svg Msg
 viewPixelatedImage { width, height, url } =
     Svg.image
-        [ Attr.width (toString (round width))
-        , Attr.height (toString (round height))
+        [ Attr.width (String.fromInt (round width))
+        , Attr.height (String.fromInt (round height))
         , Attr.xlinkHref url
         , Attr.filter "url(#pixelate)"
         ]
@@ -33,8 +33,8 @@ viewImage : Image -> Svg Msg
 viewImage { url, width, height } =
     Svg.image
         [ Attr.class "image-to-annotate"
-        , Attr.width (toString (round width))
-        , Attr.height (toString (round height))
+        , Attr.width (String.fromInt (round width))
+        , Attr.height (String.fromInt (round height))
         , Attr.xlinkHref url
         , Attr.mask "url(#pixelateMask)"
         ]
@@ -71,13 +71,15 @@ viewAnnotations annotations spotlights nonSpotlights isDrawingSpotlight =
         firstSpotlightIndex =
             getFirstSpotlightIndex annotations
     in
-        if isDrawingSpotlight && List.isEmpty spotlights then
-            nonSpotlights ++ [ viewMask ]
-        else if List.isEmpty spotlights then
-            nonSpotlights
-        else
-            List.take firstSpotlightIndex nonSpotlights
-                ++ (viewMask :: List.drop firstSpotlightIndex nonSpotlights)
+    if isDrawingSpotlight && List.isEmpty spotlights then
+        nonSpotlights ++ [ viewMask ]
+
+    else if List.isEmpty spotlights then
+        nonSpotlights
+
+    else
+        List.take firstSpotlightIndex nonSpotlights
+            ++ (viewMask :: List.drop firstSpotlightIndex nonSpotlights)
 
 
 type alias IsInMask =
@@ -97,6 +99,7 @@ viewDrawingAndAnnotations { spotlights, pixelates, imagesAndAnnotations } isSpot
         [ Definitions.view (spotlights ++ [ toDrawing True ]) pixelates ]
             ++ imagesAndAnnotations
             ++ [ toDrawing False ]
+
     else
         [ Definitions.view spotlights pixelates ]
             ++ imagesAndAnnotations
@@ -130,15 +133,15 @@ viewNonSpotlightAnnotations editState annotations =
                 |> Array.toList
                 |> List.indexedMap (Annotation.viewAnnotation editState)
     in
-        List.map Tuple.first annotationsAndVertices
-            ++ List.filterMap Tuple.second annotationsAndVertices
+    List.map Tuple.first annotationsAndVertices
+        ++ List.filterMap Tuple.second annotationsAndVertices
 
 
 viewPixelates : EditState -> Array Annotation -> List (Svg Msg)
 viewPixelates editState annotations =
     annotations
         |> Array.toIndexedList
-        |> List.filterMap (uncurry (Annotation.viewPixelate editState))
+        |> List.filterMap (\( a, b ) -> Annotation.viewPixelate editState a b)
         |> List.concat
 
 
@@ -158,9 +161,9 @@ maskInsertsAndAnnotations image drawing editState annotations =
             viewNonSpotlightAnnotations editState annotations
 
         imagesAndAnnotations =
-            (Svg.lazy viewPixelatedImage image) :: (Svg.lazy viewImage image) :: svgAnnotations
+            Svg.lazy viewPixelatedImage image :: Svg.lazy viewImage image :: svgAnnotations
     in
-        MaskInsertsAndAnnotations spotlights pixelates imagesAndAnnotations
+    MaskInsertsAndAnnotations spotlights pixelates imagesAndAnnotations
 
 
 view : DrawingModifiers -> Array Annotation -> AnnotationAttributes -> Image -> Html Msg
@@ -170,8 +173,8 @@ view ({ drawing, constrain, editState } as drawingModifiers) annotations annotat
         [ svg
             [ Attr.id "drawing-area"
             , Attr.class "drawing-area"
-            , Attr.width (toString (round image.width))
-            , Attr.height (toString (round image.height))
+            , Attr.width (String.fromInt (round image.width))
+            , Attr.height (String.fromInt (round image.height))
             , attribute "xmlns" "http://www.w3.org/2000/svg"
             ]
             (viewDrawingAndAnnotations
@@ -200,10 +203,8 @@ viewAnnotationMenu pos selectedIndex =
     div
         [ id "annotation-menu"
         , class "annotation-menu"
-        , style
-            [ ( "top", toPx pos.y )
-            , ( "left", toPx pos.x )
-            ]
+        , style "top" (toPx pos.y)
+        , style "left" (toPx pos.x)
         ]
         [ ul [ class "annotation-menu__list" ]
             (case selectedIndex of

@@ -1,18 +1,19 @@
 module Goat.View exposing (view)
 
 import Goat.EditState exposing (currentAnnotationAttributes)
-import Goat.Environment exposing (Platform(Web, Zendesk))
-import Goat.Model exposing (Model, Image)
-import Goat.Update exposing (Msg(CloseAllMenus, ShowMeTheGoats), extractAnnotationAttributes)
+import Goat.Environment exposing (Platform(..))
+import Goat.Model exposing (Image, Model)
+import Goat.Update exposing (Msg(..), extractAnnotationAttributes)
 import Goat.View.Controls as Controls
 import Goat.View.DrawingArea as DrawingArea
 import Goat.View.DrawingArea.Annotation exposing (DrawingModifiers)
 import Goat.View.ImageSelector as ImageSelector
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
-import Html.Events exposing (onClick, onWithOptions)
-import Keyboard.Extra exposing (Key(Shift))
-import List.Zipper
+import Html.Events exposing (onClick)
+import Keyboard exposing (Key(..))
+import List.Selection as Selection
+
 
 
 {-
@@ -62,10 +63,12 @@ view model =
                     viewInfoScreen
 
         Just images ->
-            if model.imageSelected then
-                viewImageAnnotator model <| List.Zipper.current images
-            else
-                ImageSelector.view images
+            case Selection.selected images of
+                Just selectedImage ->
+                    viewImageAnnotator model selectedImage
+
+                Nothing ->
+                    ImageSelector.view images
 
 
 viewEmptyImagesScreen : Html Msg
@@ -101,13 +104,13 @@ viewImageAnnotator model selectedImage =
         annotationAttrs =
             currentAnnotationAttributes model.editState (extractAnnotationAttributes model)
     in
-        div
-            [ class "annotation-app" ]
-            [ viewModals model
-            , viewModalMask model.showingAnyMenu
-            , Controls.view model annotationAttrs (Controls.viewDropdownMenu model.currentDropdown model.drawing annotationAttrs)
-            , DrawingArea.view (toDrawingModifiers model) model.edits.present annotationAttrs selectedImage
-            ]
+    div
+        [ class "annotation-app" ]
+        [ viewModals model
+        , viewModalMask model.showingAnyMenu
+        , Controls.view model annotationAttrs (Controls.viewDropdownMenu model.currentDropdown model.drawing annotationAttrs)
+        , DrawingArea.view (toDrawingModifiers model) model.edits.present annotationAttrs selectedImage
+        ]
 
 
 viewModals : Model -> Html Msg

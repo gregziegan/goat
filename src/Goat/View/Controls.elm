@@ -1,35 +1,24 @@
 module Goat.View.Controls exposing (view, viewDropdownMenu)
 
-import Array.Hamt exposing (Array)
+import Array exposing (Array)
 import Color exposing (Color)
-import Goat.Annotation exposing (Annotation, Drawing(..), LineType(..), ShapeType(..), shapes, spotlights)
+import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), LineType(..), ShapeType(..), shapes, spotlights)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, StrokeStyle(..))
 import Goat.Environment exposing (OperatingSystem(..))
 import Goat.Model exposing (AttributeDropdown(..), Model)
-import Goat.Update exposing (Msg(..), drawingsAreEqual, isSpotlightDrawing, isCtrlPressed)
-import Goat.View.Icons as Icons
+import Goat.Update exposing (Msg(..), drawingsAreEqual, isCtrlPressed, isSpotlightDrawing)
 import Goat.View.EventUtils exposing (stopPropagationAndDefault)
-import Json.Decode as Json
+import Goat.View.Icons as Icons
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style, title)
-import Html.Events exposing (onClick, onMouseDown, onMouseUp, onWithOptions)
-import Rocket exposing ((=>))
+import Html.Events exposing (onClick, onMouseDown, onMouseUp)
+import Json.Decode as Json
 import UndoList exposing (UndoList)
-import Color exposing (Color)
-import Goat.Annotation as Annotation
-import Goat.Annotation.Shared exposing (StrokeStyle)
 
 
 strokeColors : List Color
 strokeColors =
-    [ Color.rgb 255 0 212
-    , Color.rgb 255 0 0
-    , Color.rgb 73 0 255
-    , Color.rgb 0 202 255
-    , Color.rgb 16 255 0
-    , Color.rgb 255 226 0
-    , Color.rgb 255 129 0
-    , Color.black
+    [ Color.black
     , Color.white
     ]
 
@@ -37,13 +26,6 @@ strokeColors =
 fills : List (Maybe Color)
 fills =
     [ Nothing
-    , Just (Color.rgb 255 0 212)
-    , Just (Color.rgb 255 0 0)
-    , Just (Color.rgb 73 0 255)
-    , Just (Color.rgb 0 202 255)
-    , Just (Color.rgb 16 255 0)
-    , Just (Color.rgb 255 226 0)
-    , Just (Color.rgb 255 129 0)
     , Just Color.black
     , Just Color.white
     ]
@@ -142,10 +124,10 @@ viewShapesDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -> Op
 viewShapesDropdown toDropdownMenu selectedDrawing curShape os =
     div [ class "dropdown-things" ]
         [ button
-            ([ onWithOptions "contextmenu" stopPropagationAndDefault (Json.succeed (ToggleDropdown ShapesDropdown))
+            ([ stopPropagationAndDefault "contextmenu" (Json.succeed (ToggleDropdown ShapesDropdown))
              , classList
-                [ "drawing-button" => True
-                , "drawing-button--selected" => List.member selectedDrawing shapes
+                [ ( "drawing-button", True )
+                , ( "drawing-button--selected", List.member selectedDrawing shapes )
                 ]
              , title (drawingToTitle os curShape)
              ]
@@ -162,11 +144,11 @@ viewSpotlightsDropdown : (AttributeDropdown -> Html Msg) -> Drawing -> Drawing -
 viewSpotlightsDropdown toDropdownMenu selectedDrawing curSpotlight os =
     div [ class "dropdown-things" ]
         [ button
-            ([ onWithOptions "contextmenu" stopPropagationAndDefault (Json.succeed (ToggleDropdown SpotlightsDropdown))
+            ([ stopPropagationAndDefault "contextmenu" (Json.succeed (ToggleDropdown SpotlightsDropdown))
              , classList
-                [ "drawing-button" => True
-                , "drawing-button--selected" => List.member selectedDrawing spotlights
-                , "drawing-button--spotlight" => True
+                [ ( "drawing-button", True )
+                , ( "drawing-button--selected", List.member selectedDrawing spotlights )
+                , ( "drawing-button--spotlight", True )
                 ]
              , title (drawingToTitle os curSpotlight)
              ]
@@ -224,8 +206,8 @@ viewFillOption : Maybe Color -> Maybe Color -> Html Msg
 viewFillOption selectedFill fill =
     button
         [ classList
-            [ "dropdown-button" => True
-            , "dropdown-button--selected" => selectedFill == fill
+            [ ( "dropdown-button", True )
+            , ( "dropdown-button--selected", selectedFill == fill )
             ]
         , onClick (SelectFill fill)
         ]
@@ -236,8 +218,8 @@ viewStrokeColorOption : Color -> Color -> Html Msg
 viewStrokeColorOption selectedColor color =
     button
         [ classList
-            [ "dropdown-button" => True
-            , "dropdown-button--selected" => selectedColor == color
+            [ ( "dropdown-button", True )
+            , ( "dropdown-button--selected", selectedColor == color )
             ]
         , onClick (SelectStrokeColor color)
         ]
@@ -248,12 +230,12 @@ viewFontSizeOption : Int -> Int -> Html Msg
 viewFontSizeOption selectedFontSize fontSize =
     button
         [ classList
-            [ "dropdown-button" => True
-            , "dropdown-button--selected" => selectedFontSize == fontSize
+            [ ( "dropdown-button", True )
+            , ( "dropdown-button--selected", selectedFontSize == fontSize )
             ]
         , onClick (SelectFontSize fontSize)
         ]
-        [ text <| toString <| fontSize ]
+        [ text <| String.fromInt <| fontSize ]
 
 
 viewStrokeStyleDropdown : (AttributeDropdown -> Html Msg) -> StrokeStyle -> OperatingSystem -> Html Msg
@@ -330,8 +312,8 @@ viewStrokeStyleOption : StrokeStyle -> StrokeStyle -> Html Msg
 viewStrokeStyleOption selectedStrokeStyle strokeStyle =
     button
         [ classList
-            [ "dropdown-button" => True
-            , "dropdown-button--selected" => selectedStrokeStyle == strokeStyle
+            [ ( "dropdown-button", True )
+            , ( "dropdown-button--selected", selectedStrokeStyle == strokeStyle )
             ]
         , onClick (SelectStrokeStyle strokeStyle)
         ]
@@ -348,6 +330,7 @@ viewDropdownOptions : Drawing -> AnnotationAttributes -> AttributeDropdown -> At
 viewDropdownOptions drawing { fill, strokeColor, strokeStyle, fontSize } selectedOption editOption =
     if selectedOption /= editOption then
         text ""
+
     else
         case editOption of
             ShapesDropdown ->
@@ -380,9 +363,9 @@ viewDrawingOption : Drawing -> Drawing -> Html Msg
 viewDrawingOption selectedDrawing drawing =
     button
         [ classList
-            [ "dropdown-button" => True
-            , "dropdown-button--selected" => selectedDrawing == drawing
-            , "dropdown-button--spotlight" => List.member drawing spotlights
+            [ ( "dropdown-button", True )
+            , ( "dropdown-button--selected", selectedDrawing == drawing )
+            , ( "dropdown-button--spotlight", List.member drawing spotlights )
             ]
         , onClick (ChangeDrawing drawing)
         ]
@@ -400,9 +383,9 @@ viewDrawingButton : OperatingSystem -> Drawing -> Drawing -> Html Msg
 viewDrawingButton os selectedDrawing drawing =
     button
         [ classList
-            [ "drawing-button" => True
-            , "drawing-button--selected" => drawingsAreEqual selectedDrawing drawing
-            , "drawing-button--spotlight" => isSpotlightDrawing drawing
+            [ ( "drawing-button", True )
+            , ( "drawing-button--selected", drawingsAreEqual selectedDrawing drawing )
+            , ( "drawing-button--spotlight", isSpotlightDrawing drawing )
             ]
         , title (drawingToTitle os drawing)
         , onClick <| ChangeDrawing drawing

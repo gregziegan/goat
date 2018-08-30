@@ -1,11 +1,6 @@
-module Goat.View.Utils exposing (posToString, toPx)
+module Goat.View.Utils exposing (toPx)
 
 
-posToString : { x : number, y : number } -> String
-posToString pos =
-    toString pos.x ++ "," ++ toString pos.y
-
-
-toPx : number -> String
+toPx : Int -> String
 toPx number =
-    toString number ++ "px"
+    String.fromInt number ++ "px"

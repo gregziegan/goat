@@ -1,15 +1,15 @@
 module Goat.View.ImageSelector exposing (view)
 
 import Goat.Model exposing (Image)
+import Goat.Update exposing (Msg(..))
 import Goat.View.Icons as Icons
-import Goat.Update exposing (Msg(SelectImage))
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
-import Html.Events exposing (onClick, onWithOptions)
-import List.Zipper exposing (Zipper)
+import Html.Events exposing (onClick)
+import List.Selection as Selection exposing (Selection)
 
 
-view : Zipper Image -> Html Msg
+view : Selection Image -> Html Msg
 view images =
     div [ class "image-selector-page" ]
         [ h3 [] [ text "Please select an image to annotate:" ]
@@ -17,10 +17,10 @@ view images =
         ]
 
 
-viewGallery : Zipper Image -> Html Msg
+viewGallery : Selection Image -> Html Msg
 viewGallery images =
     images
-        |> List.Zipper.toList
+        |> Selection.toList
         |> List.map viewImageOption
         |> div [ class "image-selector" ]
 

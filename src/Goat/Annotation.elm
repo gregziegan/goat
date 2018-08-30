@@ -1,10 +1,10 @@
-module Goat.Annotation exposing (Annotation(..), Drawing(..), SelectState(..), LineType(..), Shape, ShapeType(..), TextArea, defaultStroke, defaultDrawing, defaultShape, defaultSpotlight, strokeStyles, isFreeHand, isSpotlightShape, isEmptyTextBox, updateTextArea, attributes, arrowAngle, updateFill, updateStrokeColor, updateStrokeStyle, updateFontSize, positions, toLineStyle, toStrokeWidth, shiftPosition, move, shiftForPaste, setFill, setStrokeColor, setStrokeStyle, setFontSize, shapes, spotlights, StartPosition, EndPosition, newTextBox, fromDrawing, resize, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, stepMouse, calcDistance, textareaPadding)
+module Goat.Annotation exposing (Annotation(..), Drawing(..), EndPosition, LineType(..), SelectState(..), Shape, ShapeType(..), StartPosition, TextArea, arrowAngle, attributes, autoExpandConfig, calcDistance, calcLinePos, calcShapePos, defaultDrawing, defaultShape, defaultSpotlight, defaultStroke, fontSizeToLineHeight, fromDrawing, isEmptyTextBox, isFreeHand, isSpotlightShape, move, newTextBox, resize, setFill, setFontSize, setStrokeColor, setStrokeStyle, shapes, shiftForPaste, shiftPosition, spotlights, startAndEnd, stepMouse, strokeStyles, textareaPadding, toLineStyle, toStrokeWidth, updateFill, updateFontSize, updateStrokeColor, updateStrokeStyle, updateTextArea)
 
 import AutoExpand
-import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle(..), Vertex(..))
 import Color exposing (Color)
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle(..), Vertex(..))
+import Html.Attributes
 import Mouse exposing (Position)
-import Rocket exposing ((=>))
 
 
 type alias StartPosition =
@@ -151,32 +151,32 @@ isEmptyTextBox : Annotation -> Bool
 isEmptyTextBox annotation =
     case annotation of
         TextBox textArea ->
-            (String.trim textArea.text) == ""
+            String.trim textArea.text == ""
 
         _ ->
             False
 
 
-positions : Annotation -> ( Position, Position )
-positions annotation =
+startAndEnd : Annotation -> ( Position, Position )
+startAndEnd annotation =
     case annotation of
         Lines lineType line ->
-            line.start => line.end
+            ( line.start, line.end )
 
         FreeDraw shape _ ->
-            shape.start => shape.end
+            ( shape.start, shape.end )
 
         Shapes shapeType _ shape ->
-            shape.start => shape.end
+            ( shape.start, shape.end )
 
         TextBox textArea ->
-            textArea.start => textArea.end
+            ( textArea.start, textArea.end )
 
         Spotlight shapeType shape ->
-            shape.start => shape.end
+            ( shape.start, shape.end )
 
         Pixelate start end ->
-            start => end
+            ( start, end )
 
 
 attributes : Annotation -> AnnotationAttributes -> AnnotationAttributes
@@ -217,30 +217,30 @@ toLineStyle strokeStyle =
         strokeWidth =
             toStrokeWidth strokeStyle
     in
-        case strokeStyle of
-            SolidThin ->
-                toString strokeWidth => ""
+    case strokeStyle of
+        SolidThin ->
+            ( String.fromInt strokeWidth, "" )
 
-            SolidMedium ->
-                toString strokeWidth => ""
+        SolidMedium ->
+            ( String.fromInt strokeWidth, "" )
 
-            SolidThick ->
-                toString strokeWidth => ""
+        SolidThick ->
+            ( String.fromInt strokeWidth, "" )
 
-            SolidVeryThick ->
-                toString strokeWidth => ""
+        SolidVeryThick ->
+            ( String.fromInt strokeWidth, "" )
 
-            DashedThin ->
-                toString strokeWidth => "10, 5"
+        DashedThin ->
+            ( String.fromInt strokeWidth, "10, 5" )
 
-            DashedMedium ->
-                toString strokeWidth => "10, 5"
+        DashedMedium ->
+            ( String.fromInt strokeWidth, "10, 5" )
 
-            DashedThick ->
-                toString strokeWidth => "10, 5"
+        DashedThick ->
+            ( String.fromInt strokeWidth, "10, 5" )
 
-            DashedVeryThick ->
-                toString strokeWidth => "10, 5"
+        DashedVeryThick ->
+            ( String.fromInt strokeWidth, "10, 5" )
 
 
 toStrokeWidth : StrokeStyle -> number
@@ -280,10 +280,11 @@ arrowAngle a b =
         radians =
             if theta < 0.0 then
                 (2 * pi) + theta
+
             else
                 theta
     in
-        radians
+    radians
 
 
 setFill : Maybe Color -> AnnotationAttributes -> AnnotationAttributes
@@ -312,8 +313,8 @@ updateStrokeColor strokeColor annotation =
         Lines lineType line ->
             Lines lineType { line | strokeColor = strokeColor }
 
-        FreeDraw shape positions ->
-            FreeDraw { shape | strokeColor = strokeColor } positions
+        FreeDraw shape points ->
+            FreeDraw { shape | strokeColor = strokeColor } points
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill { shape | strokeColor = strokeColor }
@@ -356,8 +357,8 @@ updateStrokeStyle strokeStyle annotation =
         Lines lineType line ->
             Lines lineType { line | strokeStyle = strokeStyle }
 
-        FreeDraw shape positions ->
-            FreeDraw { shape | strokeStyle = strokeStyle } positions
+        FreeDraw shape points ->
+            FreeDraw { shape | strokeStyle = strokeStyle } points
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill { shape | strokeStyle = strokeStyle }
@@ -399,8 +400,8 @@ move translate annotation =
         Lines lineType line ->
             Lines lineType (shift translate line)
 
-        FreeDraw shape positions ->
-            FreeDraw (shift translate shape) (List.map (shiftPosition (Tuple.first translate) (Tuple.second translate)) positions)
+        FreeDraw shape points ->
+            FreeDraw (shift translate shape) (List.map (shiftPosition (Tuple.first translate) (Tuple.second translate)) points)
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill (shift translate shape)
@@ -437,24 +438,28 @@ resize constrain resizingInfo annotation =
             Pixelate (resizeVertices (calcShapePos constrain) resizingInfo { start = start, end = end }).start (resizeVertices (calcShapePos constrain) resizingInfo { start = start, end = end }).end
 
 
-resizeVertices : (StartPosition -> EndPosition -> Position) -> ResizingInfo -> { a | start : Position, end : Position } -> { a | start : Position, end : Position }
+resizeVertices :
+    (StartPosition -> EndPosition -> Position)
+    -> ResizingInfo
+    -> { a | start : Position, end : Position }
+    -> { a | start : Position, end : Position }
 resizeVertices constrain { curPos, vertex, originalCoords } annotation =
     let
         ( start, end ) =
             originalCoords
     in
-        case vertex of
-            Start ->
-                { annotation | start = constrain annotation.end curPos }
+    case vertex of
+        Start ->
+            { annotation | start = constrain annotation.end curPos }
 
-            End ->
-                { annotation | end = constrain annotation.start curPos }
+        End ->
+            { annotation | end = constrain annotation.start curPos }
 
-            StartPlusX ->
-                { annotation | start = constrain annotation.end curPos, end = Position start.x end.y }
+        StartPlusX ->
+            { annotation | start = constrain annotation.end curPos, end = Position start.x end.y }
 
-            StartPlusY ->
-                { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
+        StartPlusY ->
+            { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
 
 
 shiftForPaste : Annotation -> Annotation
@@ -463,8 +468,8 @@ shiftForPaste annotation =
         Lines lineType line ->
             Lines lineType { line | start = shiftPosition 10 10 line.start, end = shiftPosition 10 10 line.end }
 
-        FreeDraw shape positions ->
-            FreeDraw { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end } (List.map (shiftPosition 10 10) positions)
+        FreeDraw shape points ->
+            FreeDraw { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end } (List.map (shiftPosition 10 10) points)
 
         Shapes shapeType fill shape ->
             Shapes shapeType fill { shape | start = shiftPosition 10 10 shape.start, end = shiftPosition 10 10 shape.end }
@@ -488,6 +493,7 @@ calcShapePos : Bool -> Position -> Position -> Position
 calcShapePos shiftPressed start end =
     if shiftPressed then
         equalXandY start end
+
     else
         end
 
@@ -496,6 +502,7 @@ calcLinePos : Bool -> Position -> Position -> Position
 calcLinePos shiftPressed start end =
     if shiftPressed then
         stepMouse start end
+
     else
         end
 
@@ -504,6 +511,7 @@ equalXandY : Position -> Position -> Position
 equalXandY a b =
     if b.y - a.y < 0 then
         Position b.x (a.y - Basics.max (b.x - a.x) (a.x - b.x))
+
     else
         Position b.x (a.y + Basics.max (b.x - a.x) (a.x - b.x))
 
@@ -565,8 +573,8 @@ autoExpandConfig onInput index fontSize =
         , maxRows = 4
         , lineHeight = fontSizeToLineHeight fontSize
         }
-        |> AutoExpand.withId ("text-box-edit--" ++ toString index)
-        |> AutoExpand.withClass "text-box-textarea"
+        |> AutoExpand.withAttribute (Html.Attributes.id ("text-box-edit--" ++ String.fromInt index))
+        |> AutoExpand.withAttribute (Html.Attributes.class "text-box-textarea")
 
 
 fontSizeToLineHeight : Int -> Float

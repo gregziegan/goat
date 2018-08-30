@@ -1,15 +1,13 @@
 module View.DrawingArea.Annotation exposing (all)
 
-import Color exposing (Color)
-import Color.Convert
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, end, goat, model, start, testColor)
-import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, toLineStyle, fontSizeToLineHeight, textareaPadding)
+import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, fontSizeToLineHeight, textareaPadding, toLineStyle)
 import Goat.EditState as EditState
 import Goat.Model exposing (Image)
 import Goat.Update exposing (Msg)
 import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
-import Goat.View.DrawingArea.Annotation exposing (arrowPath, arrowHeadPath, viewAnnotation, linePath)
+import Goat.View.DrawingArea.Annotation exposing (arrowHeadPath, arrowPath, linePath, viewAnnotation)
 import Html exposing (Html)
 import Test exposing (..)
 import Test.Html.Query as Query
@@ -30,7 +28,7 @@ arrowSelector shape =
     [ attribute "stroke" "none"
     , attribute "fill" (Color.Convert.colorToHex shape.strokeColor)
     , attribute "d" (arrowPath shape)
-    , attribute "filter" ("url(#dropShadow)")
+    , attribute "filter" "url(#dropShadow)"
     ]
 
 
@@ -39,14 +37,14 @@ arrowHeadSelector ( dx, dy ) { start, end, strokeColor } =
     let
         theta =
             (2 * pi)
-                - (arrowAngle start end)
+                - arrowAngle start end
     in
-        [ attribute "d" (arrowHeadPath end)
-        , attribute "fill" <| Color.Convert.colorToHex strokeColor
-        , attribute "stroke" "none"
-        , attribute "transform" ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
-        , attribute "filter" "url(#dropShadow)"
-        ]
+    [ attribute "d" (arrowHeadPath end)
+    , attribute "fill" <| Color.Convert.colorToHex strokeColor
+    , attribute "stroke" "none"
+    , attribute "transform" ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
+    , attribute "filter" "url(#dropShadow)"
+    ]
 
 
 strokeSelectors : String -> String -> Color -> List Selector
@@ -65,7 +63,7 @@ ellipseSelector shape =
     , attribute "cy" <| toString <| start.y + ((end.y - start.y) // 2)
     , attribute "filter" "url(#dropShadow)"
     ]
-        ++ (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
+        ++ uncurry strokeSelectors (toLineStyle shape.strokeStyle) shape.strokeColor
 
 
 roundedRectSelector : Shape -> List Selector
@@ -89,7 +87,7 @@ fillSelectors fill =
 rectSelector : Shape -> List Selector
 rectSelector shape =
     attribute "filter" "url(#dropShadow)"
-        :: (uncurry strokeSelectors (toLineStyle shape.strokeStyle)) shape.strokeColor
+        :: uncurry strokeSelectors (toLineStyle shape.strokeStyle) shape.strokeColor
 
 
 svgTextOffsetX : Int
@@ -115,8 +113,8 @@ tspanSelector { start, end, fontSize, fill } =
 
 imageSelector : Image -> List Selector
 imageSelector { width, height, url } =
-    [ attribute "width" (toString (round width))
-    , attribute "height" (toString (round height))
+    [ attribute "width" (String.fromInt (round width))
+    , attribute "height" (String.fromInt (round height))
 
     -- , attribute "xlink:href" url -- possible bug with elm-html-test, will test when there's a fix
     ]

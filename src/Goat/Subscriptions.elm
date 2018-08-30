@@ -1,11 +1,12 @@
 module Goat.Subscriptions exposing (subscriptions)
 
-import Json.Decode as Json exposing (Value, field)
 import Goat.EditState as EditState exposing (SubscriptionConfig)
 import Goat.Model exposing (Image, Model)
 import Goat.Ports as Ports
 import Goat.Update exposing (Msg(..))
-import Time exposing (second)
+import Json.Decode as Json exposing (Value, field)
+import List.Selection as Selection
+import Time
 
 
 decodeImage : Json.Decoder Image
@@ -19,12 +20,12 @@ decodeImage =
         (field "originalHeight" Json.float)
 
 
-valueToImage : Value -> Result String Image
+valueToImage : Value -> Result Json.Error Image
 valueToImage =
     Json.decodeValue decodeImage
 
 
-valueToImages : Value -> Result String (List Image)
+valueToImages : Value -> Result Json.Error (List Image)
 valueToImages =
     Json.decodeValue
         (Json.list decodeImage)
@@ -41,10 +42,10 @@ editStateConfig =
 
 imageAnnotationSubscriptions : Model -> Sub Msg
 imageAnnotationSubscriptions model =
-    if model.imageSelected then
-        EditState.subscriptions editStateConfig model.editState
-    else
-        Sub.none
+    model.images
+        |> Maybe.andThen Selection.selected
+        |> Maybe.map (\_ -> EditState.subscriptions editStateConfig model.editState)
+        |> Maybe.withDefault Sub.none
 
 
 subscriptions : Model -> Sub Msg
@@ -59,5 +60,5 @@ subscriptions model =
                 Sub.none
 
             Just attributeDropdown ->
-                Time.every (0.2 * second) (\_ -> ToggleDropdown attributeDropdown)
+                Time.every 200 (\_ -> ToggleDropdown attributeDropdown)
         ]

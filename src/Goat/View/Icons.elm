@@ -1,12 +1,11 @@
-module Goat.View.Icons exposing (viewUndoArrow, viewArrow, viewRectangle, viewSpotlightRect, viewSpotlightEllipse, viewSpotlightRoundedRect, viewRoundedRectangle, viewEllipse, viewFill, viewStrokeColor, viewLine, viewNormalLine, viewDownArrow, viewText, viewFontSize, viewPencil, viewCornerArrow, viewStrokeStyle, viewPixelate, freeHand)
+module Goat.View.Icons exposing (freeHand, viewArrow, viewCornerArrow, viewDownArrow, viewEllipse, viewFill, viewFontSize, viewLine, viewNormalLine, viewPencil, viewPixelate, viewRectangle, viewRoundedRectangle, viewSpotlightEllipse, viewSpotlightRect, viewSpotlightRoundedRect, viewStrokeColor, viewStrokeStyle, viewText, viewUndoArrow)
 
 import Color exposing (Color)
-import Color.Convert exposing (colorToHex)
 import Goat.Annotation.Shared exposing (StrokeStyle(..))
 import Html exposing (Html)
 import Html.Attributes
-import Svg exposing (circle, ellipse, g, mask, polygon, rect, svg, path, linearGradient, stop, use)
-import Svg.Attributes as Attr exposing (id, class, cx, cy, d, fill, fillOpacity, fillRule, height, points, offset, opacity, r, rx, ry, stroke, strokeLinecap, stopColor, stopOpacity, strokeWidth, viewBox, width, x, x1, x2, xlinkHref, y, y1, y2)
+import Svg exposing (circle, ellipse, g, linearGradient, mask, path, polygon, rect, stop, svg, use)
+import Svg.Attributes as Attr exposing (class, cx, cy, d, fill, fillOpacity, fillRule, height, id, offset, opacity, points, r, rx, ry, stopColor, stopOpacity, stroke, strokeLinecap, strokeWidth, viewBox, width, x, x1, x2, xlinkHref, y, y1, y2)
 
 
 viewUndoArrow : Html msg
@@ -86,12 +85,13 @@ viewFill aFill =
             Just color ->
                 if color == Color.white then
                     circle [ cx "7", cy "7", r "6", stroke "#555", fill "white" ] []
+
                 else
                     circle
                         [ cx "7"
                         , cy "7"
                         , r "7"
-                        , fill <| colorToHex color
+                        , fill color
                         ]
                         []
 
@@ -107,9 +107,10 @@ viewStrokeColor strokeColor =
             [ circle [ cx "7", cy "7", r "7", fill "currentColor" ] []
             , circle [ cx "7", cy "7", r "5", stroke "white", fill "currentColor" ] []
             ]
+
          else
             [ Svg.path
-                [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill <| Color.Convert.colorToHex strokeColor ]
+                [ d "M2 7c0 2.757 2.242 5 5 5 2.757 0 5-2.242 5-5 0-2.757-2.242-5-5-5-2.757 0-5 2.242-5 5zM0 7c0-3.866 3.142-7 7-7 3.866 0 7 3.142 7 7 0 3.866-3.142 7-7 7-3.866 0-7-3.142-7-7z", fillRule "nonzero", fill strokeColor ]
                 []
             ]
         )

@@ -1,6 +1,6 @@
-module Goat.Utils exposing (mapAtIndex, removeItemIf, removeItem)
+module Goat.Utils exposing (mapAtIndex, removeItem, removeItemIf)
 
-import Array.Hamt as Array exposing (Array)
+import Array exposing (Array)
 
 
 mapAtIndex : Int -> (a -> a) -> Array a -> Array a
@@ -24,6 +24,7 @@ removeItemIf fn index xs =
         Just x ->
             if fn x then
                 removeItem index xs
+
             else
                 xs
 

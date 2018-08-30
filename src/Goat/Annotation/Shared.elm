@@ -1,4 +1,4 @@
-module Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, StrokeStyle(..), Vertex(..), Vertices(..))
+module Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, MovingInfo, ResizingInfo, SelectingInfo, StrokeStyle(..), Vertex(..), Vertices(..))
 
 {-| This module includes data shared by both the EditState module and the Annotation module.
 
@@ -18,11 +18,11 @@ e.g: (assume a top-left to bottom-right draw)
 
 Start StartPlusX
 +----------+
-|**********|
-|**********|
-|**********|
-|**********|
-|**********|
+|\*\*\*\*\*\*\*\*\*\*|
+|\*\*\*\*\*\*\*\*\*\*|
+|\*\*\*\*\*\*\*\*\*\*|
+|\*\*\*\*\*\*\*\*\*\*|
+|\*\*\*\*\*\*\*\*\*\*|
 +----------+
 StartPlusY End
 

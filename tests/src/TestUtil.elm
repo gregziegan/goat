@@ -1,8 +1,8 @@
-module TestUtil exposing (..)
+module TestUtil exposing (getFirstAnnotation, isAnnotationMovedByCorrectAmount, position)
 
-import Array.Hamt as Array
+import Array
 import Fuzz exposing (Fuzzer)
-import Goat.Annotation as Annotation exposing (StartPosition, EndPosition, Annotation, shiftPosition)
+import Goat.Annotation as Annotation exposing (Annotation, EndPosition, StartPosition, shiftPosition)
 import Goat.Model exposing (Model)
 import Mouse exposing (Position)
 import Random.Pcg as Random
@@ -28,7 +28,7 @@ isAnnotationMovedByCorrectAmount : Position -> Position -> ( StartPosition, EndP
 isAnnotationMovedByCorrectAmount start end ( origStart, origEnd ) shiftedAnnotation =
     let
         ( shiftedStart, shiftedEnd ) =
-            Annotation.positions shiftedAnnotation
+            Annotation.startAndEnd shiftedAnnotation
 
         dx =
             shiftedEnd.x - shiftedStart.x
@@ -36,7 +36,7 @@ isAnnotationMovedByCorrectAmount start end ( origStart, origEnd ) shiftedAnnotat
         dy =
             shiftedEnd.y - shiftedStart.y
     in
-        shiftPosition dx dy origStart
-            == shiftedStart
-            && shiftPosition dx dy origEnd
-            == shiftedEnd
+    shiftPosition dx dy origStart
+        == shiftedStart
+        && shiftPosition dx dy origEnd
+        == shiftedEnd

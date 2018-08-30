@@ -1,7 +1,7 @@
 module Goat.Flags exposing (Flags, decodeFlags)
 
-import Json.Decode as Json
 import Goat.Environment exposing (OperatingSystem(..), Platform(..))
+import Json.Decode as Json
 
 
 type alias Flags =
@@ -14,6 +14,7 @@ isMacToOS : Bool -> OperatingSystem
 isMacToOS isMac =
     if isMac then
         MacOS
+
     else
         Windows
 
@@ -22,6 +23,7 @@ isZendeskToPlatform : Bool -> Platform
 isZendeskToPlatform inZendesk =
     if inZendesk then
         Zendesk
+
     else
         Web
 
@@ -33,6 +35,6 @@ decodeFlagsHelper =
         (Json.map isZendeskToPlatform (Json.field "inZendesk" Json.bool))
 
 
-decodeFlags : Json.Value -> Result String Flags
+decodeFlags : Json.Value -> Result Json.Error Flags
 decodeFlags =
     Json.decodeValue decodeFlagsHelper

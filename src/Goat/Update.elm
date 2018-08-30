@@ -1,21 +1,21 @@
-module Goat.Update exposing (..)
+module Goat.Update exposing (Msg(..), addAnnotation, alterDrawing, alterTextBoxDrawing, alterToolbarWithKeyboard, annotationAttributesInModel, bringAnnotationToFront, bringToFront, cancelWaitForDropdownToggle, changeDrawing, changeShapeAndSpotlightDropdowns, closeAllMenus, closeDropdown, closeOpenDrawingDropdowns, continueDrawing, controlKeys, copySelectedAnnotation, cutSelectedAnnotation, deleteSelectedDrawing, drawingsAreEqual, editTextBoxAnnotation, extractAnnotationAttributes, finishDrawing, finishEditingText, finishFreeHandDrawing, finishMovingAnnotation, finishNonTextDrawing, finishResizingAnnotation, finishTextDrawing, finishValidDrawing, foldDistance, getFirstSpotlightIndex, handleCopyKey, handleKeyboardInteractions, handlePaste, handleSelectedAnnotationKeyboard, isCtrlPressed, isDrawingTooSmall, isSpotlightDrawing, keyboardConfig, minDrawingDistance, minSpotlightDrawingDistance, moveAnnotation, pasteAnnotation, redoEdit, releaseKey, resetEditState, resizeAnnotation, returnToImageSelection, selectAnnotation, selectImage, selectText, sendAnnotationToBack, sendToBack, setFill, setFontSize, setStrokeColor, setStrokeStyle, skipChange, startDrawing, startEditingText, startMovingAnnotation, startResizingAnnotation, toggleAnnotationMenu, toggleDropdown, tryToBlur, tryToEdit, undoEdit, update, updateAnySelectedAnnotationsHelper, waitForDropdownToggle, whenDrawingKeyboard, whenEditingTextKeyboard, whenMovingKeyboard, whenNotSelectingKeyboard, whenResizingKeyboard, whenSelectingKeyboard)
 
-import Array.Hamt as Array exposing (Array)
+import Array exposing (Array)
 import AutoExpand
+import Browser.Dom as Dom
 import Color exposing (Color)
-import Dom
 import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, calcDistance)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, ResizingInfo, SelectingInfo, StrokeStyle, Vertex)
 import Goat.EditState as EditState exposing (EditState, KeyboardConfig)
-import Goat.Model exposing (Image, Model, AttributeDropdown(..))
-import Goat.Ports as Ports
 import Goat.Environment exposing (OperatingSystem(..))
-import Goat.Utils exposing (mapAtIndex, removeItemIf, removeItem)
-import Keyboard.Extra as Keyboard exposing (Key(..), KeyChange, KeyChange(KeyDown, KeyUp))
+import Goat.Model exposing (AttributeDropdown(..), Image, Model)
+import Goat.Ports as Ports
+import Goat.Utils exposing (mapAtIndex, removeItem, removeItemIf)
+import Json.Decode as Json
+import Keyboard exposing (Key(..), KeyChange(..), anyKey)
 import List.Extra
-import List.Zipper exposing (Zipper)
+import List.Selection as Selection exposing (Selection)
 import Mouse exposing (Position, position)
-import Rocket exposing ((=>))
 import Task exposing (succeed)
 import UndoList exposing (UndoList)
 
@@ -66,8 +66,8 @@ type Msg
     | Save
       -- Image Selection updates
     | Reset
-    | SelectImage (Result String Image)
-    | SetImages (Result String (List Image))
+    | SelectImage (Result Json.Error Image)
+    | SetImages (Result Json.Error (List Image))
     | ReturnToImageSelection
       -- Keyboard updates
     | KeyboardMsg Keyboard.Msg
@@ -81,256 +81,297 @@ update : Msg -> Model -> ( Model, List (Cmd Msg) )
 update msg ({ fill, fontSize, strokeColor, strokeStyle, images, pressedKeys, drawing } as model) =
     case msg of
         StartDrawing pos ->
-            model
+            ( model
                 |> startDrawing pos
                 |> closeDropdown
-                => []
+            , []
+            )
 
         ContinueDrawing pos ->
-            model
+            ( model
                 |> continueDrawing pos
-                => []
+            , []
+            )
 
         FinishDrawing pos ->
             finishDrawing pos model
 
         FocusTextArea index ->
-            model
+            ( model
                 |> startEditingText index
-                => [ "text-box-edit--"
-                        ++ toString index
-                        |> Dom.focus
-                        |> Task.attempt (tryToEdit index)
-                   ]
+            , [ "text-box-edit--"
+                    ++ String.fromInt index
+                    |> Dom.focus
+                    |> Task.attempt (tryToEdit index)
+              ]
+            )
 
         SelectText index ->
-            model
-                => [ Ports.selectText ("text-box-edit--" ++ toString index) ]
+            ( model
+            , [ Ports.selectText ("text-box-edit--" ++ String.fromInt index) ]
+            )
 
         StartEditingText index ->
-            model
+            ( model
                 |> closeDropdown
-                => [ Ports.selectText ("text-box-edit--" ++ toString index) ]
+            , [ Ports.selectText ("text-box-edit--" ++ String.fromInt index) ]
+            )
 
         PreventTextMouseDown ->
-            model
-                => []
+            ( model
+            , []
+            )
 
         TextBoxInput index { state, textValue } ->
-            model
+            ( model
                 |> editTextBoxAnnotation index state textValue
                 |> closeDropdown
-                => []
+            , []
+            )
 
         FinishEditingText index ->
-            model
+            ( model
                 |> finishEditingText index
-                => []
+            , []
+            )
 
         SetImages resultImages ->
             case resultImages of
-                Ok images ->
-                    { model | images = List.Zipper.fromList images, imageSelected = False }
-                        => []
+                Ok fetchedImages ->
+                    ( { model | images = Just (Selection.fromList fetchedImages) }
+                    , []
+                    )
 
                 Err _ ->
-                    model => []
+                    ( model, [] )
 
         Reset ->
-            { model
-                | imageSelected = False
-            }
-                => []
+            ( { model | images = Maybe.map Selection.deselect model.images }
+            , []
+            )
 
         ReturnToImageSelection ->
-            model
+            ( model
                 |> returnToImageSelection
-                => []
+            , []
+            )
 
         KeyboardMsg keyMsg ->
             let
                 ( newPressedKeys, maybeKeyChange ) =
-                    Keyboard.updateWithKeyChange keyMsg pressedKeys
+                    Keyboard.updateWithKeyChange anyKey keyMsg pressedKeys
             in
-                { model | pressedKeys = newPressedKeys }
-                    |> handleKeyboardInteractions maybeKeyChange
+            { model | pressedKeys = newPressedKeys }
+                |> handleKeyboardInteractions maybeKeyChange
 
         CloseAllMenus ->
-            model
+            ( model
                 |> closeAllMenus
-                => []
+            , []
+            )
 
         SelectImage resultImage ->
             case resultImage of
                 Ok image ->
-                    model
+                    ( model
                         |> selectImage image
-                        => []
+                    , []
+                    )
 
                 Err _ ->
-                    model => []
+                    ( model, [] )
 
-        ChangeDrawing drawing ->
-            model
-                |> changeDrawing drawing
+        ChangeDrawing newDrawing ->
+            ( model
+                |> changeDrawing newDrawing
                 |> closeDropdown
                 |> resetEditState
-                => []
+            , []
+            )
 
-        SelectFill fill ->
-            model.editState
+        SelectFill newFill ->
+            ( model.editState
                 |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateFill fill) model)
                 |> Maybe.withDefault model
-                |> setFill fill
+                |> setFill newFill
                 |> closeDropdown
-                => []
+            , []
+            )
 
-        SelectStrokeColor strokeColor ->
-            model.editState
+        SelectStrokeColor newStrokeColor ->
+            ( model.editState
                 |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateStrokeColor strokeColor) model)
                 |> Maybe.withDefault model
-                |> setStrokeColor strokeColor
+                |> setStrokeColor newStrokeColor
                 |> closeDropdown
-                => []
+            , []
+            )
 
-        SelectStrokeStyle strokeStyle ->
-            model.editState
+        SelectStrokeStyle newStrokeStyle ->
+            ( model.editState
                 |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateStrokeStyle strokeStyle) model)
                 |> Maybe.withDefault model
-                |> setStrokeStyle strokeStyle
+                |> setStrokeStyle newStrokeStyle
                 |> closeDropdown
-                => []
+            , []
+            )
 
-        SelectFontSize fontSize ->
-            model.editState
+        SelectFontSize newFontSize ->
+            ( model.editState
                 |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateFontSize fontSize) model)
                 |> Maybe.withDefault model
-                |> setFontSize fontSize
+                |> setFontSize newFontSize
                 |> closeDropdown
-                => []
+            , []
+            )
 
         WaitForDropdownToggle attributeDropdown ->
-            model
+            ( model
                 |> waitForDropdownToggle attributeDropdown
                 |> closeDropdown
-                => []
+            , []
+            )
 
         CancelDropdownWait ->
-            model
+            ( model
                 |> cancelWaitForDropdownToggle
-                => []
+            , []
+            )
 
         ToggleDropdown editOption ->
-            model
+            ( model
                 |> toggleDropdown editOption
                 |> cancelWaitForDropdownToggle
-                => []
+            , []
+            )
 
         CloseDropdown ->
-            model
+            ( model
                 |> closeDropdown
-                => []
+            , []
+            )
 
         CloseOpenDrawingDropdowns ->
-            model
+            ( model
                 |> closeOpenDrawingDropdowns
-                => []
+            , []
+            )
 
         SelectAnnotation index ->
-            model
+            ( model
                 |> selectAnnotation index
-                => []
+            , []
+            )
 
         SelectAndMoveAnnotation index start ->
-            model
+            ( model
                 |> selectAnnotation index
                 |> startMovingAnnotation start
-                => []
+            , []
+            )
 
         ResetToReadyToDraw ->
-            model
+            ( model
                 |> resetEditState
-                => []
+            , []
+            )
 
         StartMovingAnnotation index start ->
-            model
+            ( model
                 |> selectAnnotation index
                 |> startMovingAnnotation start
                 |> closeDropdown
-                => []
+            , []
+            )
 
         MoveAnnotation newPos ->
-            model
+            ( model
                 |> moveAnnotation newPos
-                => []
+            , []
+            )
 
         FinishMovingAnnotation endPos ->
-            model
+            ( model
                 |> moveAnnotation endPos
                 |> finishMovingAnnotation
-                => []
+            , []
+            )
 
         StartResizingAnnotation index vertex start ->
-            model
+            ( model
                 |> startResizingAnnotation index vertex start
                 |> resizeAnnotation start
                 |> closeDropdown
-                => []
+            , []
+            )
 
         ResizeAnnotation pos ->
-            model
+            ( model
                 |> resizeAnnotation pos
-                => []
+            , []
+            )
 
         FinishResizingAnnotation pos ->
-            model
+            ( model
                 |> resizeAnnotation pos
                 |> finishResizingAnnotation
-                => []
+            , []
+            )
 
         BringAnnotationToFront index ->
-            model
+            ( model
                 |> bringAnnotationToFront index
-                => []
+            , []
+            )
 
         SendAnnotationToBack index ->
-            model
+            ( model
                 |> sendAnnotationToBack index
-                => []
+            , []
+            )
 
         ToggleAnnotationMenu pos ->
-            model
+            ( model
                 |> toggleAnnotationMenu Nothing pos
-                => []
+            , []
+            )
 
         ToggleSelectedAnnotationMenu index pos ->
-            model
+            ( model
                 |> toggleAnnotationMenu (Just index) pos
                 |> selectAnnotation index
-                => []
+            , []
+            )
 
         Undo ->
-            undoEdit model
-                => []
+            ( undoEdit model
+            , []
+            )
 
         Redo ->
-            redoEdit model
-                => []
+            ( redoEdit model
+            , []
+            )
 
         Save ->
-            model
+            ( model
                 |> resetEditState
-                => [ case model.images of
-                        Just images ->
-                            Ports.exportToImage (List.Zipper.current images).id
+            , [ case model.images of
+                    Just cachedImages ->
+                        cachedImages
+                            |> Selection.selected
+                            |> Maybe.map (Ports.exportToImage << .id)
+                            |> Maybe.withDefault Cmd.none
 
-                        Nothing ->
-                            Cmd.none
-                   ]
+                    Nothing ->
+                        Cmd.none
+              ]
+            )
 
         ShowMeTheGoats ->
-            model
-                => [ Ports.requestImages () ]
+            ( model
+            , [ Ports.requestImages () ]
+            )
 
 
 {-| Do not add this annotations array change to undo history
@@ -376,9 +417,10 @@ finishValidDrawing model drawingInfo =
 
 foldDistance : Position -> ( Float, Position ) -> ( Float, Position )
 foldDistance position ( distance, previousPosition ) =
-    distance
-        + (calcDistance position previousPosition)
-        => position
+    ( distance
+        + calcDistance position previousPosition
+    , position
+    )
 
 
 finishFreeHandDrawing : EditState -> DrawingInfo -> Model -> Model
@@ -387,16 +429,18 @@ finishFreeHandDrawing finishedEditState ({ start, curPos, positions } as drawing
         ( distance, _ ) =
             List.foldl foldDistance ( 0.0, start ) (positions ++ [ curPos ])
     in
-        if distance < minDrawingDistance then
-            resetEditState model
-        else
-            finishValidDrawing { model | editState = finishedEditState } drawingInfo
+    if distance < minDrawingDistance then
+        resetEditState model
+
+    else
+        finishValidDrawing { model | editState = finishedEditState } drawingInfo
 
 
 finishNonTextDrawing : EditState -> DrawingInfo -> Model -> Model
 finishNonTextDrawing finishedEditState ({ start, curPos } as drawingInfo) model =
     if isDrawingTooSmall (isSpotlightDrawing model.drawing) start curPos then
         resetEditState model
+
     else
         finishValidDrawing { model | editState = finishedEditState } drawingInfo
 
@@ -410,18 +454,19 @@ finishTextDrawing pos model =
         attributes =
             AnnotationAttributes model.strokeColor model.fill model.strokeStyle model.fontSize
     in
-        case EditState.finishTextDrawing pos numAnnotations attributes model.editState of
-            Ok ( newEditState, drawingInfo ) ->
-                { model | editState = newEditState }
-                    |> addAnnotation (Annotation.newTextBox TextBoxInput numAnnotations attributes drawingInfo)
-                    => [ "text-box-edit--"
-                            ++ toString numAnnotations
-                            |> Dom.focus
-                            |> Task.attempt (selectText numAnnotations)
-                       ]
+    case EditState.finishTextDrawing pos numAnnotations attributes model.editState of
+        Ok ( newEditState, drawingInfo ) ->
+            ( { model | editState = newEditState }
+                |> addAnnotation (Annotation.newTextBox TextBoxInput numAnnotations attributes drawingInfo)
+            , [ "text-box-edit--"
+                    ++ String.fromInt numAnnotations
+                    |> Dom.focus
+                    |> Task.attempt (selectText numAnnotations)
+              ]
+            )
 
-            Err _ ->
-                model => []
+        Err _ ->
+            ( model, [] )
 
 
 selectText : Int -> Result Dom.Error () -> Msg
@@ -440,11 +485,12 @@ finishDrawing pos model =
         DrawFreeHand ->
             case EditState.finishDrawing pos model.editState of
                 Ok ( newEditState, drawingInfo ) ->
-                    finishFreeHandDrawing newEditState drawingInfo model
-                        => []
+                    ( finishFreeHandDrawing newEditState drawingInfo model
+                    , []
+                    )
 
                 Err _ ->
-                    model => []
+                    ( model, [] )
 
         DrawTextBox ->
             finishTextDrawing pos model
@@ -452,11 +498,12 @@ finishDrawing pos model =
         _ ->
             case EditState.finishDrawing pos model.editState of
                 Ok ( newEditState, drawingInfo ) ->
-                    finishNonTextDrawing newEditState drawingInfo model
-                        => []
+                    ( finishNonTextDrawing newEditState drawingInfo model
+                    , []
+                    )
 
                 Err _ ->
-                    model => []
+                    ( model, [] )
 
 
 resetEditState : Model -> Model
@@ -579,7 +626,7 @@ startResizingAnnotation : Int -> Vertex -> StartPosition -> Model -> Model
 startResizingAnnotation index vertex start model =
     model.edits.present
         |> Array.get index
-        |> Maybe.andThen (\annotation -> Result.toMaybe <| EditState.startResizing start vertex (Annotation.positions annotation) model.editState)
+        |> Maybe.andThen (\annotation -> Result.toMaybe <| EditState.startResizing start vertex (Annotation.startAndEnd annotation) model.editState)
         |> Maybe.map (\newEditState -> { model | editState = newEditState })
         |> Maybe.withDefault model
 
@@ -619,8 +666,9 @@ closeOpenDrawingDropdowns : Model -> Model
 closeOpenDrawingDropdowns model =
     { model
         | currentDropdown =
-            if model.currentDropdown == (Just ShapesDropdown) || model.currentDropdown == (Just SpotlightsDropdown) then
+            if model.currentDropdown == Just ShapesDropdown || model.currentDropdown == Just SpotlightsDropdown then
                 Nothing
+
             else
                 model.currentDropdown
     }
@@ -656,6 +704,7 @@ toggleDropdown attributeDropdown model =
                 Just dropdown ->
                     if dropdown == attributeDropdown then
                         Nothing
+
                     else
                         Just attributeDropdown
 
@@ -698,52 +747,53 @@ alterToolbarWithKeyboard ctrlPressed keyChange model =
                 Escape ->
                     closeDropdown model
 
-                CharA ->
+                Character "A" ->
                     { model | drawing = DrawLine Arrow }
 
-                CharH ->
+                Character "H" ->
                     { model | drawing = DrawFreeHand }
 
-                CharL ->
+                Character "L" ->
                     { model | drawing = DrawLine StraightLine }
 
-                CharR ->
+                Character "R" ->
                     { model | drawing = DrawShape Rect, shape = DrawShape Rect }
 
-                CharO ->
+                Character "O" ->
                     { model | drawing = DrawShape RoundedRect, shape = DrawShape RoundedRect }
 
-                CharE ->
+                Character "E" ->
                     { model | drawing = DrawShape Ellipse, shape = DrawShape Ellipse }
 
-                CharT ->
+                Character "T" ->
                     { model | drawing = DrawTextBox }
 
-                CharG ->
+                Character "G" ->
                     { model | drawing = DrawSpotlight Rect, spotlight = DrawSpotlight Rect }
 
-                CharC ->
+                Character "C" ->
                     if ctrlPressed then
                         model
+
                     else
                         { model | drawing = DrawSpotlight RoundedRect, spotlight = DrawSpotlight RoundedRect }
 
-                CharI ->
+                Character "I" ->
                     { model | drawing = DrawSpotlight Ellipse, spotlight = DrawSpotlight Ellipse }
 
-                CharP ->
+                Character "P" ->
                     { model | drawing = DrawPixelate }
 
-                CharN ->
+                Character "N" ->
                     toggleDropdown Fonts model
 
-                CharK ->
+                Character "K" ->
                     toggleDropdown StrokeColors model
 
-                CharF ->
+                Character "F" ->
                     toggleDropdown Fills model
 
-                CharS ->
+                Character "S" ->
                     toggleDropdown Strokes model
 
                 _ ->
@@ -780,8 +830,10 @@ handleCopyKey : Int -> OperatingSystem -> Model -> Model
 handleCopyKey index osToIgnore model =
     if model.operatingSystem == osToIgnore then
         model
-    else if (List.member CharC model.pressedKeys) then
+
+    else if List.member (Character "C") model.pressedKeys then
         copySelectedAnnotation index model
+
     else
         model
 
@@ -794,18 +846,20 @@ handleSelectedAnnotationKeyboard index ctrlPressed keyChange model =
                 Delete ->
                     deleteSelectedDrawing index model
 
-                BackSpace ->
+                Backspace ->
                     deleteSelectedDrawing index model
 
-                CharC ->
+                Character "C" ->
                     if ctrlPressed then
                         copySelectedAnnotation index model
+
                     else
                         model
 
-                CharX ->
+                Character "X" ->
                     if ctrlPressed then
                         cutSelectedAnnotation index model
+
                     else
                         model
 
@@ -844,28 +898,33 @@ handlePaste ctrlPressed keyChange model =
     case keyChange of
         KeyDown key ->
             case key of
-                CharV ->
+                Character "V" ->
                     if ctrlPressed then
                         pasteAnnotation model
-                            |> releaseKey CharV
+                            |> releaseKey (Character "V")
+
                     else
                         model
 
                 Control ->
                     if model.operatingSystem == MacOS then
                         model
-                    else if List.member CharV model.pressedKeys then
+
+                    else if List.member (Character "V") model.pressedKeys then
                         pasteAnnotation model
-                            |> releaseKey CharV
+                            |> releaseKey (Character "V")
+
                     else
                         model
 
                 Super ->
                     if model.operatingSystem == Windows then
                         model
-                    else if List.member CharV model.pressedKeys then
+
+                    else if List.member (Character "V") model.pressedKeys then
                         pasteAnnotation model
-                            |> releaseKey CharV
+                            |> releaseKey (Character "V")
+
                     else
                         model
 
@@ -882,18 +941,19 @@ alterTextBoxDrawing keyChange index model =
         KeyDown key ->
             case key of
                 Escape ->
-                    finishEditingText index model
-                        => [ "text-box-edit--"
-                                ++ toString index
-                                |> Dom.blur
-                                |> Task.attempt tryToBlur
-                           ]
+                    ( finishEditingText index model
+                    , [ "text-box-edit--"
+                            ++ String.fromInt index
+                            |> Dom.blur
+                            |> Task.attempt tryToBlur
+                      ]
+                    )
 
                 _ ->
-                    model => []
+                    ( model, [] )
 
         KeyUp key ->
-            model => []
+            ( model, [] )
 
 
 deleteSelectedDrawing : Int -> Model -> Model
@@ -960,37 +1020,45 @@ alterDrawing ctrlPressed keyChange ({ pressedKeys } as model) =
                 Escape ->
                     resetEditState model
 
-                CharZ ->
+                Character "Z" ->
                     if List.member Shift pressedKeys && ctrlPressed then
                         redoEdit model
-                            |> releaseKey CharZ
+                            |> releaseKey (Character "Z")
+
                     else if ctrlPressed then
                         undoEdit model
-                            |> releaseKey CharZ
+                            |> releaseKey (Character "Z")
+
                     else
                         model
 
                 Control ->
                     if model.operatingSystem == MacOS then
                         model
-                    else if List.member Shift pressedKeys && List.member CharZ pressedKeys then
+
+                    else if List.member Shift pressedKeys && List.member (Character "Z") pressedKeys then
                         redoEdit model
-                            |> releaseKey CharZ
-                    else if List.member CharZ pressedKeys then
+                            |> releaseKey (Character "Z")
+
+                    else if List.member (Character "Z") pressedKeys then
                         undoEdit model
-                            |> releaseKey CharZ
+                            |> releaseKey (Character "Z")
+
                     else
                         model
 
                 Super ->
                     if model.operatingSystem == Windows then
                         model
-                    else if List.member Shift pressedKeys && List.member CharZ pressedKeys then
+
+                    else if List.member Shift pressedKeys && List.member (Character "Z") pressedKeys then
                         redoEdit model
-                            |> releaseKey CharZ
-                    else if List.member CharZ pressedKeys then
+                            |> releaseKey (Character "Z")
+
+                    else if List.member (Character "Z") pressedKeys then
                         undoEdit model
-                            |> releaseKey CharZ
+                            |> releaseKey (Character "Z")
+
                     else
                         model
 
@@ -1027,6 +1095,7 @@ toggleAnnotationMenu selectedIndex position model =
         Just menu ->
             if menu.index == selectedIndex then
                 { model | showingAnyMenu = False, annotationMenu = Nothing }
+
             else
                 { model
                     | showingAnyMenu = True
@@ -1093,28 +1162,30 @@ closeAllMenus model =
 
 selectImage : Image -> Model -> Model
 selectImage image model =
-    case model.images of
-        Just images ->
-            { model
-                | images =
-                    images
-                        |> List.Zipper.first
-                        |> List.Zipper.find ((==) image.url << .url)
-                , imageSelected = True
-                , edits = UndoList.reset model.edits
-            }
+    { model | images = Maybe.map (Selection.select image) model.images }
 
-        Nothing ->
-            { model
-                | images = List.Zipper.fromList [ image ]
-                , imageSelected = True
-                , edits = UndoList.reset model.edits
-            }
+
+
+-- case model.images of
+--     Just images ->
+--         { model
+--             | images =
+--                 images
+--                     |> ZipList.find ((==) image.url << .url)
+--             , imageSelected = True
+--             , edits = UndoList.reset model.edits
+--         }
+--     Nothing ->
+--         { model
+--             | images = ZipList.fromList [ image ]
+--             , imageSelected = True
+--             , edits = UndoList.reset model.edits
+--         }
 
 
 returnToImageSelection : Model -> Model
 returnToImageSelection model =
-    { model | imageSelected = False, edits = UndoList.reset model.edits }
+    { model | images = Maybe.map Selection.deselect model.images, edits = UndoList.reset model.edits }
 
 
 controlKeys : OperatingSystem -> List Key
@@ -1142,12 +1213,14 @@ handleKeyboardInteractions : Maybe KeyChange -> Model -> ( Model, List (Cmd Msg)
 handleKeyboardInteractions maybeKeyChange model =
     case maybeKeyChange of
         Just keyChange ->
-            EditState.keyboard (keyboardConfig keyChange) model.editState model
-                => []
+            ( EditState.keyboard (keyboardConfig keyChange) model.editState model
+            , []
+            )
 
         Nothing ->
-            model
-                => []
+            ( model
+            , []
+            )
 
 
 whenNotSelectingKeyboard : KeyChange -> Model -> Model
@@ -1156,9 +1229,9 @@ whenNotSelectingKeyboard keyChange model =
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
-        alterDrawing ctrlPressed keyChange model
-            |> alterToolbarWithKeyboard ctrlPressed keyChange
-            |> handlePaste ctrlPressed keyChange
+    alterDrawing ctrlPressed keyChange model
+        |> alterToolbarWithKeyboard ctrlPressed keyChange
+        |> handlePaste ctrlPressed keyChange
 
 
 whenDrawingKeyboard : KeyChange -> DrawingInfo -> Model -> Model
@@ -1167,8 +1240,8 @@ whenDrawingKeyboard keyChange _ model =
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
-        alterDrawing ctrlPressed keyChange model
-            |> alterToolbarWithKeyboard ctrlPressed keyChange
+    alterDrawing ctrlPressed keyChange model
+        |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
 whenSelectingKeyboard : KeyChange -> SelectingInfo -> Model -> Model
@@ -1177,10 +1250,10 @@ whenSelectingKeyboard keyChange { id } model =
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
-        alterDrawing ctrlPressed keyChange model
-            |> alterToolbarWithKeyboard ctrlPressed keyChange
-            |> handleSelectedAnnotationKeyboard id ctrlPressed keyChange
-            |> handlePaste ctrlPressed keyChange
+    alterDrawing ctrlPressed keyChange model
+        |> alterToolbarWithKeyboard ctrlPressed keyChange
+        |> handleSelectedAnnotationKeyboard id ctrlPressed keyChange
+        |> handlePaste ctrlPressed keyChange
 
 
 whenMovingKeyboard : KeyChange -> a -> Model -> Model
@@ -1189,8 +1262,8 @@ whenMovingKeyboard keyChange _ model =
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
-        alterDrawing ctrlPressed keyChange model
-            |> alterToolbarWithKeyboard ctrlPressed keyChange
+    alterDrawing ctrlPressed keyChange model
+        |> alterToolbarWithKeyboard ctrlPressed keyChange
 
 
 whenResizingKeyboard : KeyChange -> a -> Model -> Model
@@ -1204,7 +1277,7 @@ whenEditingTextKeyboard keyChange _ model =
         ctrlPressed =
             isCtrlPressed model.pressedKeys model.operatingSystem
     in
-        model
+    model
 
 
 getFirstSpotlightIndex : Array Annotation -> Int
@@ -1286,6 +1359,7 @@ isDrawingTooSmall : Bool -> StartPosition -> EndPosition -> Bool
 isDrawingTooSmall isSpotlight start end =
     if isSpotlight then
         abs (start.x - end.x) < minSpotlightDrawingDistance && abs (start.y - end.y) < minSpotlightDrawingDistance
+
     else
         abs (start.x - end.x) < minDrawingDistance && abs (start.y - end.y) < minDrawingDistance
 

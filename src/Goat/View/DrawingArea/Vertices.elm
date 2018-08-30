@@ -1,8 +1,7 @@
-module Goat.View.DrawingArea.Vertices exposing (viewVertices, ResizeDirection)
+module Goat.View.DrawingArea.Vertices exposing (ResizeDirection, viewVertices)
 
-import Color exposing (Color)
-import Color.Convert
-import Goat.Annotation exposing (SelectState(..), StartPosition, EndPosition)
+import Color
+import Goat.Annotation exposing (EndPosition, SelectState(..), StartPosition)
 import Goat.Annotation.Shared exposing (Vertex(..), Vertices(..))
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
@@ -17,10 +16,10 @@ type ResizeDirection
 viewVertex : List (Svg.Attribute msg) -> ResizeDirection -> Int -> Int -> Svg msg
 viewVertex vertexEvents direction x y =
     circle
-        ([ Attr.cx <| toString x
-         , Attr.cy <| toString y
+        ([ Attr.cx <| String.fromInt x
+         , Attr.cy <| String.fromInt y
          , Attr.r "5"
-         , Attr.fill <| Color.Convert.colorToHex Color.blue
+         , Attr.fill <| Color.blue
          , Attr.stroke "white"
          , Attr.strokeWidth "2"
          , Attr.filter "url(#dropShadow)"
@@ -31,25 +30,41 @@ viewVertex vertexEvents direction x y =
         []
 
 
+type alias ResizeDirections =
+    { startVert : ResizeDirection
+    , startPlusXVert : ResizeDirection
+    , startPlusYVert : ResizeDirection
+    , endVert : ResizeDirection
+    }
+
+
+shapeVerticesHelp : StartPosition -> EndPosition -> ResizeDirections
+shapeVerticesHelp start end =
+    if start.x < end.x && start.y > end.y then
+        ResizeDirections NESW NWSE NWSE NESW
+
+    else if start.x < end.x && start.y < end.y then
+        ResizeDirections NWSE NESW NESW NWSE
+
+    else if start.x > end.x && start.y > end.y then
+        ResizeDirections NWSE NESW NESW NWSE
+
+    else
+        ResizeDirections NESW NWSE NWSE NESW
+
+
 shapeVertices : (Vertex -> List (Svg.Attribute msg)) -> StartPosition -> EndPosition -> Svg msg
 shapeVertices toVertexEvents start end =
     let
-        ( resizeDir1, resizeDir2, resizeDir3, resizeDir4 ) =
-            if start.x < end.x && start.y > end.y then
-                ( NESW, NWSE, NWSE, NESW )
-            else if start.x < end.x && start.y < end.y then
-                ( NWSE, NESW, NESW, NWSE )
-            else if start.x > end.x && start.y > end.y then
-                ( NWSE, NESW, NESW, NWSE )
-            else
-                ( NESW, NWSE, NWSE, NESW )
+        { startVert, startPlusXVert, startPlusYVert, endVert } =
+            shapeVerticesHelp start end
     in
-        Svg.g []
-            [ viewVertex (toVertexEvents Start) resizeDir1 start.x start.y
-            , viewVertex (toVertexEvents StartPlusX) resizeDir2 end.x start.y
-            , viewVertex (toVertexEvents StartPlusY) resizeDir3 start.x end.y
-            , viewVertex (toVertexEvents End) resizeDir4 end.x end.y
-            ]
+    Svg.g []
+        [ viewVertex (toVertexEvents Start) startVert start.x start.y
+        , viewVertex (toVertexEvents StartPlusX) startPlusXVert end.x start.y
+        , viewVertex (toVertexEvents StartPlusY) startPlusYVert start.x end.y
+        , viewVertex (toVertexEvents End) endVert end.x end.y
+        ]
 
 
 lineVertices : (Vertex -> List (Svg.Attribute msg)) -> StartPosition -> EndPosition -> Svg msg
@@ -71,10 +86,11 @@ viewVertices vertices start end toVertexEvents selectState =
                 Linear ->
                     lineVertices
     in
-        if selectState == SelectedWithVertices then
-            Just (toVertices toVertexEvents start end)
-        else
-            Nothing
+    if selectState == SelectedWithVertices then
+        Just (toVertices toVertexEvents start end)
+
+    else
+        Nothing
 
 
 directionToCursor : ResizeDirection -> String

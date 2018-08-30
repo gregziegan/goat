@@ -1,34 +1,31 @@
-module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, viewAnnotation, viewShape, viewPixelate, viewSpotlightInMask, viewDrawing, annotationConfig, linePath, arrowPath, arrowHeadPath)
+module Goat.View.DrawingArea.Annotation exposing (DrawingModifiers, annotationConfig, arrowHeadPath, arrowPath, linePath, viewAnnotation, viewDrawing, viewPixelate, viewShape, viewSpotlightInMask)
 
 import AutoExpand
 import Color exposing (Color)
-import Color.Convert
-import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), EndPosition, LineType(..), SelectState(..), Shape, ShapeType(..), StartPosition, TextArea, arrowAngle, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, isFreeHand, shiftPosition, toLineStyle, toStrokeWidth, textareaPadding)
+import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), EndPosition, LineType(..), SelectState(..), Shape, ShapeType(..), StartPosition, TextArea, arrowAngle, autoExpandConfig, calcLinePos, calcShapePos, fontSizeToLineHeight, isFreeHand, shiftPosition, textareaPadding, toLineStyle, toStrokeWidth)
 import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, MovingInfo, ResizingInfo, StrokeStyle, Vertex, Vertices(..))
 import Goat.EditState as EditState exposing (AnnotationConfig, EditState)
 import Goat.Update exposing (Msg(..))
 import Goat.View.DrawingArea.Vertices as Vertices
-import Goat.View.EventUtils exposing (defaultPrevented, onMouseUp, stopPropagation)
-import Goat.View.Utils exposing (posToString, toPx)
+import Goat.View.EventUtils exposing (onMouseUp, stopPropagationAndDefault)
+import Goat.View.Utils exposing (toPx)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
-import Html.Events exposing (onClick, onWithOptions)
+import Html.Events exposing (onClick)
+import Html.Events.Extra.Touch as T
 import Json.Decode as Json
 import List.Extra
 import Mouse exposing (Position)
-import Rocket exposing ((=>))
-import SingleTouch as ST
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
-import Touch as T
 
 
 rectAttrs : StartPosition -> EndPosition -> List (Svg.Attribute Msg)
 rectAttrs start end =
-    [ Attr.width <| toString <| abs <| end.x - start.x
-    , Attr.height <| toString <| abs <| end.y - start.y
-    , Attr.x <| toString <| Basics.min start.x end.x
-    , Attr.y <| toString <| Basics.min start.y end.y
+    [ Attr.width <| String.fromInt <| abs <| end.x - start.x
+    , Attr.height <| String.fromInt <| abs <| end.y - start.y
+    , Attr.x <| String.fromInt <| Basics.min start.x end.x
+    , Attr.y <| String.fromInt <| Basics.min start.y end.y
     , Attr.filter "url(#dropShadow)"
     ]
 
@@ -42,19 +39,19 @@ ellipseAttributes { start, end } =
         dy =
             toFloat (end.y - start.y)
     in
-        [ Attr.rx (toString (abs dx / 2))
-        , Attr.ry (toString (abs dy / 2))
-        , Attr.cx (toString (toFloat start.x + dx / 2))
-        , Attr.cy (toString (toFloat start.y + dy / 2))
-        , Attr.filter "url(#dropShadow)"
-        ]
+    [ Attr.rx (String.fromFloat (abs dx / 2))
+    , Attr.ry (String.fromFloat (abs dy / 2))
+    , Attr.cx (String.fromFloat (toFloat start.x + dx / 2))
+    , Attr.cy (String.fromFloat (toFloat start.y + dy / 2))
+    , Attr.filter "url(#dropShadow)"
+    ]
 
 
 fillAttrs : Maybe Color -> List (Svg.Attribute Msg)
 fillAttrs fill =
     case fill of
         Just color ->
-            [ Attr.fill <| Color.Convert.colorToHex color
+            [ Attr.fill color
             , Attr.pointerEvents "auto"
             ]
 
@@ -64,12 +61,22 @@ fillAttrs fill =
             ]
 
 
+positionToString : Position -> String
+positionToString { x, y } =
+    String.fromInt x ++ "," ++ String.fromInt y
+
+
+posToString : { x : Float, y : Float } -> String
+posToString { x, y } =
+    String.fromFloat x ++ "," ++ String.fromFloat y
+
+
 linePath : Float -> StartPosition -> EndPosition -> String
 linePath strokeWidth start end =
     let
         theta =
             (2 * pi)
-                - (arrowAngle start end)
+                - arrowAngle start end
 
         perpen =
             (pi / 2) - theta
@@ -95,17 +102,17 @@ linePath strokeWidth start end =
         ccPt4 =
             shiftPosition -dx -dy ccPt3
     in
-        "M"
-            ++ posToString start
-            ++ " L"
-            ++ posToString ccPt1
-            ++ " L"
-            ++ posToString ccPt2
-            ++ " L"
-            ++ posToString ccPt3
-            ++ " L"
-            ++ posToString ccPt4
-            ++ "Z"
+    "M"
+        ++ positionToString start
+        ++ " L"
+        ++ posToString ccPt1
+        ++ " L"
+        ++ posToString ccPt2
+        ++ " L"
+        ++ posToString ccPt3
+        ++ " L"
+        ++ posToString ccPt4
+        ++ "Z"
 
 
 freeDrawPathHelper : List Position -> String -> String
@@ -115,15 +122,15 @@ freeDrawPathHelper positions pathString =
             pathString
 
         lastPos :: [] ->
-            pathString ++ " L " ++ posToString lastPos
+            pathString ++ " L " ++ positionToString lastPos
 
         pos :: nextPos :: rest ->
-            freeDrawPathHelper rest (pathString ++ " S " ++ posToString pos ++ " " ++ posToString nextPos)
+            freeDrawPathHelper rest (pathString ++ " S " ++ positionToString pos ++ " " ++ positionToString nextPos)
 
 
 freeDrawPath : StartPosition -> List Position -> String
 freeDrawPath start positions =
-    freeDrawPathHelper positions ("M " ++ posToString start)
+    freeDrawPathHelper positions ("M " ++ positionToString start)
 
 
 freeDrawAttributes : Shape -> List Position -> List (Svg.Attribute Msg)
@@ -139,15 +146,16 @@ shapeAttributes : ShapeType -> Shape -> Maybe Color -> List (Svg.Attribute Msg)
 shapeAttributes shapeType shape fill =
     fillAttrs fill
         ++ strokeAttrs shape.strokeStyle shape.strokeColor
-        ++ case shapeType of
-            Rect ->
-                rectAttrs shape.start shape.end ++ [ Attr.strokeLinejoin "round" ]
+        ++ (case shapeType of
+                Rect ->
+                    rectAttrs shape.start shape.end ++ [ Attr.strokeLinejoin "round" ]
 
-            RoundedRect ->
-                rectAttrs shape.start shape.end ++ [ Attr.rx "15", Attr.ry "15" ]
+                RoundedRect ->
+                    rectAttrs shape.start shape.end ++ [ Attr.rx "15", Attr.ry "15" ]
 
-            Ellipse ->
-                ellipseAttributes shape
+                Ellipse ->
+                    ellipseAttributes shape
+           )
 
 
 strokeAttrs : StrokeStyle -> Color -> List (Svg.Attribute Msg)
@@ -156,16 +164,16 @@ strokeAttrs strokeStyle strokeColor =
         ( strokeWidth, dashArray ) =
             toLineStyle strokeStyle
     in
-        [ Attr.stroke <| Color.Convert.colorToHex strokeColor
-        , Attr.strokeWidth strokeWidth
-        , Attr.strokeDasharray dashArray
-        ]
+    [ Attr.stroke strokeColor
+    , Attr.strokeWidth strokeWidth
+    , Attr.strokeDasharray dashArray
+    ]
 
 
 simpleLineAttrs : Shape -> List (Svg.Attribute Msg)
 simpleLineAttrs { start, end, strokeColor, strokeStyle } =
     [ Attr.stroke "none"
-    , Attr.fill <| Color.Convert.colorToHex strokeColor
+    , Attr.fill strokeColor
     , Attr.d <| linePath (toStrokeWidth strokeStyle) start end
     , Attr.filter "url(#dropShadow)"
     ]
@@ -174,7 +182,7 @@ simpleLineAttrs { start, end, strokeColor, strokeStyle } =
 arrowAttributes : Shape -> List (Svg.Attribute Msg)
 arrowAttributes shape =
     [ Attr.stroke "none"
-    , Attr.fill (Color.Convert.colorToHex shape.strokeColor)
+    , Attr.fill shape.strokeColor
     , Attr.d (arrowPath shape)
     , Attr.filter "url(#dropShadow)"
     ]
@@ -183,9 +191,9 @@ arrowAttributes shape =
 arrowHeadPath : EndPosition -> String
 arrowHeadPath pos =
     "M"
-        ++ toString (toFloat pos.x - 20.6667)
+        ++ String.fromFloat (toFloat pos.x - 20.6667)
         ++ ","
-        ++ toString (toFloat pos.y - 2.8)
+        ++ String.fromFloat (toFloat pos.y - 2.8)
         ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z"
 
 
@@ -194,15 +202,16 @@ moveArrowHead index start end { translate, id } =
     let
         theta =
             (2 * pi)
-                - (arrowAngle start end)
+                - arrowAngle start end
 
         ( dx, dy ) =
             translate
     in
-        if index == id then
-            [ Attr.transform ("translate(" ++ toString dx ++ "," ++ toString dy ++ ") rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")") ]
-        else
-            []
+    if index == id then
+        [ Attr.transform ("translate(" ++ String.fromInt dx ++ "," ++ String.fromInt dy ++ ") rotate(" ++ String.fromFloat (-theta * (180 / pi)) ++ " " ++ String.fromInt end.x ++ " " ++ String.fromInt end.y ++ ")") ]
+
+    else
+        []
 
 
 arrowHeadAttrs : StartPosition -> EndPosition -> Color -> List (Svg.Attribute Msg)
@@ -210,23 +219,25 @@ arrowHeadAttrs start end strokeColor =
     let
         theta =
             (2 * pi)
-                - (arrowAngle start end)
+                - arrowAngle start end
     in
-        [ Attr.d (arrowHeadPath end)
-        , Attr.fill <| Color.Convert.colorToHex strokeColor
-        , Attr.stroke "none"
-        , Attr.transform ("rotate(" ++ toString (-theta * (180 / pi)) ++ " " ++ toString end.x ++ " " ++ toString end.y ++ ")")
-        ]
+    [ Attr.d (arrowHeadPath end)
+    , Attr.fill strokeColor
+    , Attr.stroke "none"
+    , Attr.transform ("rotate(" ++ String.fromFloat (-theta * (180 / pi)) ++ " " ++ String.fromInt end.x ++ " " ++ String.fromInt end.y ++ ")")
+    ]
 
 
 viewArrowHeadDrawing : Bool -> StartPosition -> Position -> Color -> Svg Msg
 viewArrowHeadDrawing showDropShadow start end strokeColor =
     Svg.path
         (arrowHeadAttrs start end strokeColor
-            ++ if showDropShadow then
-                [ Attr.filter "url(#dropShadow)" ]
-               else
-                []
+            ++ (if showDropShadow then
+                    [ Attr.filter "url(#dropShadow)" ]
+
+                else
+                    []
+               )
         )
         []
 
@@ -236,18 +247,20 @@ viewArrowHead index editState attrs showDropShadow start end strokeColor =
     let
         theta =
             (2 * pi)
-                - (arrowAngle start end)
+                - arrowAngle start end
     in
-        Svg.path
-            (arrowHeadAttrs start end strokeColor
-                ++ attrs
-                ++ Maybe.withDefault [] (Maybe.map (moveArrowHead index start end) (EditState.ifMoving editState))
-                ++ if showDropShadow then
+    Svg.path
+        (arrowHeadAttrs start end strokeColor
+            ++ attrs
+            ++ Maybe.withDefault [] (Maybe.map (moveArrowHead index start end) (EditState.ifMoving editState))
+            ++ (if showDropShadow then
                     [ Attr.filter "url(#dropShadow)" ]
-                   else
+
+                else
                     []
-            )
-            []
+               )
+        )
+        []
 
 
 lineAttributes : LineType -> Shape -> List (Svg.Attribute Msg)
@@ -286,52 +299,53 @@ viewDrawingHelper { drawing, constrain, editState } { strokeColor, fill, strokeS
         spotlightAttrs shapeType =
             if isInMask then
                 shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) (Just Color.black)
+
             else
                 shapeAttributes shapeType (Shape start (calcShapePos constrain start curPos) strokeColor strokeStyle) Nothing
     in
-        case drawing of
-            DrawLine lineType ->
-                case lineType of
-                    Arrow ->
-                        Svg.g []
-                            [ viewArrowHeadDrawing True start (calcLinePos constrain start curPos) strokeColor
-                            , Svg.path (lineAttrs lineType) []
-                            , viewArrowHeadDrawing False start (calcLinePos constrain start curPos) strokeColor
-                            ]
+    case drawing of
+        DrawLine lineType ->
+            case lineType of
+                Arrow ->
+                    Svg.g []
+                        [ viewArrowHeadDrawing True start (calcLinePos constrain start curPos) strokeColor
+                        , Svg.path (lineAttrs lineType) []
+                        , viewArrowHeadDrawing False start (calcLinePos constrain start curPos) strokeColor
+                        ]
 
-                    StraightLine ->
-                        Svg.path (lineAttrs lineType) []
+                StraightLine ->
+                    Svg.path (lineAttrs lineType) []
 
-            DrawFreeHand ->
-                Svg.path (freeDrawAttributes (Shape start curPos strokeColor strokeStyle) positions) []
+        DrawFreeHand ->
+            Svg.path (freeDrawAttributes (Shape start curPos strokeColor strokeStyle) positions) []
 
-            DrawShape shapeType ->
-                case shapeType of
-                    Rect ->
-                        Svg.rect (shapeAttrs shapeType) []
+        DrawShape shapeType ->
+            case shapeType of
+                Rect ->
+                    Svg.rect (shapeAttrs shapeType) []
 
-                    RoundedRect ->
-                        Svg.rect (shapeAttrs shapeType) []
+                RoundedRect ->
+                    Svg.rect (shapeAttrs shapeType) []
 
-                    Ellipse ->
-                        Svg.ellipse (shapeAttrs shapeType) []
+                Ellipse ->
+                    Svg.ellipse (shapeAttrs shapeType) []
 
-            DrawTextBox ->
-                Svg.rect ((shapeAttributes Rect <| Shape start curPos (Color.rgb 230 230 230) Annotation.defaultStroke) Nothing ++ [ Attr.strokeWidth "1" ]) []
+        DrawTextBox ->
+            Svg.rect ((shapeAttributes Rect <| Shape start curPos Color.grey Annotation.defaultStroke) Nothing ++ [ Attr.strokeWidth "1" ]) []
 
-            DrawSpotlight shapeType ->
-                case shapeType of
-                    Rect ->
-                        Svg.rect (spotlightAttrs shapeType) []
+        DrawSpotlight shapeType ->
+            case shapeType of
+                Rect ->
+                    Svg.rect (spotlightAttrs shapeType) []
 
-                    RoundedRect ->
-                        Svg.rect (spotlightAttrs shapeType) []
+                RoundedRect ->
+                    Svg.rect (spotlightAttrs shapeType) []
 
-                    Ellipse ->
-                        Svg.ellipse (spotlightAttrs shapeType) []
+                Ellipse ->
+                    Svg.ellipse (spotlightAttrs shapeType) []
 
-            DrawPixelate ->
-                Svg.text ""
+        DrawPixelate ->
+            Svg.text ""
 
 
 viewLine : Int -> EditState -> List (Svg.Attribute Msg) -> LineType -> Shape -> Svg Msg
@@ -371,15 +385,15 @@ viewFreeDraw selectState attrs shape positions =
                 |> Maybe.map .y
                 |> Maybe.withDefault 0
     in
-        Svg.g attrs
-            ([ Svg.path (freeDrawAttributes shape positions) []
-             ]
-                ++ if selectState == Selected then
+    Svg.g attrs
+        ([ Svg.path (freeDrawAttributes shape positions) []
+         ]
+            ++ (if selectState == Selected then
                     [ Svg.rect
-                        [ Attr.x (toString (leftMostX - 5))
-                        , Attr.y (toString (topMostY - 5))
-                        , Attr.width (toString (10 + rightMostX - leftMostX))
-                        , Attr.height (toString (10 + bottomMostY - topMostY))
+                        [ Attr.x (String.fromInt (leftMostX - 5))
+                        , Attr.y (String.fromInt (topMostY - 5))
+                        , Attr.width (String.fromInt (10 + rightMostX - leftMostX))
+                        , Attr.height (String.fromInt (10 + bottomMostY - topMostY))
                         , Attr.stroke "#555"
                         , Attr.strokeWidth "0.5"
                         , Attr.strokeDasharray "10, 5"
@@ -389,9 +403,11 @@ viewFreeDraw selectState attrs shape positions =
                         ]
                         []
                     ]
-                   else
+
+                else
                     []
-            )
+               )
+        )
 
 
 arrowPath : Shape -> String
@@ -399,7 +415,7 @@ arrowPath shape =
     let
         theta =
             (2 * pi)
-                - (arrowAngle shape.start shape.end)
+                - arrowAngle shape.start shape.end
 
         perpen =
             (pi / 2) - theta
@@ -414,19 +430,25 @@ arrowPath shape =
             { x =
                 if shape.end.x > shape.start.x && shape.end.y > shape.start.y then
                     (-20 * cos -theta) + toFloat shape.end.x
+
                 else if shape.end.x < shape.start.x && shape.end.y < shape.start.y then
                     (20 * cos -comp) + toFloat shape.end.x
+
                 else if shape.end.x < shape.start.x && shape.end.y > shape.start.y then
                     (20 * cos -comp) + toFloat shape.end.x
+
                 else
                     (-20 * cos -theta) + toFloat shape.end.x
             , y =
                 if shape.end.x > shape.start.x && shape.end.y > shape.start.y then
                     (-20 * sin -theta) + toFloat shape.end.y
+
                 else if shape.end.x < shape.start.x && shape.end.y < shape.start.y then
                     (-20 * sin -comp) + toFloat shape.end.y
+
                 else if shape.end.x < shape.start.x && shape.end.y > shape.start.y then
                     (-20 * sin -comp) + toFloat shape.end.y
+
                 else
                     (20 * sin theta) + toFloat shape.end.y
             }
@@ -443,46 +465,46 @@ arrowPath shape =
         arcPt =
             dx * 0.85714
     in
-        "M "
-            ++ toString start.x
-            ++ ","
-            ++ toString start.y
-            ++ "l"
-            ++ toString (4 * cos perpen)
-            ++ ","
-            ++ toString (4 * sin perpen)
-            ++ "c"
-            ++ toString halfWayPt
-            ++ ","
-            ++ toString (dy * 0.54286)
-            ++ " "
-            ++ toString arcPt
-            ++ ","
-            ++ toString (dy * 0.85714)
-            ++ " "
-            ++ toString (dx + (2.5 * cos perpen))
-            ++ ","
-            ++ toString (dy + (2.5 * sin perpen))
-            ++ "l "
-            ++ toString (-13 * cos (-theta + (pi / 2)))
-            ++ ","
-            ++ toString (-13 * sin (-theta + (pi / 2)))
-            ++ "c"
-            ++ toString (arcPt - dx + (2.5 * cos perpen))
-            ++ ","
-            ++ toString (((dy * 0.85714) - dy) + (2.5 * sin perpen))
-            ++ " "
-            ++ toString (halfWayPt - dx + (2.5 * cos perpen))
-            ++ ","
-            ++ toString (((dy * 0.54286) - dy) + (2.5 * sin perpen))
-            ++ " "
-            ++ toString (-dx + (2.5 * cos perpen))
-            ++ ","
-            ++ toString (-dy + (2.5 * sin perpen))
-            ++ "l"
-            ++ toString (4 * cos perpen)
-            ++ ","
-            ++ toString (4 * sin perpen)
+    "M "
+        ++ String.fromFloat start.x
+        ++ ","
+        ++ String.fromFloat start.y
+        ++ "l"
+        ++ String.fromFloat (4 * cos perpen)
+        ++ ","
+        ++ String.fromFloat (4 * sin perpen)
+        ++ "c"
+        ++ String.fromFloat halfWayPt
+        ++ ","
+        ++ String.fromFloat (dy * 0.54286)
+        ++ " "
+        ++ String.fromFloat arcPt
+        ++ ","
+        ++ String.fromFloat (dy * 0.85714)
+        ++ " "
+        ++ String.fromFloat (dx + (2.5 * cos perpen))
+        ++ ","
+        ++ String.fromFloat (dy + (2.5 * sin perpen))
+        ++ "l "
+        ++ String.fromFloat (-13 * cos (-theta + (pi / 2)))
+        ++ ","
+        ++ String.fromFloat (-13 * sin (-theta + (pi / 2)))
+        ++ "c"
+        ++ String.fromFloat (arcPt - dx + (2.5 * cos perpen))
+        ++ ","
+        ++ String.fromFloat (((dy * 0.85714) - dy) + (2.5 * sin perpen))
+        ++ " "
+        ++ String.fromFloat (halfWayPt - dx + (2.5 * cos perpen))
+        ++ ","
+        ++ String.fromFloat (((dy * 0.54286) - dy) + (2.5 * sin perpen))
+        ++ " "
+        ++ String.fromFloat (-dx + (2.5 * cos perpen))
+        ++ ","
+        ++ String.fromFloat (-dy + (2.5 * sin perpen))
+        ++ "l"
+        ++ String.fromFloat (4 * cos perpen)
+        ++ ","
+        ++ String.fromFloat (4 * sin perpen)
 
 
 viewShape : List (Svg.Attribute Msg) -> ShapeType -> Maybe Color -> Shape -> Svg Msg
@@ -503,14 +525,12 @@ viewTextArea index ({ start, end, fill, fontSize, autoexpand } as textArea) =
     foreignObject []
         [ div
             [ class "text-box-container"
-            , style
-                [ "top" => toPx (-10 + (Basics.min start.y end.y))
-                , "left" => toPx (-20 + (Basics.min start.x end.x))
-                , "width" => toPx (abs (end.x - start.x))
-                , "font-size" => toPx fontSize
-                , "color" => Color.Convert.colorToHex fill
-                ]
-            , Html.Events.onWithOptions "mousedown" stopPropagation (Json.succeed PreventTextMouseDown)
+            , (\( a, b ) -> style a b) ( "top", toPx (-10 + Basics.min start.y end.y) )
+            , (\( a, b ) -> style a b) ( "left", toPx (-20 + Basics.min start.x end.x) )
+            , (\( a, b ) -> style a b) ( "width", toPx (abs (end.x - start.x)) )
+            , (\( a, b ) -> style a b) ( "font-size", toPx fontSize )
+            , (\( a, b ) -> style a b) ( "color", fill )
+            , stopPropagationAndDefault "mousedown" (Json.succeed PreventTextMouseDown)
             ]
             [ AutoExpand.view (autoExpandConfig TextBoxInput index fontSize) autoexpand textArea.text
             ]
@@ -536,24 +556,24 @@ viewTextBox attrs selectState index ({ start, end, fill, fontSize } as textBox) 
         NotSelected ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| (svgTextOffsetX + Basics.min start.x end.x), Attr.fill <| Color.Convert.colorToHex fill, Attr.fontSize <| toString fontSize ] << List.singleton << Svg.text)
-                |> Svg.text_ ([ Attr.y <| toString <| (svgTextOffsetY + Basics.min start.y end.y), Attr.fontFamily "sans-serif" ] ++ attrs)
+                |> List.map (Svg.tspan [ Attr.dy <| String.fromFloat <| fontSizeToLineHeight fontSize, Attr.x <| String.fromInt <| (svgTextOffsetX + Basics.min start.x end.x), Attr.fill fill, Attr.fontSize <| String.fromInt fontSize ] << List.singleton << Svg.text)
+                |> Svg.text_ ([ Attr.y <| String.fromInt <| (svgTextOffsetY + Basics.min start.y end.y), Attr.fontFamily "sans-serif" ] ++ attrs)
 
         SelectedWithVertices ->
             textBox.text
                 |> String.split "\n"
-                |> List.map (Svg.tspan [ Attr.dy <| toString <| fontSizeToLineHeight fontSize, Attr.x <| toString <| (svgTextOffsetX + Basics.min start.x end.x), Attr.fill <| Color.Convert.colorToHex fill ] << List.singleton << Svg.text)
+                |> List.map (Svg.tspan [ Attr.dy <| String.fromFloat <| fontSizeToLineHeight fontSize, Attr.x <| String.fromInt <| (svgTextOffsetX + Basics.min start.x end.x), Attr.fill fill ] << List.singleton << Svg.text)
                 |> Svg.text_
-                    ([ Attr.y <| toString <| (svgTextOffsetY + Basics.min start.y end.y)
+                    ([ Attr.y <| String.fromInt <| (svgTextOffsetY + Basics.min start.y end.y)
                      , Html.Events.onDoubleClick <| FocusTextArea index
-                     , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> FocusTextArea index)
                      , Attr.stroke <|
                         if fill == Color.black then
                             "white"
+
                         else
                             "black"
                      , Attr.strokeWidth "0.5px"
-                     , Attr.fontSize <| toString fontSize
+                     , Attr.fontSize <| String.fromInt fontSize
                      , Attr.fontFamily "sans-serif"
                      ]
                         ++ attrs
@@ -573,7 +593,7 @@ viewPixelate : EditState -> Int -> Annotation -> Maybe (List (Svg Msg))
 viewPixelate editState index annotation =
     case annotation of
         Pixelate start end ->
-            Just [ Svg.rect (EditState.annotationEvents (annotationConfig index) index editState ++ rectAttrs start end ++ [ Attr.fill (Color.Convert.colorToHex Color.black) ]) [] ]
+            Just [ Svg.rect (EditState.annotationEvents (annotationConfig index) index editState ++ rectAttrs start end ++ [ Attr.fill Color.black ]) [] ]
 
         _ ->
             Nothing
@@ -594,30 +614,36 @@ viewAnnotation editState index annotation =
         vertices verticesType { start, end } =
             Vertices.viewVertices verticesType start end toVertexEvents selectState
     in
-        case annotation of
-            Lines lineType shape ->
-                viewLine index editState editStateAttrs lineType shape
-                    => vertices Linear shape
+    case annotation of
+        Lines lineType shape ->
+            ( viewLine index editState editStateAttrs lineType shape
+            , vertices Linear shape
+            )
 
-            FreeDraw shape positions ->
-                viewFreeDraw selectState editStateAttrs shape positions
-                    => Nothing
+        FreeDraw shape positions ->
+            ( viewFreeDraw selectState editStateAttrs shape positions
+            , Nothing
+            )
 
-            Shapes shapeType fill shape ->
-                viewShape editStateAttrs shapeType fill shape
-                    => vertices Rectangular shape
+        Shapes shapeType fill shape ->
+            ( viewShape editStateAttrs shapeType fill shape
+            , vertices Rectangular shape
+            )
 
-            TextBox textBox ->
-                viewTextBox editStateAttrs selectState index textBox
-                    => Nothing
+        TextBox textBox ->
+            ( viewTextBox editStateAttrs selectState index textBox
+            , Nothing
+            )
 
-            Spotlight shapeType shape ->
-                viewShape editStateAttrs shapeType Nothing shape
-                    => vertices Rectangular shape
+        Spotlight shapeType shape ->
+            ( viewShape editStateAttrs shapeType Nothing shape
+            , vertices Rectangular shape
+            )
 
-            Pixelate start end ->
-                Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ editStateAttrs) []
-                    => vertices Rectangular { start = start, end = end }
+        Pixelate start end ->
+            ( Svg.rect (rectAttrs start end ++ [ Attr.fill "none", Attr.style "pointer-events: all;" ] ++ editStateAttrs) []
+            , vertices Rectangular { start = start, end = end }
+            )
 
 
 viewSpotlightInMask : EditState -> ( Int, Annotation ) -> Maybe (Svg Msg)

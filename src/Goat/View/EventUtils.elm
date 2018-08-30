@@ -1,23 +1,8 @@
-module Goat.View.EventUtils exposing (stopPropagation, defaultPrevented, stopPropagationAndDefault, onMouseDown, onMouseUp)
+module Goat.View.EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
 
 import Html exposing (Attribute)
-import Html.Events exposing (on)
+import Html.Events exposing (custom, on)
 import Json.Decode as Json
-
-
-defaultPrevented : Html.Events.Options
-defaultPrevented =
-    { stopPropagation = False, preventDefault = True }
-
-
-stopPropagation : Html.Events.Options
-stopPropagation =
-    { stopPropagation = True, preventDefault = False }
-
-
-stopPropagationAndDefault : Html.Events.Options
-stopPropagationAndDefault =
-    { stopPropagation = True, preventDefault = True }
 
 
 onMouseDown : Json.Decoder msg -> Attribute msg
@@ -28,3 +13,12 @@ onMouseDown decodeToMsg =
 onMouseUp : Json.Decoder msg -> Attribute msg
 onMouseUp decodeToMsg =
     on "mouseup" decodeToMsg
+
+
+alwaysPreventDefault : msg -> ( msg, Bool )
+alwaysPreventDefault msg =
+    ( msg, True )
+
+
+stopPropagationAndDefault event decoder =
+    custom event (Json.map (\msg -> { message = msg, stopPropagation = True, preventDefault = True }) decoder)

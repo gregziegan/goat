@@ -1,4 +1,4 @@
-module Goat.EditState exposing (EditState, DrawingConfig, AnnotationConfig, SubscriptionConfig, KeyboardConfig, initialState, startDrawing, continueDrawing, finishDrawing, finishTextDrawing, startMoving, continueMoving, finishMoving, startResizing, continueResizing, finishResizing, selectAnnotation, startEditingText, finishEditingText, updateSelectedAttributes, subscriptions, selectState, updateAnySelectedAnnotations, keyboard, annotationEvents, vertexEvents, drawingEvents, viewDrawing, ifMoving, currentAnnotationAttributes)
+module Goat.EditState exposing (AnnotationConfig, DrawingConfig, EditState, KeyboardConfig, SubscriptionConfig, annotationEvents, continueDrawing, continueMoving, continueResizing, currentAnnotationAttributes, drawingEvents, finishDrawing, finishEditingText, finishMoving, finishResizing, finishTextDrawing, ifMoving, initialState, keyboard, selectAnnotation, selectState, startDrawing, startEditingText, startMoving, startResizing, subscriptions, updateAnySelectedAnnotations, updateSelectedAttributes, vertexEvents, viewDrawing)
 
 {-| The finite state machine for annotating.
 See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
@@ -8,17 +8,17 @@ functions, with the exception of `initialState`.
 
 -}
 
-import Goat.Annotation exposing (SelectState, SelectState(..))
-import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, SelectingInfo, MovingInfo, ResizingInfo, EditingTextInfo, Vertex)
-import Goat.View.EventUtils exposing (defaultPrevented, stopPropagationAndDefault, onMouseDown, onMouseUp, stopPropagation)
-import Html.Events exposing (onWithOptions)
+import Browser.Events exposing (onMouseMove)
+import Goat.Annotation exposing (SelectState(..))
+import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, MovingInfo, ResizingInfo, SelectingInfo, Vertex)
+import Goat.View.EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
+import Html.Events exposing (custom, preventDefaultOn, stopPropagationOn)
+import Html.Events.Extra.Touch as T
 import Json.Decode as Json
-import Keyboard.Extra as Keyboard exposing (KeyChange)
+import Keyboard exposing (KeyChange)
 import Mouse exposing (Position)
-import SingleTouch as ST
 import Svg exposing (Attribute)
 import Svg.Attributes as Attr
-import Touch as T
 
 
 type EditState
@@ -53,7 +53,7 @@ type alias AnnotationConfig msg =
 
 {-| This configuration is for the svg drawing area.
 
-This drawing area *should* only need to be used for drawing, but sometimes the selected vertex is not directly under a quickly
+This drawing area _should_ only need to be used for drawing, but sometimes the selected vertex is not directly under a quickly
 moving mouse. So, we make sure to capture resizing events on the drawspace as the source of truth.
 
 -}
@@ -123,11 +123,13 @@ continueDrawing pos trackPositions editState =
                                     [ pos ]
 
                                 lastPos :: rest ->
-                                    if (abs (lastPos.x - pos.x)) < 10 && (abs (lastPos.y - pos.y)) < 10 then
+                                    if abs (lastPos.x - pos.x) < 10 && abs (lastPos.y - pos.y) < 10 then
                                         positions
+
                                     else
                                         pos :: positions
                         )
+
                 else
                     Drawing (DrawingInfo start pos [])
 
@@ -257,10 +259,10 @@ finishResizing editState =
 
 
 startEditingText : Int -> AnnotationAttributes -> EditState -> Result String EditState
-startEditingText index attributes editState =
+startEditingText index annotationAttributes editState =
     case editState of
         Drawing _ ->
-            Ok (EditingText (EditingTextInfo index attributes))
+            Ok (EditingText (EditingTextInfo index annotationAttributes))
 
         Selecting { id, attributes } ->
             Ok (EditingText (EditingTextInfo id attributes))
@@ -283,10 +285,10 @@ updateSelectedAttributes : (AnnotationAttributes -> AnnotationAttributes) -> Edi
 updateSelectedAttributes updateAttrs editState =
     case editState of
         Selecting selectingInfo ->
-            Selecting { selectingInfo | attributes = (updateAttrs selectingInfo.attributes) }
+            Selecting { selectingInfo | attributes = updateAttrs selectingInfo.attributes }
 
         EditingText editingInfo ->
-            EditingText { editingInfo | attributes = (updateAttrs editingInfo.attributes) }
+            EditingText { editingInfo | attributes = updateAttrs editingInfo.attributes }
 
         _ ->
             editState
@@ -306,27 +308,22 @@ toDrawingPosition mouse =
     { mouse | x = mouse.x - controlUIWidth, y = mouse.y - 10 }
 
 
-toPosition : ST.SingleTouch -> Position
-toPosition st =
-    Position (round st.touch.clientX) (round st.touch.clientY)
-
-
 subscriptions : SubscriptionConfig msg -> EditState -> Sub msg
 subscriptions config editState =
     Sub.batch <|
         case editState of
             Drawing _ ->
-                [ Mouse.moves (config.drawToMsg << toDrawingPosition)
+                [ onMouseMove (Json.map (config.drawToMsg << toDrawingPosition) Mouse.position)
                 , Sub.map config.keyboardToMsg Keyboard.subscriptions
                 ]
 
             Resizing _ ->
-                [ Mouse.moves (config.resizeToMsg << toDrawingPosition)
+                [ onMouseMove (Json.map (config.resizeToMsg << toDrawingPosition) Mouse.position)
                 , Sub.map config.keyboardToMsg Keyboard.subscriptions
                 ]
 
             Moving _ ->
-                [ Mouse.moves (config.moveToMsg << toDrawingPosition) ]
+                [ onMouseMove (Json.map (config.moveToMsg << toDrawingPosition) Mouse.position) ]
 
             EditingText _ ->
                 []
@@ -342,8 +339,10 @@ selectState candidateId usesVertices editState =
             if id == candidateId then
                 if usesVertices then
                     SelectedWithVertices
+
                 else
                     Selected
+
             else
                 NotSelected
 
@@ -351,8 +350,10 @@ selectState candidateId usesVertices editState =
             if id == candidateId then
                 if usesVertices then
                     SelectedWithVertices
+
                 else
                     Selected
+
             else
                 NotSelected
 
@@ -360,14 +361,17 @@ selectState candidateId usesVertices editState =
             if id == candidateId then
                 if usesVertices then
                     SelectedWithVertices
+
                 else
                     Selected
+
             else
                 NotSelected
 
         EditingText { id } ->
             if id == candidateId then
                 Selected
+
             else
                 NotSelected
 
@@ -401,9 +405,9 @@ annotationEvents : AnnotationConfig msg -> Int -> EditState -> List (Attribute m
 annotationEvents config candidateId editState =
     case editState of
         NotSelecting ->
-            [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (config.selectAndMove << toDrawingPosition) Mouse.position
+            [ stopPropagationAndDefault "mousedown" (Json.map (config.selectAndMove << toDrawingPosition) Mouse.position)
             , Attr.class "pointerCursor"
-            , onWithOptions "contextmenu" stopPropagationAndDefault (Json.map (config.contextMenu) Mouse.position)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Mouse.position)
             ]
 
         Drawing drawingInfo ->
@@ -411,9 +415,8 @@ annotationEvents config candidateId editState =
 
         Selecting selectingInfo ->
             [ Attr.class "moveCursor"
-            , Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (config.startMoving << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchStart T.preventAndStop (config.startMoving << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            , stopPropagationAndDefault "mousedown" (Json.map (config.startMoving << toDrawingPosition) Mouse.position)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Mouse.position)
             ]
 
         Moving { id, translate } ->
@@ -421,14 +424,15 @@ annotationEvents config candidateId editState =
                 ( dx, dy ) =
                     translate
             in
-                [ onMouseUp <| Json.map (config.finishMoving << toDrawingPosition) Mouse.position
-                , ST.onSingleTouch T.TouchEnd T.preventAndStop (config.finishMoving << toDrawingPosition << toPosition)
-                , Attr.class "moveCursor"
-                ]
-                    ++ if id == candidateId then
-                        [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
-                       else
+            [ onMouseUp <| Json.map (config.finishMoving << toDrawingPosition) Mouse.position
+            , Attr.class "moveCursor"
+            ]
+                ++ (if id == candidateId then
+                        [ Attr.transform <| "translate(" ++ String.fromInt dx ++ "," ++ String.fromInt dy ++ ")" ]
+
+                    else
                         []
+                   )
 
         Resizing resizingInfo ->
             [ Attr.class "resizeCursor" ]
@@ -438,16 +442,16 @@ annotationEvents config candidateId editState =
 
 
 vertexEvents : (Vertex -> Position -> msg) -> EditState -> Vertex -> List (Attribute msg)
-vertexEvents startResizing editState vertex =
-    [ Html.Events.onWithOptions "mousedown" stopPropagation <| Json.map (startResizing vertex << toDrawingPosition) Mouse.position
-    , ST.onSingleTouch T.TouchStart T.preventAndStop (startResizing vertex << toDrawingPosition << toPosition)
+vertexEvents resize editState vertex =
+    [ stopPropagationOn "mousedown" <| Json.map (alwaysPreventDefault << resize vertex << toDrawingPosition) Mouse.position
     ]
-        ++ case editState of
-            Moving movingInfo ->
-                vertexAttrsWhenMoving movingInfo
+        ++ (case editState of
+                Moving movingInfo ->
+                    vertexAttrsWhenMoving movingInfo
 
-            _ ->
-                []
+                _ ->
+                    []
+           )
 
 
 vertexAttrsWhenMoving : MovingInfo -> List (Attribute msg)
@@ -456,7 +460,7 @@ vertexAttrsWhenMoving { translate } =
         ( dx, dy ) =
             translate
     in
-        [ Attr.transform <| "translate(" ++ toString dx ++ "," ++ toString dy ++ ")" ]
+    [ Attr.transform <| "translate(" ++ String.fromInt dx ++ "," ++ String.fromInt dy ++ ")" ]
 
 
 updateAnySelectedAnnotations : (Int -> a) -> EditState -> Maybe a
@@ -496,40 +500,31 @@ drawingEvents config editState =
     case editState of
         NotSelecting ->
             [ onMouseDown <| Json.map (config.startDrawing << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (config.startDrawing << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Mouse.position)
             ]
 
         Drawing _ ->
             [ onMouseUp (Json.map (config.finishDrawing << toDrawingPosition) Mouse.position)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (config.finishDrawing << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (config.continueDrawing << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Mouse.position)
             ]
 
         Selecting _ ->
             [ onMouseDown <| Json.map (config.startDrawing << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchStart T.preventAndStop <| (config.startDrawing << toDrawingPosition << toPosition)
             ]
 
         Moving _ ->
             [ onMouseUp <| Json.map (config.finishMoving << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (config.continueMoving << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (config.finishMoving << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Mouse.position)
             ]
 
         Resizing _ ->
             [ onMouseUp <| Json.map (config.finishResizing << toDrawingPosition) Mouse.position
-            , ST.onSingleTouch T.TouchMove T.preventAndStop (config.continueResizing << toDrawingPosition << toPosition)
-            , ST.onSingleTouch T.TouchEnd T.preventAndStop (config.continueResizing << toDrawingPosition << toPosition)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Mouse.position)
             ]
 
         EditingText { id } ->
             [ Html.Events.onMouseDown (config.finishEditingText id)
-            , ST.onSingleTouch T.TouchStart T.preventAndStop (\_ -> config.finishEditingText id)
-            , onWithOptions "contextmenu" defaultPrevented (Json.map config.contextMenu Mouse.position)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Mouse.position)
             , Attr.style "cursor: default;"
             ]
 

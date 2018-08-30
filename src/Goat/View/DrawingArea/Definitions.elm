@@ -8,14 +8,13 @@ import Svg.Attributes as Attr
 maskDefinition : List (Svg msg) -> Svg msg
 maskDefinition shapes =
     rect
-        ([ Attr.x "0"
-         , Attr.y "0"
-         , Attr.width "100%"
-         , Attr.height "100%"
-         , Attr.opacity "0.5"
-         , Attr.fill "white"
-         ]
-        )
+        [ Attr.x "0"
+        , Attr.y "0"
+        , Attr.width "100%"
+        , Attr.height "100%"
+        , Attr.opacity "0.5"
+        , Attr.fill "white"
+        ]
         []
         :: shapes
         |> Svg.mask [ Attr.id "Mask" ]
@@ -24,13 +23,12 @@ maskDefinition shapes =
 pixelateMaskDefinition : List (Svg msg) -> Svg msg
 pixelateMaskDefinition shapes =
     rect
-        ([ Attr.x "0"
-         , Attr.y "0"
-         , Attr.width "100%"
-         , Attr.height "100%"
-         , Attr.fill "white"
-         ]
-        )
+        [ Attr.x "0"
+        , Attr.y "0"
+        , Attr.width "100%"
+        , Attr.height "100%"
+        , Attr.fill "white"
+        ]
         []
         :: shapes
         |> Svg.mask [ Attr.id "pixelateMask" ]
