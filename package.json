@@ -10,8 +10,8 @@
   },
   "scripts": {
     "start": "zendency development",
-    "dev": "(cpx \"./docs/{elm.js,index.js,index.css}\" zendesk-app/ --watch &) && elm-live src/Main.elm --output=docs/elm.js --debug --open",
-    "bundle": "elm-make src/Main.elm --output=elm.js && uglifyjs -c -m -o elm.js elm.js && zendency bundle $1",
+    "dev": "elm-live src/Main.elm --open -- --output=elm.js",
+    "bundle": "elm make src/Main.elm --optimize --output=elm.js && uglifyjs -c -m -o elm.js elm.js && zendency bundle $1",
     "test": "elm-test"
   },
   "main": "./zendesk-app",

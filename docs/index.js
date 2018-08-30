@@ -3,7 +3,10 @@ var isMac = navigator.userAgent.indexOf('Mac OS X') != -1;
 var client = window.ZAFClient ? ZAFClient.init() : null;
 var isInZendeskAppContext = !!client;
 
-var app = Elm.Main.embed(document.getElementById("root"), { isMac: isMac, inZendesk : isInZendeskAppContext });
+var app = Elm.Main.init({
+  node: document.getElementById("root"),
+  flags: { isMac: isMac, inZendesk : isInZendeskAppContext }
+});
 var zendeskExportId;
 var b64ImageDict = {};
 
