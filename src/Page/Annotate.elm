@@ -228,11 +228,11 @@ update env image msg ({ pressedKeys } as model) =
 
         ControlsUpdate controlsMsg ->
             let
-                ( newState, options ) =
+                newState =
                     Controls.update controlsMsg model.controls
             in
             ( model.editState
-                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateAttributes options.styles) model)
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateAttributes newState.drawingStyles) model)
                 |> Maybe.withDefault model
                 |> alterControls (always newState)
             , Cmd.none
@@ -355,7 +355,7 @@ startDrawing start model =
 
 continueDrawing : Position -> Model -> Model
 continueDrawing pos model =
-    case EditState.continueDrawing pos (Controls.getDrawing model.controls == DrawFreeHand) model.editState of
+    case EditState.continueDrawing pos (model.controls.drawing == DrawFreeHand) model.editState of
         Ok newEditState ->
             { model | editState = newEditState }
 
@@ -368,7 +368,7 @@ finishValidDrawing model styles drawingInfo =
     let
         config =
             { constrain = shouldConstrain model
-            , drawing = Controls.getDrawing model.controls
+            , drawing = model.controls.drawing
             , styles = styles
             }
     in
@@ -403,7 +403,7 @@ finishFreeHandDrawing ( finishedEditState, { start, curPos, positions } as drawi
 
 finishNonTextDrawing : ( EditState, DrawingInfo ) -> DrawingStyles -> Model -> Model
 finishNonTextDrawing ( finishedEditState, { start, curPos } as drawingInfo ) styles model =
-    if isDrawingTooSmall (Drawing.isSpotlight (Controls.getDrawing model.controls)) start curPos then
+    if isDrawingTooSmall (Drawing.isSpotlight model.controls.drawing) start curPos then
         resetEditState model
 
     else
@@ -448,7 +448,7 @@ finishDrawing pos model =
         styles =
             model.controls.drawingStyles
     in
-    case Controls.getDrawing model.controls of
+    case model.controls.drawing of
         DrawFreeHand ->
             case EditState.finishDrawing pos model.editState of
                 Ok newState ->
@@ -961,7 +961,7 @@ isCtrlPressed pressedKeys os =
 
 toDrawingModifiers : Model -> DrawingModifiers
 toDrawingModifiers model =
-    DrawingModifiers (Controls.getDrawing model.controls) (shouldConstrain model) model.editState model.controls.drawingStyles
+    DrawingModifiers model.controls.drawing (shouldConstrain model) model.editState model.controls.drawingStyles
 
 
 translateArrowHead : Int -> StartPosition -> EndPosition -> MovingInfo -> List (Svg.Attribute Msg)

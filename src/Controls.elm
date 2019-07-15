@@ -1,4 +1,4 @@
-module Controls exposing (Config, Msg, State, closeDropdown, defaultDrawingStyles, getDrawing, initialState, onKeyDown, subscriptions, update, view)
+module Controls exposing (Config, Msg, State, closeDropdown, defaultDrawingStyles, initialState, onKeyDown, subscriptions, update, view)
 
 import Color exposing (Color)
 import Drawing exposing (AttributeDropdown(..), Drawing(..), LineType(..), ShapeType(..))
@@ -44,12 +44,6 @@ type alias DropdownConfig selection =
     }
 
 
-type alias DrawOptions =
-    { drawing : Drawing
-    , styles : DrawingStyles
-    }
-
-
 initialState : State
 initialState =
     { drawing = DrawLine Arrow
@@ -64,11 +58,6 @@ initialState =
 defaultDrawingStyles : DrawingStyles
 defaultDrawingStyles =
     DrawingStyles Palette.purple Nothing SolidMedium 20
-
-
-getDrawing : State -> Drawing
-getDrawing state =
-    state.drawing
 
 
 toStrokeStylesTitle : OperatingSystem -> String
@@ -126,51 +115,47 @@ type Msg
     | ToggleDropdown AttributeDropdown
 
 
-update : Msg -> State -> ( State, DrawOptions )
+update : Msg -> State -> State
 update msg state =
-    let
-        newState =
-            case msg of
-                SelectFill newFill ->
-                    state
-                        |> updateStyles (setFill newFill state.drawingStyles)
-                        |> closeDropdown
+    case msg of
+        SelectFill newFill ->
+            state
+                |> updateStyles (setFill newFill state.drawingStyles)
+                |> closeDropdown
 
-                SelectStrokeColor newStrokeColor ->
-                    state
-                        |> updateStyles (setStrokeColor newStrokeColor state.drawingStyles)
-                        |> closeDropdown
+        SelectStrokeColor newStrokeColor ->
+            state
+                |> updateStyles (setStrokeColor newStrokeColor state.drawingStyles)
+                |> closeDropdown
 
-                SelectStrokeStyle newStrokeStyle ->
-                    state
-                        |> updateStyles (setStrokeStyle newStrokeStyle state.drawingStyles)
-                        |> closeDropdown
+        SelectStrokeStyle newStrokeStyle ->
+            state
+                |> updateStyles (setStrokeStyle newStrokeStyle state.drawingStyles)
+                |> closeDropdown
 
-                SelectFontSize newFontSize ->
-                    state
-                        |> updateStyles (setFontSize newFontSize state.drawingStyles)
-                        |> closeDropdown
+        SelectFontSize newFontSize ->
+            state
+                |> updateStyles (setFontSize newFontSize state.drawingStyles)
+                |> closeDropdown
 
-                WaitForDropdownToggle attributeDropdown ->
-                    state
-                        |> waitForDropdownToggle attributeDropdown
-                        |> closeDropdown
+        WaitForDropdownToggle attributeDropdown ->
+            state
+                |> waitForDropdownToggle attributeDropdown
+                |> closeDropdown
 
-                CancelDropdownWait ->
-                    state
-                        |> cancelWaitForDropdownToggle
+        CancelDropdownWait ->
+            state
+                |> cancelWaitForDropdownToggle
 
-                ToggleDropdown editOption ->
-                    state
-                        |> toggleDropdown editOption
-                        |> cancelWaitForDropdownToggle
+        ToggleDropdown editOption ->
+            state
+                |> toggleDropdown editOption
+                |> cancelWaitForDropdownToggle
 
-                ChangeDrawing newDrawing ->
-                    state
-                        |> changeDrawing newDrawing
-                        |> closeDropdown
-    in
-    ( newState, DrawOptions newState.drawing newState.drawingStyles )
+        ChangeDrawing newDrawing ->
+            state
+                |> changeDrawing newDrawing
+                |> closeDropdown
 
 
 onKeyDown : Key -> State -> State
