@@ -21,6 +21,7 @@ module Annotation exposing
 
 import AutoExpand
 import Color exposing (Color)
+import Controls
 import Drawing exposing (Drawing(..), LineType, Shape, ShapeType, calcLinePos, calcShapePos)
 import Drawing.Options as Drawing exposing (DrawingStyles, StrokeColor, StrokeStyle(..))
 import EditState exposing (ResizingInfo)
@@ -109,7 +110,7 @@ startAndEnd annotation =
 
 defaultAttributes : DrawingStyles
 defaultAttributes =
-    Drawing.defaults
+    Controls.defaultDrawingStyles
 
 
 styles : Annotation -> DrawingStyles

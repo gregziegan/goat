@@ -1,7 +1,7 @@
 module DrawingOptionsTests exposing (suite)
 
 import Color exposing (Color)
-import Drawing.Options as Options exposing (StrokeStyle(..), defaults)
+import Drawing.Options as Options exposing (StrokeStyle(..))
 import Expect exposing (Expectation)
 import Fuzz exposing (int)
 import Palette
@@ -83,19 +83,5 @@ suite =
             [ test "provides six options in increasing order" <|
                 \_ ->
                     Expect.equalLists fontSizes Options.fontSizes
-            ]
-        , describe "defaults"
-            [ test "to a purple stroke color" <|
-                \_ ->
-                    Expect.equal Palette.purple defaults.strokeColor
-            , test "to an empty fill" <|
-                \_ ->
-                    Expect.equal Nothing defaults.fill
-            , test "to solid stroke style" <|
-                \_ ->
-                    Expect.equal SolidMedium defaults.strokeStyle
-            , test "to a medium font size" <|
-                \_ ->
-                    Expect.equal 20 defaults.fontSize
             ]
         ]

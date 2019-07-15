@@ -1,4 +1,4 @@
-module Controls exposing (Config, Msg, State, closeDropdown, getDrawing, initialState, onKeyDown, styles, subscriptions, update, view)
+module Controls exposing (Config, Msg, State, closeDropdown, defaultDrawingStyles, getDrawing, initialState, onKeyDown, subscriptions, update, view)
 
 import Color exposing (Color)
 import Drawing exposing (AttributeDropdown(..), Drawing(..), LineType(..), ShapeType(..))
@@ -11,6 +11,7 @@ import Html.Events exposing (onClick, onMouseDown, onMouseUp)
 import Icons
 import Json.Decode as Decode
 import Keyboard exposing (Key(..))
+import Palette
 import Time
 
 
@@ -24,10 +25,7 @@ type alias State =
     , drawing : Drawing
     , shape : Drawing
     , spotlight : Drawing
-    , fill : Maybe Color
-    , strokeColor : Color
-    , strokeStyle : StrokeStyle
-    , fontSize : Int
+    , drawingStyles : DrawingStyles
     , waitingForDropdownToggle : Maybe AttributeDropdown
     }
 
@@ -54,16 +52,18 @@ type alias DrawOptions =
 
 initialState : State
 initialState =
-    { drawing = Drawing.default
-    , shape = Drawing.defaultShape
-    , spotlight = Drawing.defaultSpotlight
+    { drawing = DrawLine Arrow
+    , shape = DrawShape RoundedRect
+    , spotlight = DrawSpotlight RoundedRect
     , waitingForDropdownToggle = Nothing
-    , fill = Drawing.defaults.fill
-    , strokeColor = Drawing.defaults.strokeColor
-    , strokeStyle = Drawing.defaults.strokeStyle
-    , fontSize = Drawing.defaults.fontSize
+    , drawingStyles = defaultDrawingStyles
     , currentDropdown = Nothing
     }
+
+
+defaultDrawingStyles : DrawingStyles
+defaultDrawingStyles =
+    DrawingStyles Palette.purple Nothing SolidMedium 20
 
 
 getDrawing : State -> Drawing
@@ -111,11 +111,6 @@ toFontSizeTitle os =
             "Foṉt Sizes"
 
 
-styles : State -> DrawingStyles
-styles { strokeColor, fill, strokeStyle, fontSize } =
-    DrawingStyles strokeColor fill strokeStyle fontSize
-
-
 
 -- UPDATE
 
@@ -138,22 +133,22 @@ update msg state =
             case msg of
                 SelectFill newFill ->
                     state
-                        |> setFill newFill
+                        |> updateStyles (setFill newFill state.drawingStyles)
                         |> closeDropdown
 
                 SelectStrokeColor newStrokeColor ->
                     state
-                        |> setStrokeColor newStrokeColor
+                        |> updateStyles (setStrokeColor newStrokeColor state.drawingStyles)
                         |> closeDropdown
 
                 SelectStrokeStyle newStrokeStyle ->
                     state
-                        |> setStrokeStyle newStrokeStyle
+                        |> updateStyles (setStrokeStyle newStrokeStyle state.drawingStyles)
                         |> closeDropdown
 
                 SelectFontSize newFontSize ->
                     state
-                        |> setFontSize newFontSize
+                        |> updateStyles (setFontSize newFontSize state.drawingStyles)
                         |> closeDropdown
 
                 WaitForDropdownToggle attributeDropdown ->
@@ -175,7 +170,7 @@ update msg state =
                         |> changeDrawing newDrawing
                         |> closeDropdown
     in
-    ( newState, DrawOptions newState.drawing (styles newState) )
+    ( newState, DrawOptions newState.drawing newState.drawingStyles )
 
 
 onKeyDown : Key -> State -> State
@@ -240,30 +235,35 @@ changeDrawing drawing state =
         |> changeShapeAndSpotlightDropdowns drawing
 
 
-setFill : Maybe Color -> State -> State
-setFill fill state =
-    { state
+updateStyles : DrawingStyles -> State -> State
+updateStyles styles state =
+    { state | drawingStyles = styles }
+
+
+setFill : Maybe Color -> DrawingStyles -> DrawingStyles
+setFill fill styles =
+    { styles
         | fill = fill
     }
 
 
-setFontSize : Int -> State -> State
-setFontSize fontSize state =
-    { state
+setFontSize : Int -> DrawingStyles -> DrawingStyles
+setFontSize fontSize styles =
+    { styles
         | fontSize = fontSize
     }
 
 
-setStrokeStyle : StrokeStyle -> State -> State
-setStrokeStyle strokeStyle state =
-    { state
+setStrokeStyle : StrokeStyle -> DrawingStyles -> DrawingStyles
+setStrokeStyle strokeStyle styles =
+    { styles
         | strokeStyle = strokeStyle
     }
 
 
-setStrokeColor : Color -> State -> State
-setStrokeColor strokeColor state =
-    { state
+setStrokeColor : Color -> DrawingStyles -> DrawingStyles
+setStrokeColor strokeColor styles =
+    { styles
         | strokeColor = strokeColor
     }
 

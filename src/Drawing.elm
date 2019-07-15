@@ -1,4 +1,4 @@
-module Drawing exposing (ArrowAttributes, AttributeDropdown(..), Drawing(..), LineType(..), Shape, ShapeType(..), calcLinePos, calcShapePos, default, defaultShape, defaultSpotlight, equal, freeDrawAttributes, icon, isSpotlight, lineAttributes, rectAttrs, shapeAttributes, shapes, spotlights, toString, viewArrow, viewFreeDraw)
+module Drawing exposing (ArrowAttributes, AttributeDropdown(..), Drawing(..), LineType(..), Shape, ShapeType(..), calcLinePos, calcShapePos, equal, freeDrawAttributes, icon, isSpotlight, lineAttributes, rectAttrs, shapeAttributes, shapes, spotlights, toString, viewArrow, viewFreeDraw)
 
 import Color exposing (Color)
 import Drawing.Options exposing (Fill, StrokeColor, StrokeStyle(..))
@@ -44,21 +44,6 @@ type AttributeDropdown
     | Fills
     | StrokeColors
     | Strokes
-
-
-default : Drawing
-default =
-    DrawLine Arrow
-
-
-defaultShape : Drawing
-defaultShape =
-    DrawShape RoundedRect
-
-
-defaultSpotlight : Drawing
-defaultSpotlight =
-    DrawSpotlight RoundedRect
 
 
 shapes : List Drawing

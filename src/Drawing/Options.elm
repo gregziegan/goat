@@ -1,4 +1,4 @@
-module Drawing.Options exposing (DrawingStyles, Fill, FontSize, StrokeColor, StrokeStyle(..), defaults, fills, fontSizes, strokeColors, strokeStyles)
+module Drawing.Options exposing (DrawingStyles, Fill, FontSize, StrokeColor, StrokeStyle(..), fills, fontSizes, strokeColors, strokeStyles)
 
 import Color exposing (Color)
 import Palette
@@ -86,8 +86,3 @@ fontSizes =
     , 32
     , 40
     ]
-
-
-defaults : DrawingStyles
-defaults =
-    DrawingStyles Palette.purple Nothing SolidMedium 20

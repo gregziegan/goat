@@ -417,7 +417,7 @@ finishTextDrawing pos model =
             Array.length model.edits.present
 
         styles =
-            Controls.styles model.controls
+            model.controls.drawingStyles
     in
     case EditState.finishTextDrawing pos numAnnotations styles model.editState of
         Ok ( newEditState, drawingInfo ) ->
@@ -446,7 +446,7 @@ finishDrawing : Position -> Model -> ( Model, Cmd Msg )
 finishDrawing pos model =
     let
         styles =
-            Controls.styles model.controls
+            model.controls.drawingStyles
     in
     case Controls.getDrawing model.controls of
         DrawFreeHand ->
@@ -961,7 +961,7 @@ isCtrlPressed pressedKeys os =
 
 toDrawingModifiers : Model -> DrawingModifiers
 toDrawingModifiers model =
-    DrawingModifiers (Controls.getDrawing model.controls) (shouldConstrain model) model.editState (Controls.styles model.controls)
+    DrawingModifiers (Controls.getDrawing model.controls) (shouldConstrain model) model.editState model.controls.drawingStyles
 
 
 translateArrowHead : Int -> StartPosition -> EndPosition -> MovingInfo -> List (Svg.Attribute Msg)
@@ -1041,7 +1041,7 @@ viewDrawingHelper { drawing, constrain, styles } isInMask { start, curPos, posit
                     Svg.ellipse (shapeAttrs shapeType) []
 
         DrawTextBox ->
-            Svg.rect ((shapeAttributes Rect <| Shape start curPos Palette.gray Drawing.Options.defaults.strokeStyle) Nothing ++ [ Attr.strokeWidth "1" ]) []
+            Svg.rect ((shapeAttributes Rect <| Shape start curPos Palette.gray Controls.defaultDrawingStyles.strokeStyle) Nothing ++ [ Attr.strokeWidth "1" ]) []
 
         DrawSpotlight shapeType ->
             case shapeType of
@@ -1592,7 +1592,7 @@ content : Environment -> Image -> Model -> Html Msg
 content env image model =
     let
         styles =
-            Controls.styles model.controls
+            model.controls.drawingStyles
 
         annotationModifiers =
             { config = annotationConfig styles
