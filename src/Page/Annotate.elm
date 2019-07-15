@@ -6,7 +6,7 @@ import AutoExpand
 import Browser.Dom as Dom
 import Color exposing (Color)
 import Controls
-import Drawing exposing (AttributeDropdown(..), Drawing(..), LineType(..), Shape, ShapeType(..), calcLinePos, calcShapePos, lineAttributes, rectAttrs, shapeAttributes)
+import Drawing exposing (Drawing(..), LineType(..), Shape, ShapeType(..), calcLinePos, calcShapePos, lineAttributes, rectAttrs, shapeAttributes)
 import Drawing.Options exposing (DrawingStyles, StrokeColor, StrokeStyle(..))
 import DrawingArea
 import DrawingArea.Definitions as Definitions
@@ -1027,7 +1027,7 @@ viewDrawingHelper { drawing, constrain, styles } isInMask { start, curPos, posit
                     Svg.path (lineAttrs lineType) []
 
         DrawFreeHand ->
-            Drawing.viewFreeDraw (Shape start curPos strokeColor strokeStyle) positions []
+            Drawing.viewFreeDraw (Shape start curPos strokeColor strokeStyle) positions
 
         DrawShape shapeType ->
             case shapeType of

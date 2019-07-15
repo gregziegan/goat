@@ -1,10 +1,10 @@
-module Drawing exposing (ArrowAttributes, AttributeDropdown(..), Drawing(..), LineType(..), Shape, ShapeType(..), calcLinePos, calcShapePos, equal, freeDrawAttributes, icon, isSpotlight, lineAttributes, rectAttrs, shapeAttributes, shapes, spotlights, toString, viewArrow, viewFreeDraw)
+module Drawing exposing (ArrowAttributes, Drawing(..), LineType(..), Shape, ShapeType(..), calcLinePos, calcShapePos, equal, freeDrawAttributes, icon, isSpotlight, lineAttributes, rectAttrs, shapeAttributes, shapes, spotlights, toString, viewArrow, viewFreeDraw)
 
 import Color exposing (Color)
 import Drawing.Options exposing (Fill, StrokeColor, StrokeStyle(..))
 import Environment exposing (OperatingSystem(..))
 import Icons
-import Position exposing (EndPosition, Position, StartPosition, calcDistance)
+import Position exposing (EndPosition, Position, StartPosition)
 import Svg exposing (Svg)
 import Svg.Attributes as Attr exposing (d, fill, filter, stroke, transform)
 
@@ -35,15 +35,6 @@ type Drawing
     | DrawTextBox
     | DrawSpotlight ShapeType
     | DrawPixelate
-
-
-type AttributeDropdown
-    = ShapesDropdown
-    | SpotlightsDropdown
-    | Fonts
-    | Fills
-    | StrokeColors
-    | Strokes
 
 
 shapes : List Drawing
@@ -334,8 +325,8 @@ freeDrawAttributes shape positions =
         ++ strokeAttrs shape.strokeStyle shape.strokeColor
 
 
-viewFreeDraw : Shape -> List Position -> List (Svg.Attribute msg) -> Svg msg
-viewFreeDraw shape positions attrs =
+viewFreeDraw : Shape -> List Position -> Svg msg
+viewFreeDraw shape positions =
     Svg.path (freeDrawAttributes shape positions) []
 
 

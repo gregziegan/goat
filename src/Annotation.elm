@@ -23,10 +23,10 @@ import AutoExpand
 import Color exposing (Color)
 import Controls
 import Drawing exposing (Drawing(..), LineType, Shape, ShapeType, calcLinePos, calcShapePos)
-import Drawing.Options as Drawing exposing (DrawingStyles, StrokeColor, StrokeStyle(..))
+import Drawing.Options exposing (DrawingStyles, StrokeStyle(..))
 import EditState exposing (ResizingInfo)
 import Html.Attributes
-import Position exposing (EndPosition, Position, StartPosition)
+import Position exposing (Position)
 
 
 type alias Config =

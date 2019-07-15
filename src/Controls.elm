@@ -1,7 +1,7 @@
-module Controls exposing (Config, Msg, State, closeDropdown, defaultDrawingStyles, initialState, onKeyDown, subscriptions, update, view)
+module Controls exposing (Config, Dropdown, DropdownTrigger(..), DropdownType(..), Msg(..), State, closeDropdown, defaultDrawingStyles, initialState, onKeyDown, subscriptions, update, view)
 
 import Color exposing (Color)
-import Drawing exposing (AttributeDropdown(..), Drawing(..), LineType(..), ShapeType(..))
+import Drawing exposing (Drawing(..), LineType(..), ShapeType(..))
 import Drawing.Options as Drawing exposing (DrawingStyles, Fill, FontSize, StrokeColor, StrokeStyle(..))
 import Environment exposing (OperatingSystem(..))
 import EventUtils exposing (stopPropagationAndDefault)
@@ -16,17 +16,31 @@ import Time
 
 
 type DropdownTrigger
-    = DelayedDropdown
+    = DelayedDropdown { waiting : Bool }
     | ImmediateDropdown
 
 
+type DropdownType
+    = ShapesDropdown
+    | SpotlightsDropdown
+    | Fonts
+    | Fills
+    | StrokeColors
+    | Strokes
+
+
+type alias Dropdown =
+    { trigger : DropdownTrigger
+    , kind : DropdownType
+    }
+
+
 type alias State =
-    { currentDropdown : Maybe AttributeDropdown
+    { currentDropdown : Maybe Dropdown
     , drawing : Drawing
     , shape : Drawing
     , spotlight : Drawing
     , drawingStyles : DrawingStyles
-    , waitingForDropdownToggle : Maybe AttributeDropdown
     }
 
 
@@ -39,8 +53,7 @@ type alias Config =
 type alias DropdownConfig selection =
     { toTitle : selection -> String
     , selected : selection
-    , trigger : DropdownTrigger
-    , render : AttributeDropdown -> Html Msg
+    , render : DropdownType -> Html Msg
     }
 
 
@@ -49,7 +62,6 @@ initialState =
     { drawing = DrawLine Arrow
     , shape = DrawShape RoundedRect
     , spotlight = DrawSpotlight RoundedRect
-    , waitingForDropdownToggle = Nothing
     , drawingStyles = defaultDrawingStyles
     , currentDropdown = Nothing
     }
@@ -110,9 +122,9 @@ type Msg
     | SelectStrokeColor Color
     | SelectStrokeStyle StrokeStyle
     | SelectFontSize Int
-    | WaitForDropdownToggle AttributeDropdown
+    | WaitForDropdownToOpen Dropdown
     | CancelDropdownWait
-    | ToggleDropdown AttributeDropdown
+    | ToggleDropdown Dropdown
 
 
 update : Msg -> State -> State
@@ -138,19 +150,14 @@ update msg state =
                 |> updateStyles (setFontSize newFontSize state.drawingStyles)
                 |> closeDropdown
 
-        WaitForDropdownToggle attributeDropdown ->
-            state
-                |> waitForDropdownToggle attributeDropdown
-                |> closeDropdown
+        WaitForDropdownToOpen dropdown ->
+            waitForDropdownOpen dropdown state
 
         CancelDropdownWait ->
-            state
-                |> cancelWaitForDropdownToggle
+            cancelDelayedDropdown state
 
-        ToggleDropdown editOption ->
-            state
-                |> toggleDropdown editOption
-                |> cancelWaitForDropdownToggle
+        ToggleDropdown dropdown ->
+            toggleDropdown dropdown state
 
         ChangeDrawing newDrawing ->
             state
@@ -195,16 +202,16 @@ onKeyDown key state =
             { state | drawing = DrawPixelate }
 
         Character "N" ->
-            toggleDropdown Fonts state
+            toggleDropdown (dropdownFromType Fonts) state
 
         Character "K" ->
-            toggleDropdown StrokeColors state
+            toggleDropdown (dropdownFromType StrokeColors) state
 
         Character "F" ->
-            toggleDropdown Fills state
+            toggleDropdown (dropdownFromType Fills) state
 
         Character "S" ->
-            toggleDropdown Strokes state
+            toggleDropdown (dropdownFromType Strokes) state
 
         _ ->
             state
@@ -258,22 +265,48 @@ closeDropdown state =
     { state | currentDropdown = Nothing }
 
 
-toggleDropdown : AttributeDropdown -> State -> State
-toggleDropdown attributeDropdown state =
+dropdownFromType : DropdownType -> Dropdown
+dropdownFromType dropdownType =
+    let
+        fromTrigger trigger =
+            { kind = dropdownType, trigger = trigger }
+    in
+    case dropdownType of
+        ShapesDropdown ->
+            fromTrigger (DelayedDropdown { waiting = False })
+
+        SpotlightsDropdown ->
+            fromTrigger (DelayedDropdown { waiting = False })
+
+        StrokeColors ->
+            fromTrigger ImmediateDropdown
+
+        Fills ->
+            fromTrigger ImmediateDropdown
+
+        Strokes ->
+            fromTrigger ImmediateDropdown
+
+        Fonts ->
+            fromTrigger ImmediateDropdown
+
+
+toggleDropdown : Dropdown -> State -> State
+toggleDropdown dropdown state =
     { state
         | currentDropdown =
             case state.currentDropdown of
-                Just dropdown ->
-                    if dropdown == attributeDropdown then
+                Just selected ->
+                    if selected == dropdown then
                         Nothing
 
                     else
-                        Just attributeDropdown
+                        Just dropdown
 
                 Nothing ->
-                    Just attributeDropdown
+                    Just dropdown
         , drawing =
-            case attributeDropdown of
+            case dropdown.kind of
                 ShapesDropdown ->
                     state.shape
 
@@ -288,12 +321,12 @@ toggleDropdown attributeDropdown state =
     }
 
 
-waitForDropdownToggle : AttributeDropdown -> State -> State
-waitForDropdownToggle attributeDropdown state =
+waitForDropdownOpen : Dropdown -> State -> State
+waitForDropdownOpen dropdown state =
     { state
-        | waitingForDropdownToggle = Just attributeDropdown
+        | currentDropdown = Just (setWaiting True dropdown)
         , drawing =
-            case attributeDropdown of
+            case dropdown.kind of
                 ShapesDropdown ->
                     state.shape
 
@@ -305,9 +338,35 @@ waitForDropdownToggle attributeDropdown state =
     }
 
 
-cancelWaitForDropdownToggle : State -> State
-cancelWaitForDropdownToggle state =
-    { state | waitingForDropdownToggle = Nothing }
+setWaiting : Bool -> Dropdown -> Dropdown
+setWaiting waiting dropdown =
+    { dropdown
+        | trigger =
+            case dropdown.trigger of
+                DelayedDropdown _ ->
+                    DelayedDropdown { waiting = waiting }
+
+                ImmediateDropdown ->
+                    dropdown.trigger
+    }
+
+
+cancelDelayedDropdown : State -> State
+cancelDelayedDropdown state =
+    { state
+        | currentDropdown =
+            case state.currentDropdown of
+                Just dropdown ->
+                    case dropdown.trigger of
+                        DelayedDropdown { waiting } ->
+                            Nothing
+
+                        ImmediateDropdown ->
+                            state.currentDropdown
+
+                Nothing ->
+                    state.currentDropdown
+    }
 
 
 changeShapeAndSpotlightDropdowns : Drawing -> State -> State
@@ -337,12 +396,12 @@ changeShapeAndSpotlightDropdowns drawing state =
             state
 
 
-viewDropdownMenu : Config -> State -> AttributeDropdown -> Html Msg
+viewDropdownMenu : Config -> State -> DropdownType -> Html Msg
 viewDropdownMenu config { currentDropdown, drawing } selection =
     case currentDropdown of
         Just dropdown ->
-            if selection == dropdown then
-                viewDropdown config.styles drawing dropdown
+            if selection == dropdown.kind then
+                viewDropdown config.styles drawing dropdown.kind
 
             else
                 text ""
@@ -355,17 +414,17 @@ viewDropdownMenu config { currentDropdown, drawing } selection =
 -- VIEW
 
 
-dropdownEvents : Drawing -> AttributeDropdown -> DropdownTrigger -> List (Html.Attribute Msg)
-dropdownEvents drawing attributeDropdown dropdownTrigger =
-    case dropdownTrigger of
-        DelayedDropdown ->
+dropdownEvents : Drawing -> Dropdown -> List (Html.Attribute Msg)
+dropdownEvents drawing dropdown =
+    case dropdown.trigger of
+        DelayedDropdown _ ->
             [ stopPropagationAndDefault "contextmenu" (Decode.succeed (ChangeDrawing drawing))
-            , onMouseDown (WaitForDropdownToggle attributeDropdown)
+            , onMouseDown (WaitForDropdownToOpen dropdown)
             , onMouseUp CancelDropdownWait
             ]
 
         ImmediateDropdown ->
-            [ Html.Events.onClick (ToggleDropdown attributeDropdown)
+            [ Html.Events.onClick (ToggleDropdown dropdown)
             ]
 
 
@@ -379,7 +438,7 @@ shapesDropdown config drawing =
                 ]
              , title (config.toTitle drawing)
              ]
-                ++ dropdownEvents drawing ShapesDropdown DelayedDropdown
+                ++ dropdownEvents drawing (dropdownFromType ShapesDropdown)
             )
             [ Drawing.icon drawing
             , Icons.viewCornerArrow
@@ -399,7 +458,7 @@ spotlightsDropdown config drawing =
                 ]
              , title (config.toTitle drawing)
              ]
-                ++ dropdownEvents drawing SpotlightsDropdown DelayedDropdown
+                ++ dropdownEvents drawing (dropdownFromType SpotlightsDropdown)
             )
             [ Drawing.icon drawing
             , Icons.viewCornerArrow
@@ -421,7 +480,7 @@ strokeColorDropdown config strokeColor =
             ([ class "drawing-button"
              , title (config.toTitle ())
              ]
-                ++ dropdownEvents placeholderDrawing StrokeColors ImmediateDropdown
+                ++ dropdownEvents placeholderDrawing (dropdownFromType StrokeColors)
             )
             [ Icons.viewStrokeColor strokeColor
             ]
@@ -436,7 +495,7 @@ strokeStylesDropdown config strokeStyle =
             ([ class "drawing-button"
              , title (config.toTitle ())
              ]
-                ++ dropdownEvents placeholderDrawing Strokes ImmediateDropdown
+                ++ dropdownEvents placeholderDrawing (dropdownFromType Strokes)
             )
             [ Icons.viewStrokeStyle strokeStyle
             ]
@@ -451,7 +510,7 @@ fillsDropdown config fill =
             ([ class "drawing-button"
              , title (config.toTitle ())
              ]
-                ++ dropdownEvents placeholderDrawing Fills ImmediateDropdown
+                ++ dropdownEvents placeholderDrawing (dropdownFromType Fills)
             )
             [ Icons.viewFill fill
             ]
@@ -466,7 +525,7 @@ fontSizesDropdown config =
             ([ class "drawing-button"
              , title (config.toTitle ())
              ]
-                ++ dropdownEvents placeholderDrawing Fonts ImmediateDropdown
+                ++ dropdownEvents placeholderDrawing (dropdownFromType Fonts)
             )
             [ Icons.viewFontSize
             ]
@@ -564,7 +623,7 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         [ Icons.viewStrokeStyle strokeStyle ]
 
 
-viewDropdown : DrawingStyles -> Drawing -> AttributeDropdown -> Html Msg
+viewDropdown : DrawingStyles -> Drawing -> DropdownType -> Html Msg
 viewDropdown { fill, strokeColor, strokeStyle, fontSize } drawing dropdown =
     case dropdown of
         ShapesDropdown ->
@@ -631,28 +690,26 @@ view config ({ drawing, shape, spotlight } as state) =
         drawingDropdownConfig =
             { toTitle = toTitle
             , selected = drawing
-            , trigger = DelayedDropdown
             , render = toDropdown
             }
 
-        toAttributeDropdownConfig title =
+        toDropdownConfig title =
             { toTitle = always title
             , selected = ()
-            , trigger = ImmediateDropdown
             , render = toDropdown
             }
 
         strokeColorsConfig =
-            toAttributeDropdownConfig (toStrokeColorsTitle config.os)
+            toDropdownConfig (toStrokeColorsTitle config.os)
 
         fillConfig =
-            toAttributeDropdownConfig (toFillsTitle config.os)
+            toDropdownConfig (toFillsTitle config.os)
 
         strokeStyleConfig =
-            toAttributeDropdownConfig (toStrokeStylesTitle config.os)
+            toDropdownConfig (toStrokeStylesTitle config.os)
 
         fontSizeConfig =
-            toAttributeDropdownConfig (toFontSizeTitle config.os)
+            toDropdownConfig (toFontSizeTitle config.os)
     in
     div [ class "columns" ]
         [ button buttonConfig (DrawLine Arrow)
@@ -670,9 +727,18 @@ view config ({ drawing, shape, spotlight } as state) =
 
 subscriptions : State -> Sub Msg
 subscriptions state =
-    case state.waitingForDropdownToggle of
+    case state.currentDropdown of
         Nothing ->
             Sub.none
 
-        Just attributeDropdown ->
-            Time.every 200 (\_ -> ToggleDropdown attributeDropdown)
+        Just dropdown ->
+            case dropdown.trigger of
+                DelayedDropdown { waiting } ->
+                    if waiting then
+                        Time.every 200 (\_ -> ToggleDropdown dropdown)
+
+                    else
+                        Sub.none
+
+                ImmediateDropdown ->
+                    Sub.none

@@ -1,24 +1,15 @@
 module ControlsTests exposing (suite)
 
 import Color exposing (Color)
-import Controls exposing (State, initialState)
-import Drawing exposing (AttributeDropdown(..), Drawing(..), LineType(..), ShapeType(..))
-import Drawing.Options as Options exposing (DrawingStyles, StrokeStyle(..))
+import Controls exposing (Dropdown, DropdownTrigger(..), DropdownType(..), Msg(..), State, initialState)
+import Drawing exposing (Drawing(..), LineType(..), ShapeType(..))
+import Drawing.Options as Options exposing (DrawingStyles, Fill, FontSize, StrokeColor, StrokeStyle(..))
 import Expect exposing (Expectation)
 import Fuzz exposing (int)
+import Helpers.Controls exposing (..)
 import Keyboard exposing (Key(..))
 import Palette
 import Test exposing (..)
-
-
-key : String -> Key
-key character =
-    Character character
-
-
-withDropdown : AttributeDropdown -> State -> State
-withDropdown dropdown state =
-    { state | currentDropdown = Just dropdown }
 
 
 defaultDrawingStylesSuite : DrawingStyles -> Test
@@ -55,23 +46,20 @@ suite =
             , test "has no selected dropdown" <|
                 \_ ->
                     Expect.equal Nothing initialState.currentDropdown
-            , test "is not waiting for a dropdown" <|
-                \_ ->
-                    Expect.equal Nothing initialState.waitingForDropdownToggle
             , defaultDrawingStylesSuite initialState.drawingStyles
             ]
-        , describe "closeDropdown" <|
+        , describe "closeDropdown"
             [ test "unselects dropdown" <|
                 \_ ->
                     initialState
-                        |> withDropdown ShapesDropdown
+                        |> withDropdown shapesDropdown
                         |> Controls.closeDropdown
                         |> .currentDropdown
                         |> Expect.equal Nothing
             ]
         , defaultDrawingStylesSuite Controls.defaultDrawingStyles
-        , describe "onKeyDown" <|
-            [ describe "when A is pressed" <|
+        , describe "onKeyDown"
+            [ describe "when A is pressed"
                 [ test "the arrow is selected" <|
                     \_ ->
                         { initialState | drawing = DrawFreeHand }
@@ -79,7 +67,7 @@ suite =
                             |> .drawing
                             |> Expect.equal (DrawLine Arrow)
                 ]
-            , describe "when C is pressed" <|
+            , describe "when C is pressed"
                 [ test "selects the rounded rectangle spotlight" <|
                     \_ ->
                         initialState
@@ -93,7 +81,7 @@ suite =
                             |> .spotlight
                             |> Expect.equal (DrawSpotlight RoundedRect)
                 ]
-            , describe "when H is pressed" <|
+            , describe "when H is pressed"
                 [ test "selects free hand" <|
                     \_ ->
                         initialState
@@ -101,7 +89,7 @@ suite =
                             |> .drawing
                             |> Expect.equal DrawFreeHand
                 ]
-            , describe "when L is pressed" <|
+            , describe "when L is pressed"
                 [ test "selects the line" <|
                     \_ ->
                         initialState
@@ -123,7 +111,7 @@ suite =
                             |> .shape
                             |> Expect.equal (DrawShape Rect)
                 ]
-            , describe "when O is pressed" <|
+            , describe "when O is pressed"
                 [ test "selects the rounded rectangle" <|
                     \_ ->
                         initialState
@@ -137,7 +125,7 @@ suite =
                             |> .shape
                             |> Expect.equal (DrawShape RoundedRect)
                 ]
-            , describe "when E is pressed" <|
+            , describe "when E is pressed"
                 [ test "selects the ellipse" <|
                     \_ ->
                         initialState
@@ -151,7 +139,7 @@ suite =
                             |> .shape
                             |> Expect.equal (DrawShape Ellipse)
                 ]
-            , describe "when T is pressed" <|
+            , describe "when T is pressed"
                 [ test "selects the text box" <|
                     \_ ->
                         initialState
@@ -200,7 +188,7 @@ suite =
                     [ test "closes the dropdown" <|
                         \_ ->
                             initialState
-                                |> withDropdown Fonts
+                                |> withDropdown (toImmediateDropdown Fonts)
                                 |> Controls.onKeyDown (key "N")
                                 |> .currentDropdown
                                 |> Expect.equal Nothing
@@ -211,7 +199,7 @@ suite =
                             initialState
                                 |> Controls.onKeyDown (key "N")
                                 |> .currentDropdown
-                                |> Expect.equal (Just Fonts)
+                                |> Expect.equal (Just (toImmediateDropdown Fonts))
                     , test "selects the textbox" <|
                         \_ ->
                             initialState
@@ -223,14 +211,14 @@ suite =
                     [ test "opens the fonts dropdown" <|
                         \_ ->
                             initialState
-                                |> withDropdown Fills
+                                |> withDropdown (toImmediateDropdown Fills)
                                 |> Controls.onKeyDown (key "N")
                                 |> .currentDropdown
-                                |> Expect.equal (Just Fonts)
+                                |> Expect.equal (Just (toImmediateDropdown Fonts))
                     , test "selects the textbox" <|
                         \_ ->
                             initialState
-                                |> withDropdown Fills
+                                |> withDropdown (toImmediateDropdown Fills)
                                 |> Controls.onKeyDown (key "N")
                                 |> .drawing
                                 |> Expect.equal DrawTextBox
@@ -241,7 +229,7 @@ suite =
                     [ test "closes the dropdown" <|
                         \_ ->
                             initialState
-                                |> withDropdown StrokeColors
+                                |> withDropdown (toImmediateDropdown StrokeColors)
                                 |> Controls.onKeyDown (key "K")
                                 |> .currentDropdown
                                 |> Expect.equal Nothing
@@ -252,16 +240,16 @@ suite =
                             initialState
                                 |> Controls.onKeyDown (key "K")
                                 |> .currentDropdown
-                                |> Expect.equal (Just StrokeColors)
+                                |> Expect.equal (Just (toImmediateDropdown StrokeColors))
                     ]
                 , describe "and another dropdown is open"
                     [ test "opens the stroke colors dropdown" <|
                         \_ ->
                             initialState
-                                |> withDropdown Fills
+                                |> withDropdown (toImmediateDropdown Fills)
                                 |> Controls.onKeyDown (key "K")
                                 |> .currentDropdown
-                                |> Expect.equal (Just StrokeColors)
+                                |> Expect.equal (Just (toImmediateDropdown StrokeColors))
                     ]
                 ]
             , describe "when F is pressed"
@@ -269,7 +257,7 @@ suite =
                     [ test "closes the dropdown" <|
                         \_ ->
                             initialState
-                                |> withDropdown Fills
+                                |> withDropdown (toImmediateDropdown Fills)
                                 |> Controls.onKeyDown (key "F")
                                 |> .currentDropdown
                                 |> Expect.equal Nothing
@@ -280,16 +268,16 @@ suite =
                             initialState
                                 |> Controls.onKeyDown (key "F")
                                 |> .currentDropdown
-                                |> Expect.equal (Just Fills)
+                                |> Expect.equal (Just (toImmediateDropdown Fills))
                     ]
                 , describe "and another dropdown is open"
                     [ test "opens the fills dropdown" <|
                         \_ ->
                             initialState
-                                |> withDropdown StrokeColors
+                                |> withDropdown (toImmediateDropdown StrokeColors)
                                 |> Controls.onKeyDown (key "F")
                                 |> .currentDropdown
-                                |> Expect.equal (Just Fills)
+                                |> Expect.equal (Just (toImmediateDropdown Fills))
                     ]
                 ]
             , describe "when S is pressed"
@@ -297,7 +285,7 @@ suite =
                     [ test "closes the dropdown" <|
                         \_ ->
                             initialState
-                                |> withDropdown Strokes
+                                |> withDropdown (toImmediateDropdown Strokes)
                                 |> Controls.onKeyDown (key "S")
                                 |> .currentDropdown
                                 |> Expect.equal Nothing
@@ -308,17 +296,136 @@ suite =
                             initialState
                                 |> Controls.onKeyDown (key "S")
                                 |> .currentDropdown
-                                |> Expect.equal (Just Strokes)
+                                |> Expect.equal (Just (toImmediateDropdown Strokes))
                     ]
                 , describe "and another dropdown is open"
                     [ test "opens the strokes dropdown" <|
                         \_ ->
                             initialState
-                                |> withDropdown StrokeColors
+                                |> withDropdown (toImmediateDropdown StrokeColors)
                                 |> Controls.onKeyDown (key "S")
                                 |> .currentDropdown
-                                |> Expect.equal (Just Strokes)
+                                |> Expect.equal (Just (toImmediateDropdown Strokes))
                     ]
+                ]
+            ]
+        , describe "update"
+            [ describe "when selecting a fill"
+                [ test "updates the fill" <|
+                    \_ ->
+                        initialState
+                            |> Controls.update (SelectFill fill)
+                            |> .drawingStyles
+                            |> .fill
+                            |> Expect.equal fill
+                , test "closes the dropdown" <|
+                    \_ ->
+                        initialState
+                            |> withDropdown (toImmediateDropdown Fills)
+                            |> Controls.update (SelectFill fill)
+                            |> .currentDropdown
+                            |> Expect.equal Nothing
+                ]
+            , describe "when selecting a stroke color"
+                [ test "updates the stroke color" <|
+                    \_ ->
+                        initialState
+                            |> Controls.update (SelectStrokeColor strokeColor)
+                            |> .drawingStyles
+                            |> .strokeColor
+                            |> Expect.equal strokeColor
+                , test "closes the dropdown" <|
+                    \_ ->
+                        initialState
+                            |> withDropdown (toImmediateDropdown StrokeColors)
+                            |> Controls.update (SelectStrokeColor strokeColor)
+                            |> .currentDropdown
+                            |> Expect.equal Nothing
+                ]
+            , describe "when selecting a stroke style"
+                [ test "updates the stroke style" <|
+                    \_ ->
+                        initialState
+                            |> Controls.update (SelectStrokeStyle strokeStyle)
+                            |> .drawingStyles
+                            |> .strokeStyle
+                            |> Expect.equal strokeStyle
+                , test "closes the dropdown" <|
+                    \_ ->
+                        initialState
+                            |> withDropdown (toImmediateDropdown Strokes)
+                            |> Controls.update (SelectStrokeStyle strokeStyle)
+                            |> .currentDropdown
+                            |> Expect.equal Nothing
+                ]
+            , describe "when selecting a font size"
+                [ test "updates the font size" <|
+                    \_ ->
+                        initialState
+                            |> Controls.update (SelectFontSize fontSize)
+                            |> .drawingStyles
+                            |> .fontSize
+                            |> Expect.equal fontSize
+                , test "closes the dropdown" <|
+                    \_ ->
+                        initialState
+                            |> withDropdown (toImmediateDropdown Fonts)
+                            |> Controls.update (SelectFontSize fontSize)
+                            |> .currentDropdown
+                            |> Expect.equal Nothing
+                ]
+            , describe "when waiting for a dropdown to open"
+                [ test "tracks the dropdown with waiting set to true" <|
+                    \_ ->
+                        initialState
+                            |> Controls.update (WaitForDropdownToOpen shapesDropdown)
+                            |> .currentDropdown
+                            |> Maybe.map isWaiting
+                            |> Maybe.withDefault False
+                            |> Expect.true "Expected a delayed dropdown with waiting set to true"
+                ]
+            , describe "when cancelling a delayed dropdown"
+                [ test "it stops tracking the dropdown" <|
+                    \_ ->
+                        { initialState | currentDropdown = Just waitingDropdown }
+                            |> Controls.update CancelDropdownWait
+                            |> .currentDropdown
+                            |> Expect.equal Nothing
+                ]
+            , describe "when toggling a dropdown"
+                [ describe "and the dropdown is open"
+                    [ test "it closes the dropdown" <|
+                        \_ ->
+                            initialState
+                                |> withDropdown (toImmediateDropdown Fills)
+                                |> Controls.update (ToggleDropdown (toImmediateDropdown Fills))
+                                |> .currentDropdown
+                                |> Expect.equal Nothing
+                    ]
+                , describe "and the dropdown is closed"
+                    [ test "it opens the dropdown" <|
+                        \_ ->
+                            initialState
+                                |> Controls.update (ToggleDropdown (toImmediateDropdown Fills))
+                                |> .currentDropdown
+                                |> Maybe.map (Expect.equal (toImmediateDropdown Fills))
+                                |> Maybe.withDefault (Expect.fail "Expected a dropdown to be open")
+                    ]
+                ]
+            , describe "when changing the selected drawing" <|
+                [ test "it closes any dropdowns" <|
+                    \_ ->
+                        initialState
+                            |> withDropdown (toImmediateDropdown Fills)
+                            |> Controls.update (ChangeDrawing DrawFreeHand)
+                            |> .currentDropdown
+                            |> Expect.equal Nothing
+                , test "it tracks the new drawing" <|
+                    \_ ->
+                        initialState
+                            |> Controls.update (ChangeDrawing DrawFreeHand)
+                            |> .drawing
+                            |> Expect.equal DrawFreeHand
                 ]
             ]
         ]
