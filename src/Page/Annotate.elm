@@ -135,7 +135,7 @@ updateSelected : Annotation -> SelectedMsg -> Model -> ( Model, Cmd Msg )
 updateSelected annotation msg model =
     case msg of
         FocusTextArea ->
-            ( Debug.log "focused" <| startEditingText annotation model
+            ( startEditingText annotation model
             , textAreaDomId annotation.id
                 |> Dom.focus
                 |> Task.attempt (tryToEdit annotation.id)
@@ -161,12 +161,11 @@ updateSelected annotation msg model =
             ( model
                 |> editTextBoxAnnotation annotation state textValue
                 |> alterControls Controls.closeDropdown
-                |> Debug.log "model"
             , Cmd.none
             )
 
         FinishEditingText ->
-            ( Debug.log "model" <| finishEditingText annotation model
+            ( finishEditingText annotation model
             , Cmd.none
             )
 
@@ -227,7 +226,7 @@ updateSelected annotation msg model =
 
 update : Environment -> Image -> Msg -> Model -> ( Model, Cmd Msg )
 update env image msg ({ pressedKeys } as model) =
-    case Debug.log "msg" msg of
+    case msg of
         StartDrawing pos ->
             ( model
                 |> startDrawing pos
@@ -432,7 +431,7 @@ finishValidDrawing annotation model =
         numAnnotations =
             Array.length model.edits.present
     in
-    ( Debug.log "finishedDrawing" { model | edits = UndoList.mapPresent (Array.set annotation.id annotation) model.edits }
+    ( { model | edits = UndoList.mapPresent (Array.set annotation.id annotation) model.edits }
     , case annotation.choice of
         TextBox ->
             textAreaDomId (numAnnotations - 1)
@@ -985,11 +984,23 @@ viewDrawingArea { editState, edits, controls } image =
         [ viewSvgArea controls editState (Array.toList edits.present) image ]
 
 
+withMask : List Annotation -> List (Svg Msg) -> List (Svg Msg)
+withMask annotations svgs =
+    case List.Extra.findIndex (Annotation.isSpotlight << .choice) annotations of
+        Just index ->
+            List.take index svgs ++ [ DrawingArea.viewMask ] ++ List.drop index svgs
+
+        Nothing ->
+            svgs
+
+
 viewSvgArea : Controls.State -> EditState -> List Annotation -> Image -> Svg Msg
 viewSvgArea controls editState annotations image =
     let
         svgAnnotations =
-            List.indexedMap (viewAnnotation controls editState) annotations
+            annotations
+                |> List.indexedMap (viewAnnotation controls editState)
+                |> withMask annotations
 
         svgs =
             Svg.lazy viewPixelatedImage image :: Svg.lazy viewImage image :: svgAnnotations

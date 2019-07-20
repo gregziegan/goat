@@ -306,18 +306,17 @@ dropdownFromType dropdownType =
 
 toggleDropdown : Dropdown -> State -> State
 toggleDropdown dropdown state =
+    let
+        currentDropdown =
+            Just (setWaiting False dropdown)
+    in
     { state
         | currentDropdown =
-            case state.currentDropdown of
-                Just selected ->
-                    if selected == dropdown then
-                        Nothing
+            if state.currentDropdown == currentDropdown then
+                Nothing
 
-                    else
-                        Just dropdown
-
-                Nothing ->
-                    Just dropdown
+            else
+                currentDropdown
         , annotation =
             case dropdown.kind of
                 ShapesDropdown ->
@@ -371,8 +370,12 @@ cancelDelayedDropdown state =
             case state.currentDropdown of
                 Just dropdown ->
                     case dropdown.trigger of
-                        DelayedDropdown _ ->
-                            Nothing
+                        DelayedDropdown { waiting } ->
+                            if waiting then
+                                Nothing
+
+                            else
+                                state.currentDropdown
 
                         ImmediateDropdown ->
                             state.currentDropdown
@@ -423,11 +426,19 @@ viewDropdownMenu : Config -> State -> DropdownType -> Html Msg
 viewDropdownMenu config { currentDropdown, annotation } selection =
     case currentDropdown of
         Just dropdown ->
-            if selection == dropdown.kind then
-                viewDropdown config.styles annotation dropdown.kind
+            case ( dropdown.kind == selection, dropdown.trigger ) of
+                ( False, _ ) ->
+                    text ""
 
-            else
-                text ""
+                ( True, DelayedDropdown { waiting } ) ->
+                    if waiting then
+                        text ""
+
+                    else
+                        viewDropdown config.styles annotation dropdown.kind
+
+                ( True, ImmediateDropdown ) ->
+                    viewDropdown config.styles annotation dropdown.kind
 
         Nothing ->
             text ""
@@ -879,7 +890,7 @@ subscriptions state =
             case dropdown.trigger of
                 DelayedDropdown { waiting } ->
                     if waiting then
-                        Time.every 200 (\_ -> ToggleDropdown dropdown)
+                        Time.every 200 (always (ToggleDropdown dropdown))
 
                     else
                         Sub.none
