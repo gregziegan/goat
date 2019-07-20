@@ -1,10 +1,10 @@
-module Drawing.Options exposing (DrawingStyles, Fill, FontSize, StrokeColor, StrokeStyle(..), fills, fontSizes, strokeColors, strokeStyles)
+module Annotation.Options exposing (AnnotationStyles, Fill, FontSize, StrokeColor, StrokeStyle(..), fills, fontSizes, strokeColors, strokeStyles)
 
 import Color exposing (Color)
 import Palette
 
 
-type alias DrawingStyles =
+type alias AnnotationStyles =
     { strokeColor : StrokeColor
     , fill : Fill
     , strokeStyle : StrokeStyle

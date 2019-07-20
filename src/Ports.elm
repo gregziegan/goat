@@ -1,4 +1,4 @@
-port module Ports exposing (exportToImage, listenForUpload, newImage, requestImages, reset, selectText, setImages)
+port module Ports exposing (exportToImage, listenForUpload, logError, newImage, requestImages, reset, selectText, setImages)
 
 import Json.Decode exposing (Value)
 
@@ -25,6 +25,9 @@ port requestImages : () -> Cmd msg
 {-| Select the text of a textarea with provided DOM id
 -}
 port selectText : String -> Cmd msg
+
+
+port logError : String -> Cmd msg
 
 
 

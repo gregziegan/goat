@@ -1,8 +1,8 @@
-module Controls exposing (Config, Dropdown, DropdownTrigger(..), DropdownType(..), Msg(..), State, closeDropdown, defaultDrawingStyles, initialState, onKeyDown, subscriptions, update, view)
+module Controls exposing (Config, Dropdown, DropdownTrigger(..), DropdownType(..), Msg(..), State, closeDropdown, initialState, onKeyDown, subscriptions, update, view)
 
+import Annotation exposing (Annotation, Choice(..))
+import Annotation.Options as Annotation exposing (AnnotationStyles, Fill, FontSize, StrokeColor, StrokeStyle(..))
 import Color exposing (Color)
-import Drawing exposing (Drawing(..), LineType(..), ShapeType(..))
-import Drawing.Options as Drawing exposing (DrawingStyles, Fill, FontSize, StrokeColor, StrokeStyle(..))
 import Environment exposing (OperatingSystem(..))
 import EventUtils exposing (stopPropagationAndDefault)
 import Html exposing (Html, div, text)
@@ -12,6 +12,7 @@ import Icons
 import Json.Decode as Decode
 import Keyboard exposing (Key(..))
 import Palette
+import Svg exposing (Svg)
 import Time
 
 
@@ -37,15 +38,15 @@ type alias Dropdown =
 
 type alias State =
     { currentDropdown : Maybe Dropdown
-    , drawing : Drawing
-    , shape : Drawing
-    , spotlight : Drawing
-    , drawingStyles : DrawingStyles
+    , annotation : Annotation.Choice
+    , shape : Annotation.Choice
+    , spotlight : Annotation.Choice
+    , annotationStyles : AnnotationStyles
     }
 
 
 type alias Config =
-    { styles : DrawingStyles
+    { styles : AnnotationStyles
     , os : OperatingSystem
     }
 
@@ -57,19 +58,31 @@ type alias DropdownConfig selection =
     }
 
 
+shapes : List Annotation.Choice
+shapes =
+    [ RoundedRectangle
+    , Rectangle
+    , Ellipse
+    , StraightLine
+    ]
+
+
+spotlights : List Annotation.Choice
+spotlights =
+    [ SpotlightRoundedRectangle
+    , SpotlightRectangle
+    , SpotlightEllipse
+    ]
+
+
 initialState : State
 initialState =
-    { drawing = DrawLine Arrow
-    , shape = DrawShape RoundedRect
-    , spotlight = DrawSpotlight RoundedRect
-    , drawingStyles = defaultDrawingStyles
+    { annotation = Arrow
+    , shape = RoundedRectangle
+    , spotlight = SpotlightRoundedRectangle
+    , annotationStyles = Annotation.defaultStyles
     , currentDropdown = Nothing
     }
-
-
-defaultDrawingStyles : DrawingStyles
-defaultDrawingStyles =
-    DrawingStyles Palette.purple Nothing SolidMedium 20
 
 
 toStrokeStylesTitle : OperatingSystem -> String
@@ -117,7 +130,7 @@ toFontSizeTitle os =
 
 
 type Msg
-    = ChangeDrawing Drawing
+    = ChangeAnnotation Annotation.Choice
     | SelectFill (Maybe Color)
     | SelectStrokeColor Color
     | SelectStrokeStyle StrokeStyle
@@ -132,22 +145,22 @@ update msg state =
     case msg of
         SelectFill newFill ->
             state
-                |> updateStyles (setFill newFill state.drawingStyles)
+                |> updateStyles (setFill newFill state.annotationStyles)
                 |> closeDropdown
 
         SelectStrokeColor newStrokeColor ->
             state
-                |> updateStyles (setStrokeColor newStrokeColor state.drawingStyles)
+                |> updateStyles (setStrokeColor newStrokeColor state.annotationStyles)
                 |> closeDropdown
 
         SelectStrokeStyle newStrokeStyle ->
             state
-                |> updateStyles (setStrokeStyle newStrokeStyle state.drawingStyles)
+                |> updateStyles (setStrokeStyle newStrokeStyle state.annotationStyles)
                 |> closeDropdown
 
         SelectFontSize newFontSize ->
             state
-                |> updateStyles (setFontSize newFontSize state.drawingStyles)
+                |> updateStyles (setFontSize newFontSize state.annotationStyles)
                 |> closeDropdown
 
         WaitForDropdownToOpen dropdown ->
@@ -159,9 +172,9 @@ update msg state =
         ToggleDropdown dropdown ->
             toggleDropdown dropdown state
 
-        ChangeDrawing newDrawing ->
+        ChangeAnnotation newAnnotation ->
             state
-                |> changeDrawing newDrawing
+                |> changeAnnotation newAnnotation
                 |> closeDropdown
 
 
@@ -169,37 +182,37 @@ onKeyDown : Key -> State -> State
 onKeyDown key state =
     case key of
         Character "A" ->
-            { state | drawing = DrawLine Arrow }
+            { state | annotation = Arrow }
 
         Character "C" ->
-            { state | drawing = DrawSpotlight RoundedRect, spotlight = DrawSpotlight RoundedRect }
+            { state | annotation = SpotlightRoundedRectangle, spotlight = SpotlightRoundedRectangle }
 
         Character "H" ->
-            { state | drawing = DrawFreeHand }
+            { state | annotation = FreeHand }
 
         Character "L" ->
-            { state | drawing = DrawLine StraightLine }
+            { state | annotation = StraightLine }
 
         Character "R" ->
-            { state | drawing = DrawShape Rect, shape = DrawShape Rect }
+            { state | annotation = Rectangle, shape = Rectangle }
 
         Character "O" ->
-            { state | drawing = DrawShape RoundedRect, shape = DrawShape RoundedRect }
+            { state | annotation = RoundedRectangle, shape = RoundedRectangle }
 
         Character "E" ->
-            { state | drawing = DrawShape Ellipse, shape = DrawShape Ellipse }
+            { state | annotation = Ellipse, shape = Ellipse }
 
         Character "T" ->
-            { state | drawing = DrawTextBox }
+            { state | annotation = TextBox }
 
         Character "G" ->
-            { state | drawing = DrawSpotlight Rect, spotlight = DrawSpotlight Rect }
+            { state | annotation = SpotlightRectangle, spotlight = SpotlightRectangle }
 
         Character "I" ->
-            { state | drawing = DrawSpotlight Ellipse, spotlight = DrawSpotlight Ellipse }
+            { state | annotation = SpotlightEllipse, spotlight = SpotlightEllipse }
 
         Character "P" ->
-            { state | drawing = DrawPixelate }
+            { state | annotation = Pixelate }
 
         Character "N" ->
             toggleDropdown (dropdownFromType Fonts) state
@@ -221,39 +234,39 @@ onKeyDown key state =
 -- SELECTION
 
 
-changeDrawing : Drawing -> State -> State
-changeDrawing drawing state =
-    { state | drawing = drawing }
-        |> changeShapeAndSpotlightDropdowns drawing
+changeAnnotation : Annotation.Choice -> State -> State
+changeAnnotation annotation state =
+    { state | annotation = annotation }
+        |> changeShapeAndSpotlightDropdowns annotation
 
 
-updateStyles : DrawingStyles -> State -> State
+updateStyles : AnnotationStyles -> State -> State
 updateStyles styles state =
-    { state | drawingStyles = styles }
+    { state | annotationStyles = styles }
 
 
-setFill : Maybe Color -> DrawingStyles -> DrawingStyles
+setFill : Maybe Color -> AnnotationStyles -> AnnotationStyles
 setFill fill styles =
     { styles
         | fill = fill
     }
 
 
-setFontSize : Int -> DrawingStyles -> DrawingStyles
+setFontSize : Int -> AnnotationStyles -> AnnotationStyles
 setFontSize fontSize styles =
     { styles
         | fontSize = fontSize
     }
 
 
-setStrokeStyle : StrokeStyle -> DrawingStyles -> DrawingStyles
+setStrokeStyle : StrokeStyle -> AnnotationStyles -> AnnotationStyles
 setStrokeStyle strokeStyle styles =
     { styles
         | strokeStyle = strokeStyle
     }
 
 
-setStrokeColor : Color -> DrawingStyles -> DrawingStyles
+setStrokeColor : Color -> AnnotationStyles -> AnnotationStyles
 setStrokeColor strokeColor styles =
     { styles
         | strokeColor = strokeColor
@@ -305,7 +318,7 @@ toggleDropdown dropdown state =
 
                 Nothing ->
                     Just dropdown
-        , drawing =
+        , annotation =
             case dropdown.kind of
                 ShapesDropdown ->
                     state.shape
@@ -314,10 +327,10 @@ toggleDropdown dropdown state =
                     state.spotlight
 
                 Fonts ->
-                    DrawTextBox
+                    TextBox
 
                 _ ->
-                    state.drawing
+                    state.annotation
     }
 
 
@@ -325,7 +338,7 @@ waitForDropdownOpen : Dropdown -> State -> State
 waitForDropdownOpen dropdown state =
     { state
         | currentDropdown = Just (setWaiting True dropdown)
-        , drawing =
+        , annotation =
             case dropdown.kind of
                 ShapesDropdown ->
                     state.shape
@@ -334,7 +347,7 @@ waitForDropdownOpen dropdown state =
                     state.spotlight
 
                 _ ->
-                    state.drawing
+                    state.annotation
     }
 
 
@@ -358,7 +371,7 @@ cancelDelayedDropdown state =
             case state.currentDropdown of
                 Just dropdown ->
                     case dropdown.trigger of
-                        DelayedDropdown { waiting } ->
+                        DelayedDropdown _ ->
                             Nothing
 
                         ImmediateDropdown ->
@@ -369,39 +382,49 @@ cancelDelayedDropdown state =
     }
 
 
-changeShapeAndSpotlightDropdowns : Drawing -> State -> State
-changeShapeAndSpotlightDropdowns drawing state =
-    case drawing of
-        DrawLine lineType ->
-            case lineType of
-                Arrow ->
-                    state
-
-                StraightLine ->
-                    { state | shape = drawing }
-
-        DrawFreeHand ->
+changeShapeAndSpotlightDropdowns : Annotation.Choice -> State -> State
+changeShapeAndSpotlightDropdowns choice state =
+    case choice of
+        Arrow ->
             state
 
-        DrawShape _ ->
-            { state | shape = drawing }
+        StraightLine ->
+            { state | shape = choice }
 
-        DrawTextBox ->
+        FreeHand ->
             state
 
-        DrawSpotlight _ ->
-            { state | spotlight = drawing }
+        Rectangle ->
+            { state | shape = choice }
 
-        DrawPixelate ->
+        RoundedRectangle ->
+            { state | shape = choice }
+
+        Ellipse ->
+            { state | shape = choice }
+
+        TextBox ->
+            state
+
+        SpotlightRectangle ->
+            { state | spotlight = choice }
+
+        SpotlightRoundedRectangle ->
+            { state | spotlight = choice }
+
+        SpotlightEllipse ->
+            { state | spotlight = choice }
+
+        Pixelate ->
             state
 
 
 viewDropdownMenu : Config -> State -> DropdownType -> Html Msg
-viewDropdownMenu config { currentDropdown, drawing } selection =
+viewDropdownMenu config { currentDropdown, annotation } selection =
     case currentDropdown of
         Just dropdown ->
             if selection == dropdown.kind then
-                viewDropdown config.styles drawing dropdown.kind
+                viewDropdown config.styles annotation dropdown.kind
 
             else
                 text ""
@@ -414,11 +437,11 @@ viewDropdownMenu config { currentDropdown, drawing } selection =
 -- VIEW
 
 
-dropdownEvents : Drawing -> Dropdown -> List (Html.Attribute Msg)
-dropdownEvents drawing dropdown =
+dropdownEvents : Annotation.Choice -> Dropdown -> List (Html.Attribute Msg)
+dropdownEvents annotation dropdown =
     case dropdown.trigger of
         DelayedDropdown _ ->
-            [ stopPropagationAndDefault "contextmenu" (Decode.succeed (ChangeDrawing drawing))
+            [ stopPropagationAndDefault "contextmenu" (Decode.succeed (ChangeAnnotation annotation))
             , onMouseDown (WaitForDropdownToOpen dropdown)
             , onMouseUp CancelDropdownWait
             ]
@@ -428,59 +451,59 @@ dropdownEvents drawing dropdown =
             ]
 
 
-shapesDropdown : DropdownConfig Drawing -> Drawing -> Html Msg
-shapesDropdown config drawing =
+shapesDropdown : DropdownConfig Annotation.Choice -> Annotation.Choice -> Html Msg
+shapesDropdown config annotation =
     div [ class "dropdown-things" ]
         [ Html.button
             ([ classList
-                [ ( "drawing-button", True )
-                , ( "drawing-button--selected", Drawing.equal config.selected drawing )
+                [ ( "annotation-button", True )
+                , ( "annotation-button--selected", config.selected == annotation )
                 ]
-             , title (config.toTitle drawing)
+             , title (config.toTitle annotation)
              ]
-                ++ dropdownEvents drawing (dropdownFromType ShapesDropdown)
+                ++ dropdownEvents annotation (dropdownFromType ShapesDropdown)
             )
-            [ Drawing.icon drawing
+            [ icon annotation
             , Icons.viewCornerArrow
             ]
         , config.render ShapesDropdown
         ]
 
 
-spotlightsDropdown : DropdownConfig Drawing -> Drawing -> Html Msg
-spotlightsDropdown config drawing =
+spotlightsDropdown : DropdownConfig Annotation.Choice -> Annotation.Choice -> Html Msg
+spotlightsDropdown config annotation =
     div [ class "dropdown-things" ]
         [ Html.button
             ([ classList
-                [ ( "drawing-button", True )
-                , ( "drawing-button--selected", Drawing.equal config.selected drawing )
-                , ( "drawing-button--spotlight", True )
+                [ ( "annotation-button", True )
+                , ( "annotation-button--selected", config.selected == annotation )
+                , ( "annotation-button--spotlight", True )
                 ]
-             , title (config.toTitle drawing)
+             , title (config.toTitle annotation)
              ]
-                ++ dropdownEvents drawing (dropdownFromType SpotlightsDropdown)
+                ++ dropdownEvents annotation (dropdownFromType SpotlightsDropdown)
             )
-            [ Drawing.icon drawing
+            [ icon annotation
             , Icons.viewCornerArrow
             ]
         , config.render SpotlightsDropdown
         ]
 
 
-placeholderDrawing : Drawing
-placeholderDrawing =
+placeholderAnnotation : Annotation.Choice
+placeholderAnnotation =
     -- TODO: make this type better so we don't need this
-    DrawPixelate
+    Pixelate
 
 
 strokeColorDropdown : DropdownConfig () -> Color -> Html Msg
 strokeColorDropdown config strokeColor =
     div [ class "dropdown-things" ]
         [ Html.button
-            ([ class "drawing-button"
+            ([ class "annotation-button"
              , title (config.toTitle ())
              ]
-                ++ dropdownEvents placeholderDrawing (dropdownFromType StrokeColors)
+                ++ dropdownEvents placeholderAnnotation (dropdownFromType StrokeColors)
             )
             [ Icons.viewStrokeColor strokeColor
             ]
@@ -492,10 +515,10 @@ strokeStylesDropdown : DropdownConfig () -> StrokeStyle -> Html Msg
 strokeStylesDropdown config strokeStyle =
     div [ class "dropdown-things" ]
         [ Html.button
-            ([ class "drawing-button"
+            ([ class "annotation-button"
              , title (config.toTitle ())
              ]
-                ++ dropdownEvents placeholderDrawing (dropdownFromType Strokes)
+                ++ dropdownEvents placeholderAnnotation (dropdownFromType Strokes)
             )
             [ Icons.viewStrokeStyle strokeStyle
             ]
@@ -507,10 +530,10 @@ fillsDropdown : DropdownConfig () -> Maybe Color -> Html Msg
 fillsDropdown config fill =
     div [ class "dropdown-things" ]
         [ Html.button
-            ([ class "drawing-button"
+            ([ class "annotation-button"
              , title (config.toTitle ())
              ]
-                ++ dropdownEvents placeholderDrawing (dropdownFromType Fills)
+                ++ dropdownEvents placeholderAnnotation (dropdownFromType Fills)
             )
             [ Icons.viewFill fill
             ]
@@ -522,10 +545,10 @@ fontSizesDropdown : DropdownConfig () -> Html Msg
 fontSizesDropdown config =
     div [ class "dropdown-things" ]
         [ Html.button
-            ([ class "drawing-button"
+            ([ class "annotation-button"
              , title (config.toTitle ())
              ]
-                ++ dropdownEvents placeholderDrawing (dropdownFromType Fonts)
+                ++ dropdownEvents placeholderAnnotation (dropdownFromType Fonts)
             )
             [ Icons.viewFontSize
             ]
@@ -533,37 +556,37 @@ fontSizesDropdown config =
         ]
 
 
-button : { toTitle : Drawing -> String, selected : Drawing } -> Drawing -> Html Msg
-button config drawing =
+button : { toTitle : Annotation.Choice -> String, selected : Annotation.Choice } -> Annotation.Choice -> Html Msg
+button config annotation =
     Html.button
         [ classList
-            [ ( "drawing-button", True )
-            , ( "drawing-button--selected", Drawing.equal config.selected drawing )
-            , ( "drawing-button--spotlight", Drawing.isSpotlight drawing )
+            [ ( "annotation-button", True )
+            , ( "annotation-button--selected", config.selected == annotation )
+            , ( "annotation-button--spotlight", Annotation.isSpotlight annotation )
             ]
-        , title (config.toTitle drawing)
-        , onClick (ChangeDrawing drawing)
+        , title (config.toTitle annotation)
+        , onClick (ChangeAnnotation annotation)
         ]
-        [ Drawing.icon drawing ]
+        [ icon annotation ]
 
 
 viewFontSizeOptions : FontSize -> Html Msg
 viewFontSizeOptions fontSize =
-    Drawing.fontSizes
+    Annotation.fontSizes
         |> List.map (viewFontSizeOption fontSize)
         |> div [ class "dropdown-options" ]
 
 
 viewFillOptions : Fill -> Html Msg
 viewFillOptions fill =
-    Drawing.fills
+    Annotation.fills
         |> List.map (viewFillOption fill)
         |> div [ class "dropdown-options" ]
 
 
 viewStrokeColorOptions : StrokeColor -> Html Msg
 viewStrokeColorOptions strokeColor =
-    Drawing.strokeColors
+    Annotation.strokeColors
         |> List.map (viewStrokeColorOption strokeColor)
         |> div [ class "dropdown-options" ]
 
@@ -606,7 +629,7 @@ viewFontSizeOption selectedFontSize fontSize =
 
 viewStrokeStyleOptions : StrokeStyle -> Html Msg
 viewStrokeStyleOptions strokeStyle =
-    Drawing.strokeStyles
+    Annotation.strokeStyles
         |> List.map (viewStrokeStyleOption strokeStyle)
         |> div [ class "dropdown-options" ]
 
@@ -623,14 +646,14 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         [ Icons.viewStrokeStyle strokeStyle ]
 
 
-viewDropdown : DrawingStyles -> Drawing -> DropdownType -> Html Msg
-viewDropdown { fill, strokeColor, strokeStyle, fontSize } drawing dropdown =
+viewDropdown : AnnotationStyles -> Annotation.Choice -> DropdownType -> Html Msg
+viewDropdown { fill, strokeColor, strokeStyle, fontSize } annotation dropdown =
     case dropdown of
         ShapesDropdown ->
-            viewShapesOptions drawing
+            viewShapesOptions annotation
 
         SpotlightsDropdown ->
-            viewSpotlightsOptions drawing
+            viewSpotlightsOptions annotation
 
         Fonts ->
             viewFontSizeOptions fontSize
@@ -645,51 +668,172 @@ viewDropdown { fill, strokeColor, strokeStyle, fontSize } drawing dropdown =
             viewStrokeStyleOptions strokeStyle
 
 
-viewShapesOptions : Drawing -> Html Msg
-viewShapesOptions drawing =
-    Drawing.shapes
-        |> List.map (viewDrawingOption drawing)
+viewShapesOptions : Annotation.Choice -> Html Msg
+viewShapesOptions annotation =
+    shapes
+        |> List.map (viewAnnotationOption annotation)
         |> div [ class "dropdown-options" ]
 
 
-viewDrawingOption : Drawing -> Drawing -> Html Msg
-viewDrawingOption selectedDrawing drawing =
+viewAnnotationOption : Annotation.Choice -> Annotation.Choice -> Html Msg
+viewAnnotationOption selectedAnnotation annotation =
     Html.button
         [ classList
             [ ( "dropdown-button", True )
-            , ( "dropdown-button--selected", selectedDrawing == drawing )
-            , ( "dropdown-button--spotlight", List.member drawing Drawing.spotlights )
+            , ( "dropdown-button--selected", selectedAnnotation == annotation )
+            , ( "dropdown-button--spotlight", List.member annotation spotlights )
             ]
-        , onClick (ChangeDrawing drawing)
+        , onClick (ChangeAnnotation annotation)
         ]
-        [ Drawing.icon drawing ]
+        [ icon annotation ]
 
 
-viewSpotlightsOptions : Drawing -> Html Msg
-viewSpotlightsOptions drawing =
-    Drawing.spotlights
-        |> List.map (viewDrawingOption drawing)
+viewSpotlightsOptions : Annotation.Choice -> Html Msg
+viewSpotlightsOptions annotation =
+    spotlights
+        |> List.map (viewAnnotationOption annotation)
         |> div [ class "dropdown-options" ]
 
 
+icon : Annotation.Choice -> Svg msg
+icon choice =
+    case choice of
+        Arrow ->
+            Icons.viewArrow
+
+        StraightLine ->
+            Icons.viewLine
+
+        FreeHand ->
+            Icons.freeHand
+
+        Rectangle ->
+            Icons.viewRectangle
+
+        RoundedRectangle ->
+            Icons.viewRoundedRectangle
+
+        Ellipse ->
+            Icons.viewEllipse
+
+        TextBox ->
+            Icons.viewText
+
+        SpotlightRectangle ->
+            Icons.viewSpotlightRect
+
+        SpotlightRoundedRectangle ->
+            Icons.viewSpotlightRoundedRect
+
+        SpotlightEllipse ->
+            Icons.viewSpotlightEllipse
+
+        Pixelate ->
+            Icons.viewPixelate
+
+
+choiceToTitle : OperatingSystem -> Annotation.Choice -> String
+choiceToTitle os choice =
+    case os of
+        MacOS ->
+            macAnnotationToTitle choice
+
+        Windows ->
+            windowsAnnotationToTitle choice
+
+
+windowsAnnotationToTitle : Annotation.Choice -> String
+windowsAnnotationToTitle drawing =
+    case drawing of
+        Arrow ->
+            "A̲rrow"
+
+        StraightLine ->
+            "L̲ine"
+
+        FreeHand ->
+            "Free H̲and"
+
+        Rectangle ->
+            "R̲ectangle"
+
+        RoundedRectangle ->
+            "Ro̲unded Rectangle"
+
+        Ellipse ->
+            "E̲llipse"
+
+        TextBox ->
+            "T̲ext"
+
+        SpotlightRectangle ->
+            "Spotlig̲ht Rectangle"
+
+        SpotlightRoundedRectangle ->
+            "Spotlight Rounded Rec̲tangle"
+
+        SpotlightEllipse ->
+            "Spotlight Elli̲pse"
+
+        Pixelate ->
+            "P̲ixelate"
+
+
+macAnnotationToTitle : Annotation.Choice -> String
+macAnnotationToTitle choice =
+    case choice of
+        Arrow ->
+            "Arrow (A)"
+
+        StraightLine ->
+            "Line (L)"
+
+        FreeHand ->
+            "Free Hand (H)"
+
+        Rectangle ->
+            "Rectangle (R)"
+
+        RoundedRectangle ->
+            "Rounded Rectangle (O)"
+
+        Ellipse ->
+            "Ellipse (E)"
+
+        TextBox ->
+            "Text (T)"
+
+        SpotlightRectangle ->
+            "Spotlight Rectangle (G)"
+
+        SpotlightRoundedRectangle ->
+            "Spotlight Rounded Rectangle (C)"
+
+        SpotlightEllipse ->
+            "Spotlight Ellipse (I)"
+
+        Pixelate ->
+            "Pixelate (P)"
+
+
 view : Config -> State -> Html Msg
-view config ({ drawing, shape, spotlight } as state) =
+view config ({ annotation, shape, spotlight } as state) =
     let
         { strokeColor, fill, strokeStyle } =
             config.styles
 
         toTitle =
-            Drawing.toString config.os
+            choiceToTitle config.os
 
         toDropdown =
             viewDropdownMenu config state
 
         buttonConfig =
-            { toTitle = toTitle, selected = drawing }
+            { toTitle = toTitle, selected = annotation }
 
-        drawingDropdownConfig =
+        annotationDropdownConfig =
             { toTitle = toTitle
-            , selected = drawing
+            , selected = annotation
             , render = toDropdown
             }
 
@@ -712,12 +856,12 @@ view config ({ drawing, shape, spotlight } as state) =
             toDropdownConfig (toFontSizeTitle config.os)
     in
     div [ class "columns" ]
-        [ button buttonConfig (DrawLine Arrow)
-        , button buttonConfig DrawFreeHand
-        , button buttonConfig DrawTextBox
-        , shapesDropdown drawingDropdownConfig shape
-        , spotlightsDropdown drawingDropdownConfig spotlight
-        , button buttonConfig DrawPixelate
+        [ button buttonConfig Arrow
+        , button buttonConfig FreeHand
+        , button buttonConfig TextBox
+        , shapesDropdown annotationDropdownConfig shape
+        , spotlightsDropdown annotationDropdownConfig spotlight
+        , button buttonConfig Pixelate
         , strokeColorDropdown strokeColorsConfig strokeColor
         , fillsDropdown fillConfig fill
         , strokeStylesDropdown strokeStyleConfig strokeStyle

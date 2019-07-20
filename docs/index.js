@@ -56,6 +56,10 @@ app.ports.selectText.subscribe(function (id) {
   }
 })
 
+app.ports.logError.subscribe(function (error) {
+  console.log(error)
+})
+
 // zendesk listeners
 if (isInZendeskAppContext) {
   client.invoke('resize', { height: 320, width: 800 });

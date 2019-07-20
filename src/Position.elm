@@ -1,4 +1,4 @@
-module Position exposing (EndPosition, Position, StartPosition, angle, calcDistance, decoder, shift, step, toString)
+module Position exposing (EndPosition, Position, StartPosition, angle, calcDistance, decoder, shift, snap, toString)
 
 import Json.Decode as D
 
@@ -57,8 +57,8 @@ angle a b =
 
 {-| Returns the position of the nearest 45 degree angle
 -}
-step : StartPosition -> EndPosition -> EndPosition
-step start curPos =
+snap : StartPosition -> EndPosition -> EndPosition
+snap start curPos =
     angle start curPos
         / (pi / 4)
         |> round

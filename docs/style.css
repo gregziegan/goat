@@ -35,7 +35,7 @@ button:active, button:focus, button:hover {
   flex-wrap: wrap;
 }
 
-.drawing-button {
+.annotation-button {
   position: relative;
   display: flex;
   justify-content: center;
@@ -49,11 +49,11 @@ button:active, button:focus, button:hover {
   color: #555;
 }
 
-.drawing-button--spotlight {
+.annotation-button--spotlight {
   padding: 0;
 }
 
-.drawing-button--selected {
+.annotation-button--selected {
   background-color: rgb(230, 230, 230);
   border: 1px solid rgb(230, 230, 230);
 }

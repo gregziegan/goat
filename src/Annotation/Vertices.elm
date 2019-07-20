@@ -1,4 +1,4 @@
-module DrawingArea.Vertices exposing (ResizeDirection, Vertex(..), Vertices(..), view)
+module Annotation.Vertices exposing (ResizeDirection, Vertex(..), Vertices(..), view)
 
 import Color
 import Palette

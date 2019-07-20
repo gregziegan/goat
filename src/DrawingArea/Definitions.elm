@@ -1,22 +1,24 @@
 module DrawingArea.Definitions exposing (view)
 
+import Annotation exposing (Def(..))
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 
 
-maskDefinition : List (Svg msg) -> Svg msg
-maskDefinition shapes =
-    rect
-        [ x "0"
-        , y "0"
-        , width "100%"
-        , height "100%"
-        , opacity "0.5"
-        , fill "white"
-        ]
-        []
-        :: shapes
-        |> Svg.mask [ id "Mask" ]
+spotlightMaskDefinition : List (Svg msg) -> Svg msg
+spotlightMaskDefinition cutouts =
+    Svg.mask [ id "Mask" ]
+        (rect
+            [ x "0"
+            , y "0"
+            , width "100%"
+            , height "100%"
+            , opacity "0.5"
+            , fill "white"
+            ]
+            []
+            :: cutouts
+        )
 
 
 pixelateMaskDefinition : List (Svg msg) -> Svg msg
@@ -74,14 +76,33 @@ viewSvgIconDefinitions =
     ]
 
 
-viewMasks : List (Svg msg) -> List (Svg msg) -> List (Svg msg)
-viewMasks spotlightCutOuts blurCutOuts =
-    [ maskDefinition spotlightCutOuts, pixelateMaskDefinition blurCutOuts ]
+toMasks : { pixelates : List (Svg msg), spotlights : List (Svg msg) } -> List (Svg msg)
+toMasks { pixelates, spotlights } =
+    [ spotlightMaskDefinition spotlights, pixelateMaskDefinition pixelates ]
 
 
-view : List (Svg msg) -> List (Svg msg) -> Svg msg
-view spotlightCutOuts blurCutOuts =
-    [ viewMasks spotlightCutOuts blurCutOuts
+viewMasks : List (Annotation.Def msg) -> List (Svg msg)
+viewMasks cutouts =
+    cutouts
+        |> List.foldl
+            (\def acc ->
+                case def of
+                    PixelateCutout pixelate ->
+                        { acc | pixelates = pixelate :: acc.pixelates }
+
+                    SpotlightCutout spotlight ->
+                        { acc | spotlights = spotlight :: acc.spotlights }
+
+                    Empty ->
+                        acc
+            )
+            { pixelates = [], spotlights = [] }
+        |> toMasks
+
+
+view : List (Annotation.Def msg) -> Svg msg
+view cutOuts =
+    [ viewMasks cutOuts
     , viewSvgIconDefinitions
     , viewSvgFilters
     ]

@@ -1,16 +1,12 @@
 module EditState exposing
     ( AnnotationConfig
     , DrawingConfig
-    , DrawingInfo
     , EditState
     , EndPosition
     , MovingInfo
     , ResizingInfo
-    , SelectState(..)
-    , SelectingInfo
     , StartPosition
     , SubscriptionConfig
-    , annotationAttributes
     , annotationEvents
     , continueDrawing
     , continueMoving
@@ -20,24 +16,18 @@ module EditState exposing
     , finishEditingText
     , finishMoving
     , finishResizing
-    , finishTextDrawing
-    , ifMoving
     , initialState
-    , mapSelected
     , resizeVertices
     , selectAnnotation
-    , selectState
+    , selected
     , startDrawing
     , startEditingText
     , startMoving
     , startResizing
     , subscriptions
-    , textAreaDomId
     , updateAnySelectedAnnotations
-    , updateSelectedStyles
-    , vertexEvents
-    , viewDrawing
-    , whenTyping
+    , view
+    , viewDef
     )
 
 {-| The finite state machine for annotating.
@@ -48,15 +38,16 @@ functions, with the exception of `initialState`.
 
 -}
 
-import Browser.Events exposing (onMouseMove)
-import Drawing.Options exposing (DrawingStyles)
-import DrawingArea.Vertices exposing (Vertex(..))
+import Annotation exposing (Annotation, Choice(..))
+import Annotation.Options exposing (AnnotationStyles)
+import Annotation.Vertices exposing (Vertex(..))
+import Browser.Events exposing (onClick, onMouseMove)
 import EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
 import Html.Events exposing (stopPropagationOn)
 import Json.Decode as Json
 import Keyboard
-import Position exposing (Position)
-import Svg exposing (Attribute)
+import Position exposing (Position, calcDistance)
+import Svg exposing (Attribute, Svg)
 import Svg.Attributes as Attr
 
 
@@ -68,107 +59,65 @@ type alias EndPosition =
     Position
 
 
-type alias Id =
-    Int
-
-
-type alias DrawingInfo =
-    { start : Position
-    , curPos : Position
-    , positions : List Position
-    }
-
-
-type alias SelectingInfo =
-    { id : Id
-    , styles : DrawingStyles
-    }
-
-
 type alias MovingInfo =
-    { id : Id
-    , start : Position
+    { start : Position
     , translate : ( Int, Int )
-    , styles : DrawingStyles
     }
 
 
 type alias ResizingInfo =
-    { id : Id
-    , start : Position
+    { start : Position
     , curPos : Position
     , vertex : Vertex
     , originalCoords : ( Position, Position )
-    , styles : DrawingStyles
     }
-
-
-type alias EditingTextInfo =
-    { id : Id
-    , styles : DrawingStyles
-    }
-
-
-{-| Annotations are viewed differently based on the kind of selection.
-
-1.  Selected corresponds to annotations that are not in a state for resizing/moving.
-    This is currently only relevant to Textboxes when they are being edited.
-2.  SelectedWithVertices shows vertices on any annotation that allows for resizing/moving
-3.  NotSelected shows the unadorned annotation
-
--}
-type SelectState
-    = Selected
-    | SelectedWithVertices
-    | NotSelected
 
 
 type EditState
     = NotSelecting
-    | Drawing DrawingInfo
-    | Selecting SelectingInfo
-    | Moving MovingInfo
-    | Resizing ResizingInfo
-    | EditingText EditingTextInfo
+    | Drawing Annotation.Id
+    | Selecting Annotation.Id
+    | Moving Annotation.Id MovingInfo
+    | Resizing Annotation.Id ResizingInfo
+    | EditingText Annotation.Id
 
 
 {-| EditState provides subscriptions for mouse movements and keyboard interactions.
 These subscriptions will be turned on/off depending on the edit state.
 -}
 type alias SubscriptionConfig msg =
-    { drawToMsg : Position -> msg
-    , resizeToMsg : Position -> msg
-    , moveToMsg : Position -> msg
-    , keyboardToMsg : Keyboard.Msg -> msg
+    { drew : Position -> msg
+    , resized : Position -> msg
+    , moved : Position -> msg
+    , changedKey : Keyboard.Msg -> msg
+    , clicked : Annotation.Id -> msg
     }
 
 
 {-| Individual Annotations (svgs) are moved on mouse/touch interaction.
 -}
 type alias AnnotationConfig msg =
-    { selectAndMove : Id -> Position -> msg
-    , contextMenu : Id -> Position -> msg
-    , startMoving : Id -> Position -> msg
-    , finishMoving : Position -> msg
-    , defaultAttributes : DrawingStyles
+    { selectAndMove : StartPosition -> msg
+    , contextMenu : Position -> msg
+    , startMoving : StartPosition -> msg
+    , finishMoving : EndPosition -> msg
+    , resize : Vertex -> StartPosition -> msg
+    , annotation : Annotation.Config msg
     }
 
 
 {-| This configuration is for the svg drawing area.
-
-This drawing area _should_ only need to be used for drawing, but sometimes the selected vertex is not directly under a quickly
-moving mouse. So, we make sure to capture resizing events on the drawspace as the source of truth.
-
 -}
 type alias DrawingConfig msg =
     { startDrawing : Position -> msg
-    , continueDrawing : Position -> msg
+
+    -- , continueDrawing : Position -> msg
     , finishDrawing : Position -> msg
-    , continueMoving : Position -> msg
-    , finishMoving : Position -> msg
-    , continueResizing : Position -> msg
-    , finishResizing : Position -> msg
-    , finishEditingText : Id -> msg
+
+    -- , continueMoving : Position -> msg
+    -- , finishMoving : Position -> msg
+    -- , continueResizing : Position -> msg
+    -- , finishResizing : Position -> msg
     , contextMenu : Position -> msg
     }
 
@@ -183,41 +132,29 @@ errorMessage editState =
     editStateToString editState ++ " is not a valid state to start this transition."
 
 
-startDrawing : Position -> EditState -> Result String EditState
-startDrawing start editState =
+startDrawing : Annotation -> EditState -> Result String EditState
+startDrawing annotation editState =
     case editState of
         NotSelecting ->
-            Ok (Drawing (DrawingInfo start start []))
+            Ok (Drawing annotation.id)
 
         Selecting _ ->
-            Ok (Drawing (DrawingInfo start start []))
+            Ok (Drawing annotation.id)
 
         _ ->
             Err (errorMessage editState)
 
 
-continueDrawing : Position -> Bool -> EditState -> Result String EditState
-continueDrawing pos trackPositions editState =
+continueDrawing : Position -> Annotation -> EditState -> Result String ( EditState, Annotation )
+continueDrawing pos annotation editState =
     case editState of
-        Drawing { start, positions } ->
-            Ok <|
-                if trackPositions then
-                    Drawing
-                        (DrawingInfo start pos <|
-                            case positions of
-                                [] ->
-                                    [ pos ]
+        Drawing _ ->
+            case annotation.choice of
+                FreeHand ->
+                    Ok ( editState, { annotation | end = pos, positions = pos :: annotation.positions } )
 
-                                lastPos :: _ ->
-                                    if abs (lastPos.x - pos.x) < 10 && abs (lastPos.y - pos.y) < 10 then
-                                        positions
-
-                                    else
-                                        pos :: positions
-                        )
-
-                else
-                    Drawing (DrawingInfo start pos [])
+                _ ->
+                    Ok ( editState, { annotation | end = pos } )
 
         _ ->
             Err (errorMessage editState)
@@ -235,50 +172,73 @@ editStateToString editState =
         Selecting _ ->
             "Selecting"
 
-        Moving _ ->
+        Moving _ _ ->
             "Moving"
 
-        Resizing _ ->
+        Resizing _ _ ->
             "Resizing"
 
         EditingText _ ->
             "EditingText"
 
 
-finishDrawing : Position -> EditState -> Result String ( EditState, DrawingInfo )
-finishDrawing end editState =
+sumDistance : Position -> ( Float, Position ) -> ( Float, Position )
+sumDistance position ( distance, previousPosition ) =
+    ( distance
+        + calcDistance position previousPosition
+    , position
+    )
+
+
+finishDrawingFreeHand : Annotation -> Maybe Annotation
+finishDrawingFreeHand annotation =
+    let
+        ( totalDistance, _ ) =
+            List.foldl sumDistance ( 0.0, annotation.start ) (annotation.positions ++ [ annotation.end ])
+    in
+    if totalDistance < minDrawingDistance then
+        Nothing
+
+    else
+        Just annotation
+
+
+finishDrawing : Position -> Annotation -> EditState -> Result String ( EditState, Maybe Annotation )
+finishDrawing end annotation editState =
     case editState of
-        Drawing drawingInfo ->
-            Ok ( NotSelecting, { drawingInfo | curPos = end } )
+        Drawing id ->
+            let
+                updatedAnnotation =
+                    { annotation | end = end }
+            in
+            case annotation.choice of
+                FreeHand ->
+                    Ok ( NotSelecting, finishDrawingFreeHand updatedAnnotation )
+
+                TextBox ->
+                    Ok ( EditingText id, Just updatedAnnotation )
+
+                _ ->
+                    Ok ( NotSelecting, Just updatedAnnotation )
 
         _ ->
             Err (errorMessage editState)
 
 
-finishTextDrawing : Position -> Id -> DrawingStyles -> EditState -> Result String ( EditState, DrawingInfo )
-finishTextDrawing end id styles editState =
-    case editState of
-        Drawing drawingInfo ->
-            Ok ( EditingText (EditingTextInfo id styles), { drawingInfo | curPos = end } )
-
-        _ ->
-            Err (errorMessage editState)
-
-
-selectAnnotation : Id -> DrawingStyles -> EditState -> Result String EditState
-selectAnnotation id annotationAttrs editState =
+selectAnnotation : Annotation -> EditState -> Result String EditState
+selectAnnotation annotation editState =
     case editState of
         NotSelecting ->
-            Ok (Selecting (SelectingInfo id annotationAttrs))
+            Ok (Selecting annotation.id)
 
         Selecting _ ->
-            Ok (Selecting (SelectingInfo id annotationAttrs))
+            Ok (Selecting annotation.id)
 
-        Moving _ ->
-            Ok (Selecting (SelectingInfo id annotationAttrs))
+        Moving _ _ ->
+            Ok (Selecting annotation.id)
 
-        Resizing _ ->
-            Ok (Selecting (SelectingInfo id annotationAttrs))
+        Resizing _ _ ->
+            Ok (Selecting annotation.id)
 
         _ ->
             Err (errorMessage editState)
@@ -287,28 +247,32 @@ selectAnnotation id annotationAttrs editState =
 startMoving : Position -> EditState -> Result String EditState
 startMoving start editState =
     case editState of
-        Selecting { id, styles } ->
-            Ok (Moving (MovingInfo id start ( 0, 0 ) styles))
+        Selecting annotation ->
+            Ok (Moving annotation (MovingInfo start ( 0, 0 )))
 
         _ ->
             Err (errorMessage editState)
 
 
-continueMoving : Position -> EditState -> Result String ( EditState, MovingInfo )
-continueMoving newPos editState =
+continueMoving : Position -> Annotation -> EditState -> Result String ( EditState, Annotation )
+continueMoving newPos annotation editState =
     case editState of
-        Moving movingInfo ->
-            Ok ( Moving { movingInfo | translate = ( newPos.x - movingInfo.start.x, newPos.y - movingInfo.start.y ) }, movingInfo )
+        Moving id movingInfo ->
+            let
+                ( dx, dy ) =
+                    ( newPos.x - movingInfo.start.x, newPos.y - movingInfo.start.y )
+            in
+            Ok ( Moving id { movingInfo | translate = ( dx, dy ) }, Annotation.move ( dx, dy ) annotation )
 
         _ ->
             Err (errorMessage editState)
 
 
-finishMoving : EditState -> Result String ( EditState, MovingInfo )
-finishMoving editState =
+finishMoving : Annotation -> EditState -> Result String ( EditState, Annotation )
+finishMoving annotation editState =
     case editState of
-        Moving ({ id, styles } as movingInfo) ->
-            Ok ( Selecting (SelectingInfo id styles), movingInfo )
+        Moving id _ ->
+            Ok ( Selecting id, annotation )
 
         _ ->
             Err (errorMessage editState)
@@ -317,67 +281,54 @@ finishMoving editState =
 startResizing : Position -> Vertex -> ( Position, Position ) -> EditState -> Result String EditState
 startResizing start vertex originalCoords editState =
     case editState of
-        Selecting { id, styles } ->
-            Ok (Resizing (ResizingInfo id start start vertex originalCoords styles))
+        Selecting id ->
+            Ok (Resizing id (ResizingInfo start start vertex originalCoords))
 
         _ ->
             Err (errorMessage editState)
 
 
-continueResizing : Position -> EditState -> Result String ( EditState, ResizingInfo )
-continueResizing curPos editState =
+continueResizing : Position -> Annotation -> EditState -> Result String ( EditState, Annotation )
+continueResizing curPos annotation editState =
     case editState of
-        Resizing resizingData ->
-            Ok ( Resizing { resizingData | curPos = curPos }, resizingData )
+        Resizing id resizingData ->
+            Ok ( Resizing id { resizingData | curPos = curPos }, annotation )
 
         _ ->
             Err (errorMessage editState)
 
 
-finishResizing : EditState -> Result String ( EditState, ResizingInfo )
-finishResizing editState =
+finishResizing : Annotation -> EditState -> Result String ( EditState, Annotation )
+finishResizing annotation editState =
     case editState of
-        Resizing ({ id, styles } as resizingInfo) ->
-            Ok ( Selecting (SelectingInfo id styles), resizingInfo )
+        Resizing id resizingInfo ->
+            Ok ( Selecting id, annotation )
 
         _ ->
             Err (errorMessage editState)
 
 
-startEditingText : Id -> DrawingStyles -> EditState -> Result String EditState
-startEditingText index annotationAttrs editState =
+startEditingText : Annotation -> EditState -> Result String EditState
+startEditingText annotationAttrs editState =
     case editState of
-        Drawing _ ->
-            Ok (EditingText (EditingTextInfo index annotationAttrs))
+        Drawing annotation ->
+            Ok (EditingText annotation)
 
-        Selecting { id, styles } ->
-            Ok (EditingText (EditingTextInfo id styles))
+        Selecting annotation ->
+            Ok (EditingText annotation)
 
         _ ->
             Err (errorMessage editState)
 
 
-finishEditingText : EditState -> Result String ( EditState, EditingTextInfo )
-finishEditingText editState =
+finishEditingText : Annotation -> EditState -> Result String ( EditState, Annotation )
+finishEditingText annotation editState =
     case editState of
-        EditingText editingTextInfo ->
-            Ok ( NotSelecting, editingTextInfo )
+        EditingText id ->
+            Ok ( NotSelecting, annotation )
 
         _ ->
             Err (errorMessage editState)
-
-
-updateSelectedStyles : (DrawingStyles -> DrawingStyles) -> EditState -> EditState
-updateSelectedStyles updateStyles editState =
-    case editState of
-        Selecting selectingInfo ->
-            Selecting { selectingInfo | styles = updateStyles selectingInfo.styles }
-
-        EditingText editingInfo ->
-            EditingText { editingInfo | styles = updateStyles editingInfo.styles }
-
-        _ ->
-            editState
 
 
 {-| The sidebar is a hard-coded width. This offset is used to shift the incoming mouse position.
@@ -398,84 +349,36 @@ subscriptions : SubscriptionConfig msg -> EditState -> Sub msg
 subscriptions config editState =
     Sub.batch <|
         case editState of
+            NotSelecting ->
+                [ Sub.map config.changedKey Keyboard.subscriptions ]
+
+            Selecting _ ->
+                [ Sub.map config.changedKey Keyboard.subscriptions ]
+
             Drawing _ ->
-                [ onMouseMove (Json.map (config.drawToMsg << toDrawingPosition) Position.decoder)
-                , Sub.map config.keyboardToMsg Keyboard.subscriptions
+                [ onMouseMove (Json.map (config.drew << toDrawingPosition) Position.decoder)
+                , Sub.map config.changedKey Keyboard.subscriptions
                 ]
 
-            Resizing _ ->
-                [ onMouseMove (Json.map (config.resizeToMsg << toDrawingPosition) Position.decoder)
-                , Sub.map config.keyboardToMsg Keyboard.subscriptions
+            Moving _ _ ->
+                [ onMouseMove (Json.map (config.moved << toDrawingPosition) Position.decoder) ]
+
+            Resizing _ _ ->
+                [ onMouseMove (Json.map (config.resized << toDrawingPosition) Position.decoder)
+                , Sub.map config.changedKey Keyboard.subscriptions
                 ]
 
-            Moving _ ->
-                [ onMouseMove (Json.map (config.moveToMsg << toDrawingPosition) Position.decoder) ]
-
-            EditingText _ ->
-                []
-
-            _ ->
-                [ Sub.map config.keyboardToMsg Keyboard.subscriptions ]
+            EditingText id ->
+                [ Browser.Events.onMouseDown (Json.succeed (config.clicked id)) ]
 
 
-type alias UsesVertices =
-    Bool
-
-
-selectState : Id -> UsesVertices -> EditState -> SelectState
-selectState candidateId usesVertices editState =
-    case editState of
-        Selecting { id } ->
-            if id == candidateId then
-                if usesVertices then
-                    SelectedWithVertices
-
-                else
-                    Selected
-
-            else
-                NotSelected
-
-        Moving { id } ->
-            if id == candidateId then
-                if usesVertices then
-                    SelectedWithVertices
-
-                else
-                    Selected
-
-            else
-                NotSelected
-
-        Resizing { id } ->
-            if id == candidateId then
-                if usesVertices then
-                    SelectedWithVertices
-
-                else
-                    Selected
-
-            else
-                NotSelected
-
-        EditingText { id } ->
-            if id == candidateId then
-                Selected
-
-            else
-                NotSelected
-
-        _ ->
-            NotSelected
-
-
-annotationEvents : AnnotationConfig msg -> Id -> EditState -> List (Attribute msg)
+annotationEvents : AnnotationConfig msg -> Annotation.Id -> EditState -> List (Attribute msg)
 annotationEvents config candidateId editState =
     case editState of
         NotSelecting ->
-            [ stopPropagationAndDefault "mousedown" (Json.map (config.selectAndMove candidateId << toDrawingPosition) Position.decoder)
+            [ stopPropagationAndDefault "mousedown" (Json.map (config.selectAndMove << toDrawingPosition) Position.decoder)
             , Attr.class "pointerCursor"
-            , stopPropagationAndDefault "contextmenu" (Json.map (config.contextMenu candidateId) Position.decoder)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
             ]
 
         Drawing _ ->
@@ -483,11 +386,11 @@ annotationEvents config candidateId editState =
 
         Selecting _ ->
             [ Attr.class "moveCursor"
-            , stopPropagationAndDefault "mousedown" (Json.map (config.startMoving candidateId << toDrawingPosition) Position.decoder)
-            , stopPropagationAndDefault "contextmenu" (Json.map (config.contextMenu candidateId) Position.decoder)
+            , stopPropagationAndDefault "mousedown" (Json.map (config.startMoving << toDrawingPosition) Position.decoder)
+            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
             ]
 
-        Moving { id, translate } ->
+        Moving id { translate } ->
             let
                 ( dx, dy ) =
                     translate
@@ -502,21 +405,23 @@ annotationEvents config candidateId editState =
                         []
                    )
 
-        Resizing _ ->
+        Resizing _ _ ->
             [ Attr.class "resizeCursor" ]
 
         EditingText _ ->
             [ Attr.class "crosshairCursor" ]
 
 
-vertexEvents : (Vertex -> Position -> msg) -> EditState -> Vertex -> List (Attribute msg)
-vertexEvents resize editState vertex =
-    (stopPropagationOn "mousedown" <| Json.map (alwaysPreventDefault << resize vertex << toDrawingPosition) Position.decoder)
-        :: (case editState of
-                Moving movingInfo ->
-                    vertexAttrsWhenMoving movingInfo
+vertexEvents : Maybe MovingInfo -> (Vertex -> Position -> msg) -> Vertex -> List (Svg.Attribute msg)
+vertexEvents movingInfo resize vertex =
+    (stopPropagationOn "mousedown" <|
+        Json.map (alwaysPreventDefault << resize vertex << toDrawingPosition) Position.decoder
+    )
+        :: (case movingInfo of
+                Just info ->
+                    vertexAttrsWhenMoving info
 
-                _ ->
+                Nothing ->
                     []
            )
 
@@ -530,36 +435,17 @@ vertexAttrsWhenMoving { translate } =
     [ Attr.transform <| "translate(" ++ String.fromInt dx ++ "," ++ String.fromInt dy ++ ")" ]
 
 
-updateAnySelectedAnnotations : (Id -> a) -> EditState -> Maybe a
+updateAnySelectedAnnotations : (Annotation.Id -> a) -> EditState -> Maybe a
 updateAnySelectedAnnotations fn editState =
     case editState of
-        Selecting { id } ->
+        Selecting id ->
             Just (fn id)
 
-        EditingText { id } ->
+        EditingText id ->
             Just (fn id)
 
         _ ->
             Nothing
-
-
-annotationAttributes : AnnotationConfig msg -> EditState -> DrawingStyles
-annotationAttributes config editState =
-    case editState of
-        Selecting { styles } ->
-            styles
-
-        Moving { styles } ->
-            styles
-
-        Resizing { styles } ->
-            styles
-
-        EditingText { styles } ->
-            styles
-
-        _ ->
-            config.defaultAttributes
 
 
 drawingEvents : DrawingConfig msg -> EditState -> List (Attribute msg)
@@ -579,94 +465,30 @@ drawingEvents config editState =
             [ onMouseDown <| Json.map (config.startDrawing << toDrawingPosition) Position.decoder
             ]
 
-        Moving _ ->
-            [ onMouseUp <| Json.map (config.finishMoving << toDrawingPosition) Position.decoder
-            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
+        Moving _ _ ->
+            -- [ onMouseUp <| Json.map (config.finishMoving << toDrawingPosition) Position.decoder
+            [ stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
             ]
 
-        Resizing _ ->
-            [ onMouseUp <| Json.map (config.finishResizing << toDrawingPosition) Position.decoder
-            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
+        Resizing _ _ ->
+            -- [ onMouseUp <| Json.map (config.finishResizing << toDrawingPosition) Position.decoder
+            [ stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
             ]
 
-        EditingText { id } ->
-            [ Html.Events.onMouseDown (config.finishEditingText id)
-            , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
+        EditingText _ ->
+            [ stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
             , Attr.style "cursor: default;"
             ]
 
 
-
-{-
-   The below functions are being used for two special cases that may be able to be solved
-   in a different way.
-
-   viewDrawing -> Pixelate needs to be added to the svg <defs/>, and we therefore need access to DrawingInfo
-   ifMoving -> The arrow head is being rotated and translated, but the Svg.Attributes.translate attribute does not stack.
-              We could
-                 a) try to resize/move the arrow path with only Svg.Attributes.translate so both are treated equally
-                 b) try to resize/move the arrow head with only the Svg.Attributes.d string
--}
-
-
-viewDrawing : (DrawingInfo -> a) -> EditState -> Maybe a
-viewDrawing fn editState =
-    case editState of
-        Drawing drawingInfo ->
-            Just (fn drawingInfo)
-
-        _ ->
-            Nothing
-
-
-ifMoving : EditState -> Maybe MovingInfo
-ifMoving editState =
-    case editState of
-        Moving movingInfo ->
-            Just movingInfo
-
-        _ ->
-            Nothing
-
-
-whenTyping : (Maybe Id -> a) -> EditState -> a
-whenTyping fn editState =
-    case editState of
-        EditingText { id } ->
-            fn (Just id)
-
-        _ ->
-            fn Nothing
-
-
-mapSelected : (Maybe Id -> a) -> EditState -> a
-mapSelected fn editState =
-    case editState of
-        Selecting selectingInfo ->
-            fn (Just selectingInfo.id)
-
-        Moving movingInfo ->
-            fn (Just movingInfo.id)
-
-        Resizing resizingInfo ->
-            fn (Just resizingInfo.id)
-
-        EditingText editingInfo ->
-            fn (Just editingInfo.id)
-
-        _ ->
-            fn Nothing
-
-
-resizeVertices :
-    (StartPosition -> EndPosition -> Position)
-    -> ResizingInfo
-    -> { a | start : Position, end : Position }
-    -> { a | start : Position, end : Position }
-resizeVertices constrain { curPos, vertex, originalCoords } annotation =
+resizeVertices : Annotation.Config msg -> ResizingInfo -> Annotation -> Annotation
+resizeVertices config { curPos, vertex, originalCoords } annotation =
     let
         ( start, end ) =
             originalCoords
+
+        constrain =
+            Annotation.resizeFn config annotation
     in
     case vertex of
         Start ->
@@ -682,6 +504,81 @@ resizeVertices constrain { curPos, vertex, originalCoords } annotation =
             { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
 
 
-textAreaDomId : Id -> String
-textAreaDomId id =
-    "text-box-edit--" ++ String.fromInt id
+view : AnnotationConfig msg -> Annotation -> EditState -> Svg msg
+view config annotation editState =
+    let
+        eventsForVertex movingInfo =
+            vertexEvents movingInfo config.resize
+    in
+    case editState of
+        NotSelecting ->
+            Annotation.view config.annotation annotation
+
+        Drawing _ ->
+            Annotation.view config.annotation annotation
+
+        Selecting id ->
+            if id == annotation.id then
+                Annotation.view (Annotation.withVertices (eventsForVertex Nothing) config.annotation) annotation
+
+            else
+                Annotation.view config.annotation annotation
+
+        Moving id movingInfo ->
+            if id == annotation.id then
+                Annotation.view (Annotation.withVertices (eventsForVertex (Just movingInfo)) config.annotation) annotation
+
+            else
+                Annotation.view config.annotation annotation
+
+        Resizing id _ ->
+            Annotation.view config.annotation annotation
+
+        EditingText id ->
+            Annotation.view config.annotation annotation
+
+
+viewDef : AnnotationConfig msg -> Annotation -> EditState -> Annotation.Def msg
+viewDef config annotation editState =
+    Annotation.viewDef config.annotation annotation
+
+
+minDrawingDistance : number
+minDrawingDistance =
+    4
+
+
+minSpotlightDrawingDistance : number
+minSpotlightDrawingDistance =
+    8
+
+
+isDrawingTooSmall : Bool -> StartPosition -> EndPosition -> Bool
+isDrawingTooSmall isSpotlightDrawing start end =
+    if isSpotlightDrawing then
+        abs (start.x - end.x) < minSpotlightDrawingDistance && abs (start.y - end.y) < minSpotlightDrawingDistance
+
+    else
+        abs (start.x - end.x) < minDrawingDistance && abs (start.y - end.y) < minDrawingDistance
+
+
+selected : EditState -> Maybe Annotation.Id
+selected editState =
+    case editState of
+        Drawing id ->
+            Just id
+
+        Selecting id ->
+            Just id
+
+        Resizing id _ ->
+            Just id
+
+        Moving id _ ->
+            Just id
+
+        EditingText id ->
+            Just id
+
+        _ ->
+            Nothing

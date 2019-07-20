@@ -1,7 +1,7 @@
 module Icons exposing (freeHand, viewArrow, viewCornerArrow, viewDownArrow, viewEllipse, viewFill, viewFontSize, viewLine, viewNormalLine, viewPencil, viewPixelate, viewRectangle, viewRoundedRectangle, viewSpotlightEllipse, viewSpotlightRect, viewSpotlightRoundedRect, viewStrokeColor, viewStrokeStyle, viewText, viewUndoArrow)
 
+import Annotation.Options exposing (StrokeStyle(..))
 import Color exposing (Color)
-import Drawing.Options exposing (StrokeStyle(..))
 import Html exposing (Html)
 import Html.Attributes
 import Palette
