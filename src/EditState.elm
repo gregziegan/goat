@@ -536,8 +536,12 @@ viewHelper render config annotation editState =
         Moving _ _ ->
             render attrs annotation
 
-        Resizing _ resizingInfo ->
-            render attrs (resize config.annotation resizingInfo annotation)
+        Resizing id resizingInfo ->
+            if id == annotation.id then
+                render attrs (resize config.annotation resizingInfo annotation)
+
+            else
+                render attrs annotation
 
         EditingText _ ->
             render attrs annotation
@@ -577,7 +581,7 @@ attributes config annotation editState =
                 moving translate (Annotation.withVertices (eventsForVertex (Just translate)) config.annotation)
 
             else
-                static
+                { static | events = [ onMouseUp <| Json.map (config.finishMoving << toDrawingPosition) Position.decoder ] }
 
         Resizing id _ ->
             if id == annotation.id then
@@ -591,7 +595,7 @@ attributes config annotation editState =
                 interactive
 
             else
-                static
+                interactive
 
 
 viewDef : AnnotationConfig msg -> Annotation -> EditState -> Annotation.Def msg

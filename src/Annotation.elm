@@ -709,11 +709,10 @@ arrowConfig :
     { translate : ( Int, Int )
     , shape : Shape
     , events : List (Svg.Attribute msg)
-    , headTweaks : List (Svg.Attribute msg)
     }
     -> ArrowAttributes msg
-arrowConfig { translate, shape, events, headTweaks } =
-    { headAttributes = headTweaks
+arrowConfig { translate, shape, events } =
+    { headAttributes = events
     , bodyAttributes = arrowAttributes shape ++ events
     , start = shape.start
     , end = shape.end
@@ -768,8 +767,7 @@ view { events, translate, config } ({ start, end, positions, styles, choice } as
             arrowConfig
                 { translate = translate
                 , shape = arrowBody start (calcLinePos snap start end) strokeColor
-                , events = arrowAttributes shape
-                , headTweaks = events
+                , events = events
                 }
                 |> viewArrow
                 |> groupWithVertices linearVertices
