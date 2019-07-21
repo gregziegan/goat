@@ -10,7 +10,7 @@ import Color exposing (Color)
 import Controls
 import DrawingArea
 import DrawingArea.Definitions as Definitions
-import EditState as EditState exposing (AnnotationConfig, DrawingConfig, EditState, EndPosition, MovingInfo, StartPosition, SubscriptionConfig)
+import EditState as EditState exposing (AnnotationConfig, DrawingConfig, EditState, EndPosition, StartPosition, SubscriptionConfig)
 import Environment exposing (Environment, OperatingSystem(..), Platform(..))
 import EventUtils exposing (stopPropagationAndDefault)
 import Html exposing (Html, a, button, div, li, text, ul)
@@ -404,14 +404,14 @@ textAreaDomId id =
     "text-box-edit--" ++ String.fromInt id
 
 
-annoConfig : AnnotationStyles -> Int -> Annotation.Config Msg
-annoConfig styles index =
+annoConfig : Model -> Int -> Annotation.Config Msg
+annoConfig model index =
     Annotation.configure
         { id = index
         , onInput = GotSelectedMsg index << TextBoxInput
         , onFocus = GotSelectedMsg index FocusTextArea
-        , snap = False
-        , styles = styles
+        , snap = shouldSnap model
+        , styles = model.controls.annotationStyles
         , eventsForVertex = Nothing
         }
 
@@ -512,9 +512,7 @@ startMovingAnnotation : Position -> Model -> Model
 startMovingAnnotation newPos model =
     case EditState.startMoving newPos model.editState of
         Ok newEditState ->
-            { model
-                | editState = newEditState
-            }
+            { model | editState = newEditState }
 
         Err _ ->
             model
@@ -552,7 +550,7 @@ resizeAnnotation annotation curPos model =
 
 finishResizingAnnotation : Annotation -> Model -> Model
 finishResizingAnnotation annotation model =
-    case EditState.finishResizing annotation model.editState of
+    case EditState.finishResizing (annoConfig model annotation.id) annotation model.editState of
         Ok ( newEditState, updatedAnnotation ) ->
             { model
                 | edits = UndoList.mapPresent (Array.set annotation.id updatedAnnotation) model.edits
@@ -864,46 +862,6 @@ isCtrlPressed pressedKeys os =
     List.any (\key -> List.member key pressedKeys) (controlKeys os)
 
 
-
--- translateArrowHead : Int -> StartPosition -> EndPosition -> MovingInfo -> List (Svg.Attribute Msg)
--- translateArrowHead index start end { translate } =
---     let
---         theta =
---             (2 * pi)
---                 - Position.angle start end
---         ( dx, dy ) =
---             translate
---     in
---     if index == id then
---         [ Attr.transform
---             ("translate("
---                 ++ String.fromInt dx
---                 ++ ","
---                 ++ String.fromInt dy
---                 ++ ") rotate("
---                 ++ String.fromFloat (-theta * (180 / pi))
---                 ++ " "
---                 ++ String.fromInt end.x
---                 ++ " "
---                 ++ String.fromInt end.y
---                 ++ ")"
---             )
---         ]
---     else
---         []
-
-
-withEditConfig : Int -> Annotation.Config Msg -> EditState.AnnotationConfig Msg
-withEditConfig index config =
-    { selectAndMove = GotSelectedMsg index << SelectAndMoveAnnotation
-    , contextMenu = GotSelectedMsg index << ToggleSelectedAnnotationMenu
-    , startMoving = GotSelectedMsg index << StartMovingAnnotation
-    , finishMoving = GotSelectedMsg index << FinishMovingAnnotation
-    , resize = \pos vertex -> GotSelectedMsg index (StartResizingAnnotation pos vertex)
-    , annotation = config
-    }
-
-
 viewModals : Model -> Html Msg
 viewModals model =
     case model.annotationMenu of
@@ -959,10 +917,9 @@ drawingConfig : DrawingConfig Msg
 drawingConfig =
     { startDrawing = StartDrawing
     , finishDrawing = FinishDrawing
-
-    -- , finishMoving = FinishMovingAnnotation index
-    -- , finishResizing = FinishResizingAnnotation index
-    -- , finishEditingText = FinishEditingText index
+    , finishMoving = \index -> GotSelectedMsg index << FinishMovingAnnotation
+    , finishResizing = \index -> GotSelectedMsg index << FinishResizingAnnotation
+    , finishEditingText = \index -> GotSelectedMsg index << FinishEditingText
     , contextMenu = ToggleAnnotationMenu
     }
 
@@ -978,10 +935,10 @@ canvasAttributes editState =
 
 
 viewDrawingArea : Model -> Image -> Html Msg
-viewDrawingArea { editState, edits, controls } image =
+viewDrawingArea model image =
     div
-        (canvasAttributes editState)
-        [ viewSvgArea controls editState (Array.toList edits.present) image ]
+        (canvasAttributes model.editState)
+        [ viewSvgArea model (Array.toList model.edits.present) image ]
 
 
 withMask : List Annotation -> List (Svg Msg) -> List (Svg Msg)
@@ -994,12 +951,12 @@ withMask annotations svgs =
             svgs
 
 
-viewSvgArea : Controls.State -> EditState -> List Annotation -> Image -> Svg Msg
-viewSvgArea controls editState annotations image =
+viewSvgArea : Model -> List Annotation -> Image -> Svg Msg
+viewSvgArea model annotations image =
     let
         svgAnnotations =
             annotations
-                |> List.indexedMap (viewAnnotation controls editState)
+                |> List.indexedMap (viewAnnotation model)
                 |> withMask annotations
 
         svgs =
@@ -1012,17 +969,17 @@ viewSvgArea controls editState annotations image =
         , Attr.height (String.fromInt (round image.height))
         , attribute "xmlns" "http://www.w3.org/2000/svg"
         ]
-        (Definitions.view (List.indexedMap (viewDef controls editState) annotations) :: svgs)
+        (Definitions.view (List.indexedMap (viewDef model) annotations) :: svgs)
 
 
-viewDef : Controls.State -> EditState -> Int -> Annotation -> Annotation.Def Msg
-viewDef controls editState index annotation =
-    EditState.viewDef (annotationConfig index (annoConfig controls.annotationStyles index)) annotation editState
+viewDef : Model -> Int -> Annotation -> Annotation.Def Msg
+viewDef model index annotation =
+    EditState.viewDef (annotationConfig index (annoConfig model index)) annotation model.editState
 
 
-viewAnnotation : Controls.State -> EditState -> Int -> Annotation -> Svg Msg
-viewAnnotation controls editState index annotation =
-    EditState.view (annotationConfig index (annoConfig controls.annotationStyles index)) annotation editState
+viewAnnotation : Model -> Int -> Annotation -> Svg Msg
+viewAnnotation model index annotation =
+    EditState.view (annotationConfig index (annoConfig model index)) annotation model.editState
 
 
 annotationConfig : Int -> Annotation.Config Msg -> AnnotationConfig Msg
@@ -1032,6 +989,7 @@ annotationConfig index config =
     , startMoving = GotSelectedMsg index << StartMovingAnnotation
     , finishMoving = GotSelectedMsg index << FinishMovingAnnotation
     , resize = \pos vertex -> GotSelectedMsg index (StartResizingAnnotation pos vertex)
+    , finishResizing = GotSelectedMsg index << FinishResizingAnnotation
     , annotation = config
     }
 

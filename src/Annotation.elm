@@ -735,8 +735,8 @@ spotlightFill =
     Just Palette.black
 
 
-view : Config msg -> Annotation -> Svg msg
-view ((Config { snap, styles, eventsForVertex }) as config) ({ start, end, positions, choice } as annotation) =
+view : List (Svg.Attribute msg) -> Config msg -> Annotation -> Svg msg
+view attrs ((Config { snap, styles, eventsForVertex }) as config) ({ start, end, positions, choice } as annotation) =
     let
         { strokeColor, strokeStyle, fill } =
             styles
@@ -747,14 +747,14 @@ view ((Config { snap, styles, eventsForVertex }) as config) ({ start, end, posit
         shape =
             Shape start (calcShapePos snap start end) strokeColor strokeStyle
 
-        groupWithVertices toVertices annotationView =
+        groupWithVertices toVertices viewAnnotation =
             Svg.g []
                 [ case ( choice, eventsForVertex ) of
                     ( TextBox, Just _ ) ->
-                        viewText [] annotation
+                        viewText attrs annotation
 
                     ( _, _ ) ->
-                        annotationView
+                        viewAnnotation
                 , case eventsForVertex of
                     Just toEvents ->
                         toVertices toEvents annotation
@@ -765,30 +765,35 @@ view ((Config { snap, styles, eventsForVertex }) as config) ({ start, end, posit
     in
     case choice of
         Arrow ->
-            arrowConfig (arrowBody start (calcLinePos snap start end) strokeColor) (arrowAttributes shape) []
+            arrowConfig (arrowBody start (calcLinePos snap start end) strokeColor) (arrowAttributes shape ++ attrs) attrs
                 |> viewArrow
                 |> groupWithVertices linearVertices
 
         StraightLine ->
-            Svg.path (lineAttributes line) []
+            Svg.path (lineAttributes line ++ attrs) []
                 |> groupWithVertices linearVertices
 
         FreeHand ->
-            Svg.g []
+            Svg.g attrs
                 [ viewFreeDraw line positions
-                , freeHandSelection positions
+                , case eventsForVertex of
+                    Just _ ->
+                        freeHandSelection positions
+
+                    Nothing ->
+                        Svg.text ""
                 ]
 
         Rectangle ->
-            Svg.rect (rectAttributes shape fill) []
+            Svg.rect (rectAttributes shape fill ++ attrs) []
                 |> groupWithVertices rectangularVertices
 
         RoundedRectangle ->
-            Svg.rect (roundedRectAttributes shape fill) []
+            Svg.rect (roundedRectAttributes shape fill ++ attrs) []
                 |> groupWithVertices rectangularVertices
 
         Ellipse ->
-            Svg.ellipse (ellipseAttributes shape fill) []
+            Svg.ellipse (ellipseAttributes shape fill ++ attrs) []
                 |> groupWithVertices rectangularVertices
 
         TextBox ->
@@ -796,19 +801,19 @@ view ((Config { snap, styles, eventsForVertex }) as config) ({ start, end, posit
                 |> groupWithVertices rectangularVertices
 
         SpotlightRectangle ->
-            Svg.rect (rectAttributes shape fill) []
+            Svg.rect (rectAttributes shape fill ++ attrs) []
                 |> groupWithVertices rectangularVertices
 
         SpotlightRoundedRectangle ->
-            Svg.rect (roundedRectAttributes shape fill) []
+            Svg.rect (roundedRectAttributes shape fill ++ attrs) []
                 |> groupWithVertices rectangularVertices
 
         SpotlightEllipse ->
-            Svg.ellipse (ellipseAttributes shape fill) []
+            Svg.ellipse (ellipseAttributes shape fill ++ attrs) []
                 |> groupWithVertices rectangularVertices
 
         Pixelate ->
-            Svg.text ""
+            Svg.rect (rectAttributes (Shape start end Palette.white SolidThin) Nothing ++ attrs) []
                 |> groupWithVertices rectangularVertices
 
 
@@ -986,3 +991,31 @@ viewTextBoxWithVertices (Config config) attrs ({ start, end, text } as annotatio
              ]
                 ++ attrs
             )
+
+
+-- translateArrowHead : Int -> StartPosition -> EndPosition -> MovingInfo -> List (Svg.Attribute Msg)
+-- translateArrowHead index start end { translate } =
+--     let
+--         theta =
+--             (2 * pi)
+--                 - Position.angle start end
+--         ( dx, dy ) =
+--             translate
+--     in
+--     if index == id then
+--         [ Attr.transform
+--             ("translate("
+--                 ++ String.fromInt dx
+--                 ++ ","
+--                 ++ String.fromInt dy
+--                 ++ ") rotate("
+--                 ++ String.fromFloat (-theta * (180 / pi))
+--                 ++ " "
+--                 ++ String.fromInt end.x
+--                 ++ " "
+--                 ++ String.fromInt end.y
+--                 ++ ")"
+--             )
+--         ]
+--     else
+--         []
