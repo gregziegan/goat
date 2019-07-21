@@ -579,7 +579,7 @@ attributes config annotation editState =
             else
                 static
 
-        Resizing id resizingInfo ->
+        Resizing id _ ->
             if id == annotation.id then
                 { interactive | config = Annotation.withVertices (eventsForVertex Nothing) config.annotation }
 
@@ -612,15 +612,6 @@ minDrawingDistance =
 minSpotlightDrawingDistance : number
 minSpotlightDrawingDistance =
     8
-
-
-isDrawingTooSmall : Bool -> StartPosition -> EndPosition -> Bool
-isDrawingTooSmall isSpotlightDrawing start end =
-    if isSpotlightDrawing then
-        abs (start.x - end.x) < minSpotlightDrawingDistance && abs (start.y - end.y) < minSpotlightDrawingDistance
-
-    else
-        abs (start.x - end.x) < minDrawingDistance && abs (start.y - end.y) < minDrawingDistance
 
 
 selected : EditState -> Maybe Annotation.Id

@@ -727,12 +727,9 @@ controlKeys os =
 
 findAnnotation : Model -> Maybe Annotation
 findAnnotation model =
-    case EditState.selected model.editState of
-        Just id ->
-            Array.get id model.edits.present
-
-        Nothing ->
-            Nothing
+    model.editState
+        |> EditState.selected
+        |> Maybe.andThen (\id -> Array.get id model.edits.present)
 
 
 handleKeyboardInteractions : Environment -> Maybe KeyChange -> Model -> ( Model, Cmd Msg )
@@ -940,7 +937,7 @@ withMask : List Annotation -> List (Svg Msg) -> List (Svg Msg)
 withMask annotations svgs =
     case List.Extra.findIndex (Annotation.isSpotlight << .choice) annotations of
         Just index ->
-            List.take index svgs ++ [ DrawingArea.viewMask ] ++ List.drop index svgs
+            List.Extra.intercalate [ DrawingArea.viewMask ] [ List.take index svgs, List.drop index svgs ]
 
         Nothing ->
             svgs
