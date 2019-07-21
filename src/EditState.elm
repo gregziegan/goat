@@ -566,8 +566,12 @@ attributes config annotation editState =
         NotSelecting ->
             interactive
 
-        Drawing _ ->
-            interactive
+        Drawing id ->
+            if id == annotation.id then
+                interactive
+
+            else
+                static
 
         Selecting id ->
             if id == annotation.id then
@@ -595,7 +599,7 @@ attributes config annotation editState =
                 interactive
 
             else
-                interactive
+                static
 
 
 viewDef : AnnotationConfig msg -> Annotation -> EditState -> Annotation.Def msg

@@ -1,13 +1,31 @@
-module DrawingArea.Definitions exposing (view)
+module DrawingArea.Definitions exposing (view, viewMask)
 
 import Annotation exposing (Def(..))
 import Svg exposing (..)
-import Svg.Attributes exposing (..)
+import Svg.Attributes as Attr exposing (..)
+
+
+spotlightMaskId : String
+spotlightMaskId =
+    "Mask"
+
+
+viewMask : Svg msg
+viewMask =
+    rect
+        [ x "0"
+        , y "0"
+        , height "100%"
+        , width "100%"
+        , Attr.mask ("url(#" ++ spotlightMaskId ++ ")")
+        , Attr.style "pointer-events: none;"
+        ]
+        []
 
 
 spotlightMaskDefinition : List (Svg msg) -> Svg msg
 spotlightMaskDefinition cutouts =
-    Svg.mask [ id "Mask" ]
+    Svg.mask [ id spotlightMaskId ]
         (rect
             [ x "0"
             , y "0"

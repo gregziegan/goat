@@ -1,7 +1,7 @@
 module Controls exposing (Config, Dropdown, DropdownTrigger(..), DropdownType(..), Msg(..), State, closeDropdown, initialState, onKeyDown, subscriptions, update, view)
 
 import Annotation exposing (Choice(..))
-import Annotation.Options as Annotation exposing (AnnotationStyles, Fill, FontSize, StrokeColor, StrokeStyle(..))
+import Annotation.Options as Annotation exposing (Fill, FontSize, StrokeColor, StrokeStyle(..))
 import Color exposing (Color)
 import Environment exposing (OperatingSystem(..))
 import EventUtils exposing (stopPropagationAndDefault)
@@ -40,12 +40,12 @@ type alias State =
     , annotation : Annotation.Choice
     , shape : Annotation.Choice
     , spotlight : Annotation.Choice
-    , annotationStyles : AnnotationStyles
+    , annotationStyles : Annotation.Styles
     }
 
 
 type alias Config =
-    { styles : AnnotationStyles
+    { styles : Annotation.Styles
     , os : OperatingSystem
     }
 
@@ -239,33 +239,33 @@ changeAnnotation annotation state =
         |> changeShapeAndSpotlightDropdowns annotation
 
 
-updateStyles : AnnotationStyles -> State -> State
+updateStyles : Annotation.Styles -> State -> State
 updateStyles styles state =
     { state | annotationStyles = styles }
 
 
-setFill : Maybe Color -> AnnotationStyles -> AnnotationStyles
+setFill : Maybe Color -> Annotation.Styles -> Annotation.Styles
 setFill fill styles =
     { styles
         | fill = fill
     }
 
 
-setFontSize : Int -> AnnotationStyles -> AnnotationStyles
+setFontSize : Int -> Annotation.Styles -> Annotation.Styles
 setFontSize fontSize styles =
     { styles
         | fontSize = fontSize
     }
 
 
-setStrokeStyle : StrokeStyle -> AnnotationStyles -> AnnotationStyles
+setStrokeStyle : StrokeStyle -> Annotation.Styles -> Annotation.Styles
 setStrokeStyle strokeStyle styles =
     { styles
         | strokeStyle = strokeStyle
     }
 
 
-setStrokeColor : Color -> AnnotationStyles -> AnnotationStyles
+setStrokeColor : Color -> Annotation.Styles -> Annotation.Styles
 setStrokeColor strokeColor styles =
     { styles
         | strokeColor = strokeColor
@@ -656,7 +656,7 @@ viewStrokeStyleOption selectedStrokeStyle strokeStyle =
         [ Icons.viewStrokeStyle strokeStyle ]
 
 
-viewDropdown : AnnotationStyles -> Annotation.Choice -> DropdownType -> Html Msg
+viewDropdown : Annotation.Styles -> Annotation.Choice -> DropdownType -> Html Msg
 viewDropdown { fill, strokeColor, strokeStyle, fontSize } annotation dropdown =
     case dropdown of
         ShapesDropdown ->

@@ -6,6 +6,7 @@ module Annotation exposing
     , Def(..)
     , Id
     , Shape
+    , Styles
     , calcLinePos
     , calcShapePos
     , configure
@@ -26,7 +27,7 @@ module Annotation exposing
     , withVertices
     )
 
-import Annotation.Options exposing (AnnotationStyles, Fill, FontSize, StrokeColor, StrokeStyle(..))
+import Annotation.Options exposing (Fill, FontSize, StrokeColor, StrokeStyle(..))
 import Annotation.Vertices as Vertices exposing (Vertex)
 import AutoExpand
 import Color exposing (Color)
@@ -55,7 +56,7 @@ type alias Annotation =
     , angle : Float
     , autoExpand : AutoExpand.State
     , choice : Choice
-    , styles : AnnotationStyles
+    , styles : Styles
     }
 
 
@@ -64,6 +65,14 @@ type alias Shape =
     , end : Position
     , strokeColor : StrokeColor
     , strokeStyle : StrokeStyle
+    }
+
+
+type alias Styles =
+    { strokeColor : StrokeColor
+    , fill : Fill
+    , strokeStyle : StrokeStyle
+    , fontSize : FontSize
     }
 
 
@@ -103,7 +112,7 @@ init :
     , start : StartPosition
     , end : EndPosition
     , positions : List Position
-    , styles : AnnotationStyles
+    , styles : Styles
     , onInput : { state : AutoExpand.State, textValue : String } -> msg
     , onFocus : msg
     }
@@ -161,9 +170,9 @@ trackPosition position drawing =
     }
 
 
-defaultStyles : AnnotationStyles
+defaultStyles : Styles
 defaultStyles =
-    AnnotationStyles Palette.purple Nothing SolidMedium 20
+    Styles Palette.purple Nothing SolidMedium 20
 
 
 isSpotlight : Choice -> Bool
@@ -663,7 +672,7 @@ resizeFn (Config config) annotation =
             calcShapePos config.snap
 
 
-setStyles : AnnotationStyles -> Annotation -> Annotation
+setStyles : Styles -> Annotation -> Annotation
 setStyles styles annotation =
     { annotation | styles = styles }
 

@@ -1,13 +1,12 @@
 module Page.Annotate exposing (Model, Msg, init, subscriptions, toSession, update, view)
 
 import Annotation exposing (Annotation, Choice(..))
-import Annotation.Options exposing (AnnotationStyles, StrokeStyle(..))
+import Annotation.Options exposing (StrokeStyle(..))
 import Annotation.Vertices exposing (Vertex(..))
 import Array exposing (Array)
 import AutoExpand
 import Browser.Dom as Dom
 import Controls
-import DrawingArea
 import DrawingArea.Definitions as Definitions
 import EditState as EditState exposing (AnnotationConfig, DrawingConfig, EditState, EndPosition, StartPosition, SubscriptionConfig)
 import Environment exposing (Environment, OperatingSystem(..), Platform(..))
@@ -937,7 +936,7 @@ withMask : List Annotation -> List (Svg Msg) -> List (Svg Msg)
 withMask annotations svgs =
     case List.Extra.findIndex (Annotation.isSpotlight << .choice) annotations of
         Just index ->
-            List.Extra.intercalate [ DrawingArea.viewMask ] [ List.take index svgs, List.drop index svgs ]
+            List.Extra.intercalate [ Definitions.viewMask ] [ List.take index svgs, List.drop index svgs ]
 
         Nothing ->
             svgs
@@ -1040,15 +1039,11 @@ view environment image model =
 
 content : Environment -> Image -> Model -> Html Msg
 content env image model =
-    let
-        styles =
-            model.controls.annotationStyles
-    in
     div
         [ class "annotation-app" ]
         [ viewModals model
         , viewModalMask model.annotationMenu
-        , viewControls env model styles
+        , viewControls env model
         , viewDrawingArea model image
         ]
 
@@ -1093,17 +1088,17 @@ viewHistoryControls os edits =
         ]
 
 
-viewControls : Environment -> Model -> AnnotationStyles -> Html Msg
-viewControls env model annotationStyles =
+viewControls : Environment -> Model -> Html Msg
+viewControls env model =
     div
         [ class "controls" ]
         [ viewNavigationControls
         , viewHistoryControls env.operatingSystem model.edits
-        , Html.map ControlsUpdate (Controls.view (controlsConfig annotationStyles env.operatingSystem) model.controls)
+        , Html.map ControlsUpdate (Controls.view (controlsConfig model.controls.annotationStyles env.operatingSystem) model.controls)
         ]
 
 
-controlsConfig : AnnotationStyles -> OperatingSystem -> Controls.Config
+controlsConfig : Annotation.Styles -> OperatingSystem -> Controls.Config
 controlsConfig styles os =
     Controls.Config styles os
 
