@@ -1,8 +1,8 @@
 module Page.Annotate exposing (Model, Msg, init, subscriptions, toSession, update, view)
 
 import Annotation exposing (Annotation, Choice(..))
-import Annotation.Options exposing (AnnotationStyles, StrokeColor, StrokeStyle(..))
-import Annotation.Vertices as Vertices exposing (Vertex(..))
+import Annotation.Options exposing (AnnotationStyles, StrokeStyle(..))
+import Annotation.Vertices exposing (Vertex(..))
 import Array exposing (Array)
 import AutoExpand
 import Browser.Dom as Dom
@@ -135,7 +135,7 @@ updateSelected : Annotation -> SelectedMsg -> Model -> ( Model, Cmd Msg )
 updateSelected annotation msg model =
     case msg of
         FocusTextArea ->
-            ( startEditingText annotation model
+            ( startEditingText model
             , textAreaDomId annotation.id
                 |> Dom.focus
                 |> Task.attempt (tryToEdit annotation.id)
@@ -450,7 +450,7 @@ finishDrawing annotation pos model =
             finishValidDrawing updatedAnnotation { model | editState = newState }
 
         Ok ( newState, Nothing ) ->
-            ( { model | editState = newState }
+            ( { model | editState = newState, edits = UndoList.mapPresent (removeItem annotation.id) model.edits }
             , Cmd.none
             )
 
@@ -494,9 +494,9 @@ addAnnotation annotation model =
     }
 
 
-startEditingText : Annotation -> Model -> Model
-startEditingText annotation model =
-    EditState.startEditingText annotation model.editState
+startEditingText : Model -> Model
+startEditingText model =
+    EditState.startEditingText model.editState
         |> Result.map (\newState -> { model | editState = newState })
         |> Result.withDefault model
 
@@ -919,7 +919,7 @@ drawingConfig =
     , finishDrawing = FinishDrawing
     , finishMoving = \index -> GotSelectedMsg index << FinishMovingAnnotation
     , finishResizing = \index -> GotSelectedMsg index << FinishResizingAnnotation
-    , finishEditingText = \index -> GotSelectedMsg index << FinishEditingText
+    , finishEditingText = \index -> GotSelectedMsg index FinishEditingText
     , contextMenu = ToggleAnnotationMenu
     }
 

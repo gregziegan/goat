@@ -1,6 +1,6 @@
 module Controls exposing (Config, Dropdown, DropdownTrigger(..), DropdownType(..), Msg(..), State, closeDropdown, initialState, onKeyDown, subscriptions, update, view)
 
-import Annotation exposing (Annotation, Choice(..))
+import Annotation exposing (Choice(..))
 import Annotation.Options as Annotation exposing (AnnotationStyles, Fill, FontSize, StrokeColor, StrokeStyle(..))
 import Color exposing (Color)
 import Environment exposing (OperatingSystem(..))
@@ -11,7 +11,6 @@ import Html.Events exposing (onClick, onMouseDown, onMouseUp)
 import Icons
 import Json.Decode as Decode
 import Keyboard exposing (Key(..))
-import Palette
 import Svg exposing (Svg)
 import Time
 

@@ -1,6 +1,6 @@
 module Annotation exposing
     ( Annotation
-    , ArrowAttributes
+    , Attributes
     , Choice(..)
     , Config
     , Def(..)
@@ -30,12 +30,9 @@ import Annotation.Vertices as Vertices exposing (Vertex)
 import AutoExpand
 import Color exposing (Color)
 import Environment exposing (OperatingSystem(..))
-import EventUtils exposing (stopPropagationAndDefault)
 import Html exposing (Html, div)
 import Html.Attributes exposing (class, style)
 import Html.Events
-import Icons
-import Json.Decode as Decode
 import List.Extra
 import Palette
 import Position exposing (EndPosition, Position, StartPosition)
@@ -84,6 +81,13 @@ type Config msg
         , textBox : TextBoxConfig msg
         , eventsForVertex : Maybe (Vertex -> List (Svg.Attribute msg)) -- an annotation does not always show vertices
         }
+
+
+type alias Attributes msg =
+    { events : List (Svg.Attribute msg)
+    , translate : ( Int, Int )
+    , config : Config msg
+    }
 
 
 type Choice
@@ -243,11 +247,6 @@ ellipseAttributes shape fill =
     fillAttrs fill
         ++ strokeAttrs shape.strokeStyle shape.strokeColor
         ++ ellipseAttrs shape
-
-
-textAreaAttributes : Shape -> List (Svg.Attribute msg)
-textAreaAttributes shape =
-    strokeAttrs shape.strokeStyle shape.strokeColor ++ [ Attr.strokeWidth "1" ]
 
 
 strokeAttrs : StrokeStyle -> Color -> List (Svg.Attribute msg)
@@ -547,7 +546,7 @@ arrowPath shape =
 
 
 arrowHeadAttrs : ArrowAttributes msg -> List (Svg.Attribute msg)
-arrowHeadAttrs { start, end, strokeColor } =
+arrowHeadAttrs { start, end, strokeColor, translate } =
     let
         theta =
             (2 * pi)
@@ -557,6 +556,7 @@ arrowHeadAttrs { start, end, strokeColor } =
     , fill <| Color.toHexString strokeColor
     , stroke "none"
     , transform ("rotate(" ++ String.fromFloat (-theta * (180 / pi)) ++ " " ++ String.fromInt end.x ++ " " ++ String.fromInt end.y ++ ")")
+    , translateArrowHead start end translate
     ]
 
 
@@ -566,6 +566,7 @@ type alias ArrowAttributes msg =
     , start : Position
     , end : Position
     , strokeColor : Color
+    , translate : ( Int, Int )
     }
 
 
@@ -578,6 +579,7 @@ viewArrow arrow =
         ]
 
 
+viewArrowBody : List (Svg.Attribute msg) -> Svg msg
 viewArrowBody bodyAttributes =
     Svg.path bodyAttributes []
 
@@ -715,13 +717,20 @@ textareaPadding =
     2
 
 
-arrowConfig : Shape -> List (Svg.Attribute msg) -> List (Svg.Attribute msg) -> ArrowAttributes msg
-arrowConfig shape attrs head =
-    { headAttributes = head
-    , bodyAttributes = arrowAttributes shape ++ attrs
+arrowConfig :
+    { translate : ( Int, Int )
+    , shape : Shape
+    , events : List (Svg.Attribute msg)
+    , headTweaks : List (Svg.Attribute msg)
+    }
+    -> ArrowAttributes msg
+arrowConfig { translate, shape, events, headTweaks } =
+    { headAttributes = headTweaks
+    , bodyAttributes = arrowAttributes shape ++ events
     , start = shape.start
     , end = shape.end
     , strokeColor = shape.strokeColor
+    , translate = translate
     }
 
 
@@ -735,9 +744,12 @@ spotlightFill =
     Just Palette.black
 
 
-view : List (Svg.Attribute msg) -> Config msg -> Annotation -> Svg msg
-view attrs ((Config { snap, styles, eventsForVertex }) as config) ({ start, end, positions, choice } as annotation) =
+view : Attributes msg -> Annotation -> Svg msg
+view { events, translate, config } ({ start, end, positions, choice } as annotation) =
     let
+        (Config { snap, styles, eventsForVertex }) =
+            config
+
         { strokeColor, strokeStyle, fill } =
             styles
 
@@ -751,7 +763,7 @@ view attrs ((Config { snap, styles, eventsForVertex }) as config) ({ start, end,
             Svg.g []
                 [ case ( choice, eventsForVertex ) of
                     ( TextBox, Just _ ) ->
-                        viewText attrs annotation
+                        viewText events annotation
 
                     ( _, _ ) ->
                         viewAnnotation
@@ -765,16 +777,21 @@ view attrs ((Config { snap, styles, eventsForVertex }) as config) ({ start, end,
     in
     case choice of
         Arrow ->
-            arrowConfig (arrowBody start (calcLinePos snap start end) strokeColor) (arrowAttributes shape ++ attrs) attrs
+            arrowConfig
+                { translate = translate
+                , shape = arrowBody start (calcLinePos snap start end) strokeColor
+                , events = arrowAttributes shape
+                , headTweaks = events
+                }
                 |> viewArrow
                 |> groupWithVertices linearVertices
 
         StraightLine ->
-            Svg.path (lineAttributes line ++ attrs) []
+            Svg.path (lineAttributes line ++ events) []
                 |> groupWithVertices linearVertices
 
         FreeHand ->
-            Svg.g attrs
+            Svg.g events
                 [ viewFreeDraw line positions
                 , case eventsForVertex of
                     Just _ ->
@@ -785,35 +802,35 @@ view attrs ((Config { snap, styles, eventsForVertex }) as config) ({ start, end,
                 ]
 
         Rectangle ->
-            Svg.rect (rectAttributes shape fill ++ attrs) []
+            Svg.rect (rectAttributes shape fill ++ events) []
                 |> groupWithVertices rectangularVertices
 
         RoundedRectangle ->
-            Svg.rect (roundedRectAttributes shape fill ++ attrs) []
+            Svg.rect (roundedRectAttributes shape fill ++ events) []
                 |> groupWithVertices rectangularVertices
 
         Ellipse ->
-            Svg.ellipse (ellipseAttributes shape fill ++ attrs) []
+            Svg.ellipse (ellipseAttributes shape fill ++ events) []
                 |> groupWithVertices rectangularVertices
 
         TextBox ->
-            viewTextArea config annotation
+            viewTextBox config annotation
                 |> groupWithVertices rectangularVertices
 
         SpotlightRectangle ->
-            Svg.rect (rectAttributes shape fill ++ attrs) []
+            Svg.rect (rectAttributes shape fill ++ events) []
                 |> groupWithVertices rectangularVertices
 
         SpotlightRoundedRectangle ->
-            Svg.rect (roundedRectAttributes shape fill ++ attrs) []
+            Svg.rect (roundedRectAttributes shape fill ++ events) []
                 |> groupWithVertices rectangularVertices
 
         SpotlightEllipse ->
-            Svg.ellipse (ellipseAttributes shape fill ++ attrs) []
+            Svg.ellipse (ellipseAttributes shape fill ++ events) []
                 |> groupWithVertices rectangularVertices
 
         Pixelate ->
-            Svg.rect (rectAttributes (Shape start end Palette.white SolidThin) Nothing ++ attrs) []
+            Svg.rect (rectAttributes (Shape start end Palette.white SolidThin) Nothing ++ events) []
                 |> groupWithVertices rectangularVertices
 
 
@@ -823,9 +840,12 @@ type Def msg
     | Empty
 
 
-viewDef : Config msg -> Annotation -> Def msg
-viewDef (Config { snap, styles, eventsForVertex }) ({ start, end, positions, choice } as annotation) =
+viewDef : Attributes msg -> Annotation -> Def msg
+viewDef { events, config } { start, end, choice } =
     let
+        (Config { snap, styles }) =
+            config
+
         shape =
             Shape start (calcShapePos snap start end) styles.strokeColor styles.strokeStyle
     in
@@ -852,16 +872,16 @@ viewDef (Config { snap, styles, eventsForVertex }) ({ start, end, positions, cho
             Empty
 
         SpotlightRectangle ->
-            SpotlightCutout <| Svg.rect (rectAttributes shape spotlightFill) []
+            SpotlightCutout <| Svg.rect (rectAttributes shape spotlightFill ++ events) []
 
         SpotlightRoundedRectangle ->
-            SpotlightCutout <| Svg.rect (roundedRectAttributes shape spotlightFill) []
+            SpotlightCutout <| Svg.rect (roundedRectAttributes shape spotlightFill ++ events) []
 
         SpotlightEllipse ->
-            SpotlightCutout <| Svg.ellipse (ellipseAttributes shape spotlightFill) []
+            SpotlightCutout <| Svg.ellipse (ellipseAttributes shape spotlightFill ++ events) []
 
         Pixelate ->
-            PixelateCutout <| Svg.rect (rectAttributes shape spotlightFill) []
+            PixelateCutout <| Svg.rect (rectAttributes shape spotlightFill ++ events) []
 
 
 viewFreeDraw : Shape -> List Position -> Svg msg
@@ -930,8 +950,8 @@ viewText attrs annotation =
             )
 
 
-viewTextArea : Config msg -> Annotation -> Html msg
-viewTextArea (Config { styles, textBox }) { start, end, autoExpand, text } =
+viewTextBox : Config msg -> Annotation -> Html msg
+viewTextBox (Config { styles, textBox }) { start, end, autoExpand, text } =
     foreignObject
         [ Attr.y (toPx (-10 + Basics.min start.y end.y))
         , Attr.x (toPx (-20 + Basics.min start.x end.x))
@@ -993,29 +1013,23 @@ viewTextBoxWithVertices (Config config) attrs ({ start, end, text } as annotatio
             )
 
 
--- translateArrowHead : Int -> StartPosition -> EndPosition -> MovingInfo -> List (Svg.Attribute Msg)
--- translateArrowHead index start end { translate } =
---     let
---         theta =
---             (2 * pi)
---                 - Position.angle start end
---         ( dx, dy ) =
---             translate
---     in
---     if index == id then
---         [ Attr.transform
---             ("translate("
---                 ++ String.fromInt dx
---                 ++ ","
---                 ++ String.fromInt dy
---                 ++ ") rotate("
---                 ++ String.fromFloat (-theta * (180 / pi))
---                 ++ " "
---                 ++ String.fromInt end.x
---                 ++ " "
---                 ++ String.fromInt end.y
---                 ++ ")"
---             )
---         ]
---     else
---         []
+translateArrowHead : StartPosition -> EndPosition -> ( Int, Int ) -> Svg.Attribute msg
+translateArrowHead start end ( dx, dy ) =
+    let
+        theta =
+            (2 * pi)
+                - Position.angle start end
+    in
+    Attr.transform
+        ("translate("
+            ++ String.fromInt dx
+            ++ ","
+            ++ String.fromInt dy
+            ++ ") rotate("
+            ++ String.fromFloat (-theta * (180 / pi))
+            ++ " "
+            ++ String.fromInt end.x
+            ++ " "
+            ++ String.fromInt end.y
+            ++ ")"
+        )

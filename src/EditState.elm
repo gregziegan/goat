@@ -37,9 +37,8 @@ functions, with the exception of `initialState`.
 -}
 
 import Annotation exposing (Annotation, Choice(..))
-import Annotation.Options exposing (AnnotationStyles)
 import Annotation.Vertices exposing (Vertex(..))
-import Browser.Events exposing (onClick, onMouseMove)
+import Browser.Events exposing (onMouseMove)
 import EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
 import Html.Events exposing (stopPropagationOn)
 import Json.Decode as Json
@@ -198,6 +197,24 @@ finishDrawingFreeHand annotation =
         Just annotation
 
 
+finishDrawingSpotlight : Annotation -> Maybe Annotation
+finishDrawingSpotlight annotation =
+    if calcDistance annotation.start annotation.end > minSpotlightDrawingDistance then
+        Just annotation
+
+    else
+        Nothing
+
+
+finishDrawingSvg : Annotation -> Maybe Annotation
+finishDrawingSvg annotation =
+    if calcDistance annotation.start annotation.end > minDrawingDistance then
+        Just annotation
+
+    else
+        Nothing
+
+
 finishDrawing : Position -> Annotation -> EditState -> Result String ( EditState, Maybe Annotation )
 finishDrawing end annotation editState =
     case editState of
@@ -213,8 +230,17 @@ finishDrawing end annotation editState =
                 TextBox ->
                     Ok ( EditingText id, Just updatedAnnotation )
 
+                SpotlightRectangle ->
+                    Ok ( NotSelecting, finishDrawingSpotlight updatedAnnotation )
+
+                SpotlightRoundedRectangle ->
+                    Ok ( NotSelecting, finishDrawingSpotlight updatedAnnotation )
+
+                SpotlightEllipse ->
+                    Ok ( NotSelecting, finishDrawingSpotlight updatedAnnotation )
+
                 _ ->
-                    Ok ( NotSelecting, Just updatedAnnotation )
+                    Ok ( NotSelecting, finishDrawingSvg updatedAnnotation )
 
         _ ->
             Err (errorMessage editState)
@@ -303,14 +329,14 @@ finishResizing config annotation editState =
             Err (errorMessage editState)
 
 
-startEditingText : Annotation -> EditState -> Result String EditState
-startEditingText annotationAttrs editState =
+startEditingText : EditState -> Result String EditState
+startEditingText editState =
     case editState of
-        Drawing annotation ->
-            Ok (EditingText annotation)
+        Drawing id ->
+            Ok (EditingText id)
 
-        Selecting annotation ->
-            Ok (EditingText annotation)
+        Selecting id ->
+            Ok (EditingText id)
 
         _ ->
             Err (errorMessage editState)
@@ -319,7 +345,7 @@ startEditingText annotationAttrs editState =
 finishEditingText : Annotation -> EditState -> Result String ( EditState, Annotation )
 finishEditingText annotation editState =
     case editState of
-        EditingText id ->
+        EditingText _ ->
             Ok ( NotSelecting, annotation )
 
         _ ->
@@ -385,7 +411,7 @@ annotationEvents config editState =
             , stopPropagationAndDefault "contextmenu" (Json.map config.contextMenu Position.decoder)
             ]
 
-        Moving id { translate } ->
+        Moving _ { translate } ->
             let
                 ( dx, dy ) =
                     translate
@@ -491,50 +517,91 @@ resize config { curPos, vertex, originalCoords } annotation =
             { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
 
 
-view : AnnotationConfig msg -> Annotation -> EditState -> Svg msg
-view config annotation editState =
+viewHelper : (Annotation.Attributes msg -> Annotation -> view) -> AnnotationConfig msg -> Annotation -> EditState -> view
+viewHelper render config annotation editState =
+    let
+        attrs =
+            attributes config annotation editState
+    in
+    case editState of
+        NotSelecting ->
+            render attrs annotation
+
+        Drawing _ ->
+            render attrs annotation
+
+        Selecting _ ->
+            render attrs annotation
+
+        Moving id { translate } ->
+            render attrs annotation
+
+        Resizing id resizingInfo ->
+            render attrs (resize config.annotation resizingInfo annotation)
+
+        EditingText id ->
+            render attrs annotation
+
+
+attributes : AnnotationConfig msg -> Annotation -> EditState -> Annotation.Attributes msg
+attributes config annotation editState =
     let
         eventsForVertex translate =
             vertexEvents config translate
 
-        attrs =
-            annotationEvents config editState
+        static =
+            { events = [], translate = ( 0, 0 ), config = config.annotation }
+
+        interactive =
+            { events = annotationEvents config editState, translate = ( 0, 0 ), config = config.annotation }
+
+        moving translate verticesConfigured =
+            { events = annotationEvents config editState, translate = translate, config = verticesConfigured }
     in
     case editState of
         NotSelecting ->
-            Annotation.view attrs config.annotation annotation
+            interactive
 
         Drawing _ ->
-            Annotation.view attrs config.annotation annotation
+            interactive
 
         Selecting id ->
             if id == annotation.id then
-                Annotation.view attrs (Annotation.withVertices (eventsForVertex Nothing) config.annotation) annotation
+                { interactive | config = Annotation.withVertices (eventsForVertex Nothing) config.annotation }
 
             else
-                Annotation.view attrs config.annotation annotation
+                interactive
 
         Moving id { translate } ->
             if id == annotation.id then
-                Annotation.view attrs (Annotation.withVertices (eventsForVertex (Just translate)) config.annotation) annotation
+                moving translate (Annotation.withVertices (eventsForVertex (Just translate)) config.annotation)
 
             else
-                Annotation.view [] config.annotation annotation
+                static
 
         Resizing id resizingInfo ->
             if id == annotation.id then
-                Annotation.view attrs (Annotation.withVertices (eventsForVertex Nothing) config.annotation) (resize config.annotation resizingInfo annotation)
+                { interactive | config = Annotation.withVertices (eventsForVertex Nothing) config.annotation }
 
             else
-                Annotation.view [] config.annotation annotation
+                static
 
         EditingText id ->
-            Annotation.view attrs config.annotation annotation
+            if id == annotation.id then
+                interactive
+
+            else
+                static
 
 
 viewDef : AnnotationConfig msg -> Annotation -> EditState -> Annotation.Def msg
-viewDef config annotation editState =
-    Annotation.viewDef config.annotation annotation
+viewDef =
+    viewHelper Annotation.viewDef
+
+
+view : AnnotationConfig msg -> Annotation -> EditState -> Svg msg
+view =
+    viewHelper Annotation.view
 
 
 minDrawingDistance : number
