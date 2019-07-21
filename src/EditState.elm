@@ -533,13 +533,13 @@ viewHelper render config annotation editState =
         Selecting _ ->
             render attrs annotation
 
-        Moving id { translate } ->
+        Moving _ _ ->
             render attrs annotation
 
-        Resizing id resizingInfo ->
+        Resizing _ resizingInfo ->
             render attrs (resize config.annotation resizingInfo annotation)
 
-        EditingText id ->
+        EditingText _ ->
             render attrs annotation
 
 

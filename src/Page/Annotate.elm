@@ -6,33 +6,29 @@ import Annotation.Vertices exposing (Vertex(..))
 import Array exposing (Array)
 import AutoExpand
 import Browser.Dom as Dom
-import Color exposing (Color)
 import Controls
 import DrawingArea
 import DrawingArea.Definitions as Definitions
 import EditState as EditState exposing (AnnotationConfig, DrawingConfig, EditState, EndPosition, StartPosition, SubscriptionConfig)
 import Environment exposing (Environment, OperatingSystem(..), Platform(..))
-import EventUtils exposing (stopPropagationAndDefault)
 import Html exposing (Html, a, button, div, li, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, style, title)
 import Html.Events exposing (onClick, onMouseDown)
 import Icons as Icons
 import Image exposing (Image)
-import Json.Decode as Decode
 import Keyboard exposing (Key(..), KeyChange(..), anyKeyUpper)
 import List.Extra
 import Log
-import Palette
 import Ports
-import Position exposing (Position, calcDistance)
+import Position exposing (Position)
 import Route
 import Session exposing (Session)
-import Svg exposing (Svg, foreignObject, rect, svg)
+import Svg exposing (Svg, svg)
 import Svg.Attributes as Attr
 import Svg.Lazy as Svg
-import Task exposing (succeed)
+import Task
 import UndoList exposing (UndoList)
-import Utils exposing (mapAtIndex, removeItem, removeItemIf, toPx)
+import Utils exposing (mapAtIndex, removeItem, toPx)
 
 
 type alias AnnotationMenu =
@@ -299,9 +295,9 @@ update env image msg ({ pressedKeys } as model) =
                 newState =
                     Controls.update controlsMsg model.controls
             in
-            ( model
-                -- |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.updateAttributes newState.drawingStyles) model)
-                -- |> Maybe.withDefault model
+            ( model.editState
+                |> EditState.updateAnySelectedAnnotations (updateAnySelectedAnnotationsHelper (Annotation.setStyles newState.annotationStyles) model)
+                |> Maybe.withDefault model
                 |> alterControls (always newState)
             , Cmd.none
             )
@@ -407,11 +403,9 @@ textAreaDomId id =
 annoConfig : Model -> Int -> Annotation.Config Msg
 annoConfig model index =
     Annotation.configure
-        { id = index
-        , onInput = GotSelectedMsg index << TextBoxInput
+        { onInput = GotSelectedMsg index << TextBoxInput
         , onFocus = GotSelectedMsg index FocusTextArea
         , snap = shouldSnap model
-        , styles = model.controls.annotationStyles
         , eventsForVertex = Nothing
         }
 
@@ -426,6 +420,7 @@ selectText index result =
             LogError (domErrToString error)
 
 
+finishValidDrawing : Annotation -> Model -> ( Model, Cmd Msg )
 finishValidDrawing annotation model =
     let
         numAnnotations =

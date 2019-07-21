@@ -17,6 +17,7 @@ module Annotation exposing
     , move
     , rectAttrs
     , resizeFn
+    , setStyles
     , startAndEnd
     , trackPosition
     , updateTextArea
@@ -45,14 +46,6 @@ type alias Id =
     Int
 
 
-type alias TextBoxConfig msg =
-    { id : Id
-    , onInput : { state : AutoExpand.State, textValue : String } -> msg
-    , onFocus : msg
-    , fontSize : FontSize
-    }
-
-
 type alias Annotation =
     { id : Id
     , start : Position
@@ -77,8 +70,8 @@ type alias Shape =
 type Config msg
     = Config
         { snap : Bool
-        , styles : AnnotationStyles
-        , textBox : TextBoxConfig msg
+        , onInput : { state : AutoExpand.State, textValue : String } -> msg
+        , onFocus : msg
         , eventsForVertex : Maybe (Vertex -> List (Svg.Attribute msg)) -- an annotation does not always show vertices
         }
 
@@ -122,14 +115,7 @@ init { id, start, end, positions, onInput, onFocus, choice, styles } =
     , positions = positions
     , choice = choice
     , autoExpand =
-        AutoExpand.initState
-            (autoExpandConfig
-                { id = id
-                , onInput = onInput
-                , onFocus = onFocus
-                , fontSize = styles.fontSize
-                }
-            )
+        AutoExpand.initState (autoExpandConfig id styles.fontSize onInput)
     , angle = 0
     , text = "Text"
     , styles = styles
@@ -137,24 +123,17 @@ init { id, start, end, positions, onInput, onFocus, choice, styles } =
 
 
 configure :
-    { id : Int
-    , onInput : { state : AutoExpand.State, textValue : String } -> msg
+    { onInput : { state : AutoExpand.State, textValue : String } -> msg
     , onFocus : msg
     , snap : Bool
-    , styles : AnnotationStyles
     , eventsForVertex : Maybe (Vertex -> List (Svg.Attribute msg))
     }
     -> Config msg
-configure { id, onInput, onFocus, snap, styles, eventsForVertex } =
+configure { onInput, onFocus, snap, eventsForVertex } =
     Config
         { snap = snap
-        , styles = styles
-        , textBox =
-            { id = id
-            , onInput = onInput
-            , onFocus = onFocus
-            , fontSize = styles.fontSize
-            }
+        , onInput = onInput
+        , onFocus = onFocus
         , eventsForVertex = eventsForVertex
         }
 
@@ -684,6 +663,11 @@ resizeFn (Config config) annotation =
             calcShapePos config.snap
 
 
+setStyles : AnnotationStyles -> Annotation -> Annotation
+setStyles styles annotation =
+    { annotation | styles = styles }
+
+
 updateTextArea : AutoExpand.State -> String -> Annotation -> Annotation
 updateTextArea autoExpand textValue annotation =
     { annotation | autoExpand = autoExpand, text = textValue }
@@ -694,8 +678,12 @@ startAndEnd { start, end } =
     ( start, end )
 
 
-autoExpandConfig : TextBoxConfig msg -> AutoExpand.Config msg
-autoExpandConfig ({ id, onInput, fontSize } as config) =
+autoExpandConfig :
+    Id
+    -> FontSize
+    -> ({ state : AutoExpand.State, textValue : String } -> msg)
+    -> AutoExpand.Config msg
+autoExpandConfig id fontSize onInput =
     AutoExpand.config
         { onInput = onInput
         , padding = textareaPadding
@@ -745,9 +733,9 @@ spotlightFill =
 
 
 view : Attributes msg -> Annotation -> Svg msg
-view { events, translate, config } ({ start, end, positions, choice } as annotation) =
+view { events, translate, config } ({ start, end, positions, styles, choice } as annotation) =
     let
-        (Config { snap, styles, eventsForVertex }) =
+        (Config { snap, eventsForVertex }) =
             config
 
         { strokeColor, strokeStyle, fill } =
@@ -841,9 +829,9 @@ type Def msg
 
 
 viewDef : Attributes msg -> Annotation -> Def msg
-viewDef { events, config } { start, end, choice } =
+viewDef { events, config } { start, end, styles, choice } =
     let
-        (Config { snap, styles }) =
+        (Config { snap }) =
             config
 
         shape =
@@ -951,7 +939,7 @@ viewText attrs annotation =
 
 
 viewTextBox : Config msg -> Annotation -> Html msg
-viewTextBox (Config { styles, textBox }) { start, end, autoExpand, text } =
+viewTextBox (Config { onInput }) { id, start, end, autoExpand, text, styles } =
     foreignObject
         [ Attr.y (toPx (-10 + Basics.min start.y end.y))
         , Attr.x (toPx (-20 + Basics.min start.x end.x))
@@ -965,7 +953,7 @@ viewTextBox (Config { styles, textBox }) { start, end, autoExpand, text } =
 
             -- , stopPropagationAndDefault "mousedown" (Decode.fail "blah")
             ]
-            [ AutoExpand.view (autoExpandConfig textBox) autoExpand text
+            [ AutoExpand.view (autoExpandConfig id styles.fontSize onInput) autoExpand text
             ]
         ]
 
@@ -992,21 +980,21 @@ toTSpan { start, end, styles } spanText =
 
 
 viewTextBoxWithVertices : Config msg -> List (Svg.Attribute msg) -> Annotation -> Svg msg
-viewTextBoxWithVertices (Config config) attrs ({ start, end, text } as annotation) =
+viewTextBoxWithVertices (Config config) attrs ({ start, end, text, styles } as annotation) =
     text
         |> String.split "\n"
         |> List.map (toTSpan annotation)
         |> Svg.text_
             ([ Attr.y <| String.fromInt <| (svgTextOffsetY + Basics.min start.y end.y)
-             , Html.Events.onDoubleClick <| config.textBox.onFocus
+             , Html.Events.onDoubleClick <| config.onFocus
              , Attr.stroke <|
-                if config.styles.fill == Just Palette.black then
+                if styles.fill == Just Palette.black then
                     "white"
 
                 else
                     "black"
              , Attr.strokeWidth "0.5px"
-             , Attr.fontSize <| String.fromInt config.styles.fontSize
+             , Attr.fontSize <| String.fromInt styles.fontSize
              , Attr.fontFamily "sans-serif"
              ]
                 ++ attrs
