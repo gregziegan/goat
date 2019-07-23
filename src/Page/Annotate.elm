@@ -8,7 +8,7 @@ import AutoExpand
 import Browser.Dom as Dom
 import Controls
 import DrawingArea.Definitions as Definitions
-import EditState as EditState exposing (AnnotationConfig, DrawingConfig, EditState, EndPosition, StartPosition, SubscriptionConfig)
+import EditState as EditState exposing (AnnotationConfig, DrawingConfig, EditState, EndPosition, Finish(..), StartPosition, SubscriptionConfig)
 import Environment exposing (Environment, OperatingSystem(..), Platform(..))
 import Html exposing (Html, a, button, div, li, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, style, title)
@@ -91,10 +91,8 @@ type SelectedMsg
     | SelectAndMoveAnnotation StartPosition
       -- Move updates
     | StartMovingAnnotation StartPosition
-    | FinishMovingAnnotation EndPosition
       -- Resize updates
     | StartResizingAnnotation Vertex StartPosition
-    | FinishResizingAnnotation Position
     | FinishedEdit
     | ToggleSelectedAnnotationMenu Position
     | BringAnnotationToFront
@@ -104,7 +102,6 @@ type SelectedMsg
 type Msg
     = StartDrawing Position
     | ContinueDrawing Position
-    | FinishDrawing Position
     | MoveAnnotation Position
     | ResizeAnnotation Position
     | ResetToReadyToDraw
@@ -161,9 +158,7 @@ updateSelected annotation msg model =
             )
 
         FinishEditingText ->
-            ( finishEditingText annotation model
-            , Cmd.none
-            )
+            finishEdit annotation model
 
         SelectAndMoveAnnotation start ->
             ( model
@@ -180,25 +175,11 @@ updateSelected annotation msg model =
             , Cmd.none
             )
 
-        FinishMovingAnnotation endPos ->
-            ( model
-                |> moveAnnotation endPos annotation
-                |> finishMovingAnnotation annotation
-            , Cmd.none
-            )
-
         StartResizingAnnotation vertex start ->
             ( model
                 |> startResizingAnnotation annotation vertex start
                 |> resizeAnnotation annotation start
                 |> alterControls Controls.closeDropdown
-            , Cmd.none
-            )
-
-        FinishResizingAnnotation pos ->
-            ( model
-                |> resizeAnnotation annotation pos
-                |> finishResizingAnnotation annotation
             , Cmd.none
             )
 
@@ -240,14 +221,6 @@ update env image msg ({ pressedKeys } as model) =
                 |> Maybe.withDefault model
             , Cmd.none
             )
-
-        FinishDrawing pos ->
-            case Array.get (Array.length model.edits.present - 1) model.edits.present of
-                Just annotation ->
-                    finishDrawing annotation pos model
-
-                Nothing ->
-                    ( model, Cmd.none )
 
         MoveAnnotation pos ->
             ( model
@@ -345,16 +318,16 @@ resetEditState model =
 
 finishEdit : Annotation -> Model -> ( Model, Cmd Msg )
 finishEdit annotation model =
-    case EditState.finish (annoConfig model annotation.id) annotation model.editState of
-        Ok ( newState, updatedAnnotation ) ->
-            ( { model
-                | editState = newState
-                , edits = UndoList.new (Array.set annotation.id updatedAnnotation model.edits.present) model.edits
-              }
+    case EditState.finish (annotationConfig (shouldSnap model) annotation.id (annoConfig annotation.id)) annotation model.editState of
+        Successful newState updatedAnnotation ->
+            finishValidDrawing updatedAnnotation { model | editState = newState }
+
+        Unsuccessful newState ->
+            ( { model | editState = newState, edits = UndoList.mapPresent (removeItem annotation.id) model.edits }
             , Cmd.none
             )
 
-        Err _ ->
+        InvalidTransition _ ->
             ( model, Cmd.none )
 
 
@@ -384,7 +357,6 @@ startDrawing start model =
                 , end = start
                 , positions = []
                 , onInput = GotSelectedMsg numAnnotations << TextBoxInput
-                , onFocus = GotSelectedMsg numAnnotations FocusTextArea
                 , styles = styles
                 }
     in
@@ -418,12 +390,11 @@ textAreaDomId id =
     "text-box-edit--" ++ String.fromInt id
 
 
-annoConfig : Model -> Int -> Annotation.Config Msg
-annoConfig model index =
+annoConfig : Int -> Annotation.Config Msg
+annoConfig index =
     Annotation.configure
         { onInput = GotSelectedMsg index << TextBoxInput
         , onFocus = GotSelectedMsg index FocusTextArea
-        , snap = shouldSnap model
         , eventsForVertex = Nothing
         }
 
@@ -454,38 +425,6 @@ finishValidDrawing annotation model =
         _ ->
             Cmd.none
     )
-
-
-finishDrawing : Annotation -> Position -> Model -> ( Model, Cmd Msg )
-finishDrawing annotation pos model =
-    case EditState.finishDrawing pos annotation model.editState of
-        Ok ( newState, Just updatedAnnotation ) ->
-            finishValidDrawing updatedAnnotation { model | editState = newState }
-
-        Ok ( newState, Nothing ) ->
-            ( { model | editState = newState, edits = UndoList.mapPresent (removeItem annotation.id) model.edits }
-            , Cmd.none
-            )
-
-        Err _ ->
-            ( model, Cmd.none )
-
-
-
--- MOVING
-
-
-finishMovingAnnotation : Annotation -> Model -> Model
-finishMovingAnnotation annotation model =
-    case EditState.finishMoving annotation model.editState of
-        Ok ( newEditState, updatedAnnotation ) ->
-            { model
-                | edits = UndoList.new (Array.set annotation.id updatedAnnotation model.edits.present) model.edits
-                , editState = newEditState
-            }
-
-        Err _ ->
-            model
 
 
 updateAnySelectedAnnotationsHelper : (Annotation -> Annotation) -> Model -> Int -> Model
@@ -559,32 +498,6 @@ resizeAnnotation annotation curPos model =
             { model
                 | edits = UndoList.mapPresent (Array.set annotation.id updatedAnnotation) model.edits
                 , editState = newEditState
-            }
-
-        Err _ ->
-            model
-
-
-finishResizingAnnotation : Annotation -> Model -> Model
-finishResizingAnnotation annotation model =
-    case EditState.finishResizing (annoConfig model annotation.id) annotation model.editState of
-        Ok ( newEditState, updatedAnnotation ) ->
-            { model
-                | edits = UndoList.mapPresent (Array.set annotation.id updatedAnnotation) model.edits
-                , editState = newEditState
-            }
-
-        Err _ ->
-            model
-
-
-finishEditingText : Annotation -> Model -> Model
-finishEditingText annotation model =
-    case EditState.finishEditingText annotation model.editState of
-        Ok ( newEditState, updatedAnnotation ) ->
-            { model
-                | editState = newEditState
-                , edits = UndoList.mapPresent (Array.set annotation.id updatedAnnotation) model.edits
             }
 
         Err _ ->
@@ -930,10 +843,6 @@ viewImage { url, width, height } =
 drawingConfig : DrawingConfig Msg
 drawingConfig =
     { startDrawing = StartDrawing
-    , finishDrawing = FinishDrawing
-    , finishMoving = \index -> GotSelectedMsg index << FinishMovingAnnotation
-    , finishResizing = \index -> GotSelectedMsg index << FinishResizingAnnotation
-    , finishEditingText = \index -> GotSelectedMsg index FinishEditingText
     , contextMenu = ToggleAnnotationMenu
     }
 
@@ -988,23 +897,22 @@ viewSvgArea model annotations image =
 
 viewDef : Model -> Int -> Annotation -> Annotation.Def Msg
 viewDef model index annotation =
-    EditState.viewDef (annotationConfig index (annoConfig model index)) annotation model.editState
+    EditState.viewDef (annotationConfig (shouldSnap model) index (annoConfig index)) annotation model.editState
 
 
 viewAnnotation : Model -> Int -> Annotation -> Svg Msg
 viewAnnotation model index annotation =
-    EditState.view (annotationConfig index (annoConfig model index)) annotation model.editState
+    EditState.view (annotationConfig (shouldSnap model) index (annoConfig index)) annotation model.editState
 
 
-annotationConfig : Int -> Annotation.Config Msg -> AnnotationConfig Msg
-annotationConfig index config =
+annotationConfig : Bool -> Int -> Annotation.Config Msg -> AnnotationConfig Msg
+annotationConfig snap index config =
     { selectAndMove = GotSelectedMsg index << SelectAndMoveAnnotation
     , contextMenu = GotSelectedMsg index << ToggleSelectedAnnotationMenu
     , startMoving = GotSelectedMsg index << StartMovingAnnotation
-    , finishMoving = GotSelectedMsg index << FinishMovingAnnotation
     , resize = \pos vertex -> GotSelectedMsg index (StartResizingAnnotation pos vertex)
-    , finishResizing = GotSelectedMsg index << FinishResizingAnnotation
     , annotation = config
+    , snap = snap
     }
 
 

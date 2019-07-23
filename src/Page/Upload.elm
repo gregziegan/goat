@@ -54,5 +54,6 @@ content environment =
                 ]
 
 
+toSession : Model -> Session
 toSession model =
     model.session

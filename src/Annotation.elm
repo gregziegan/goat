@@ -78,8 +78,7 @@ type alias Styles =
 
 type Config msg
     = Config
-        { snap : Bool
-        , onInput : { state : AutoExpand.State, textValue : String } -> msg
+        { onInput : { state : AutoExpand.State, textValue : String } -> msg
         , onFocus : msg
         , eventsForVertex : Maybe (Vertex -> List (Svg.Attribute msg)) -- an annotation does not always show vertices
         }
@@ -89,6 +88,7 @@ type alias Attributes msg =
     { events : List (Svg.Attribute msg)
     , translate : ( Int, Int )
     , config : Config msg
+    , snap : Bool
     }
 
 
@@ -114,10 +114,9 @@ init :
     , positions : List Position
     , styles : Styles
     , onInput : { state : AutoExpand.State, textValue : String } -> msg
-    , onFocus : msg
     }
     -> Annotation
-init { id, start, end, positions, onInput, onFocus, choice, styles } =
+init { id, start, end, positions, onInput, choice, styles } =
     { id = id
     , start = start
     , end = end
@@ -134,14 +133,12 @@ init { id, start, end, positions, onInput, onFocus, choice, styles } =
 configure :
     { onInput : { state : AutoExpand.State, textValue : String } -> msg
     , onFocus : msg
-    , snap : Bool
     , eventsForVertex : Maybe (Vertex -> List (Svg.Attribute msg))
     }
     -> Config msg
-configure { onInput, onFocus, snap, eventsForVertex } =
+configure { onInput, onFocus, eventsForVertex } =
     Config
-        { snap = snap
-        , onInput = onInput
+        { onInput = onInput
         , onFocus = onFocus
         , eventsForVertex = eventsForVertex
         }
@@ -575,8 +572,8 @@ viewArrowBody bodyAttributes =
 viewArrowHead : Bool -> ArrowAttributes msg -> Svg msg
 viewArrowHead showDropShadow arrow =
     Svg.path
-        (arrowHeadAttrs arrow
-            ++ arrow.headAttributes
+        (arrow.headAttributes
+            ++ arrowHeadAttrs arrow
             ++ (if showDropShadow then
                     [ filter "url(#dropShadow)" ]
 
@@ -635,41 +632,41 @@ move ( dx, dy ) annotation =
     }
 
 
-resizeFn : Config msg -> Annotation -> (StartPosition -> EndPosition -> Position)
-resizeFn (Config config) annotation =
+resizeFn : Bool -> Annotation -> (StartPosition -> EndPosition -> Position)
+resizeFn snap annotation =
     case annotation.choice of
         Arrow ->
-            calcLinePos config.snap
+            calcLinePos snap
 
         StraightLine ->
-            calcLinePos config.snap
+            calcLinePos snap
 
         FreeHand ->
             calcLinePos False
 
         Rectangle ->
-            calcShapePos config.snap
+            calcShapePos snap
 
         RoundedRectangle ->
-            calcShapePos config.snap
+            calcShapePos snap
 
         Ellipse ->
-            calcShapePos config.snap
+            calcShapePos snap
 
         TextBox ->
             calcShapePos False
 
         SpotlightRectangle ->
-            calcShapePos config.snap
+            calcShapePos snap
 
         SpotlightRoundedRectangle ->
-            calcShapePos config.snap
+            calcShapePos snap
 
         SpotlightEllipse ->
-            calcShapePos config.snap
+            calcShapePos snap
 
         Pixelate ->
-            calcShapePos config.snap
+            calcShapePos snap
 
 
 setStyles : Styles -> Annotation -> Annotation
@@ -741,9 +738,9 @@ spotlightFill =
 
 
 view : Attributes msg -> Annotation -> Svg msg
-view { events, translate, config } ({ start, end, positions, styles, choice } as annotation) =
+view { events, translate, config, snap } ({ start, end, positions, styles, choice } as annotation) =
     let
-        (Config { snap, eventsForVertex }) =
+        (Config { eventsForVertex }) =
             config
 
         { strokeColor, strokeStyle, fill } =
@@ -836,11 +833,8 @@ type Def msg
 
 
 viewDef : Attributes msg -> Annotation -> Def msg
-viewDef { events, config } { start, end, styles, choice } =
+viewDef { events, snap } { start, end, styles, choice } =
     let
-        (Config { snap }) =
-            config
-
         shape =
             Shape start (calcShapePos snap start end) styles.strokeColor styles.strokeStyle
     in
