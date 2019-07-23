@@ -11,6 +11,7 @@ module EditState exposing
     , continueMoving
     , continueResizing
     , drawingEvents
+    , finish
     , finishDrawing
     , finishEditingText
     , finishMoving
@@ -38,7 +39,7 @@ functions, with the exception of `initialState`.
 
 import Annotation exposing (Annotation, Choice(..))
 import Annotation.Vertices exposing (Vertex(..))
-import Browser.Events exposing (onMouseMove)
+import Browser.Events as Events
 import EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
 import Html.Events exposing (stopPropagationOn)
 import Json.Decode as Json
@@ -88,6 +89,7 @@ type alias SubscriptionConfig msg =
     , moved : Position -> msg
     , changedKey : Keyboard.Msg -> msg
     , clicked : Annotation.Id -> msg
+    , finished : Annotation.Id -> msg
     }
 
 
@@ -246,6 +248,36 @@ finishDrawing end annotation editState =
             Err (errorMessage editState)
 
 
+finish : Annotation.Config msg -> Annotation -> EditState -> Result String ( EditState, Annotation )
+finish config annotation editState =
+    case editState of
+        NotSelecting ->
+            Err (errorMessage editState)
+
+        Drawing _ ->
+            case finishDrawing annotation.end annotation editState of
+                Ok ( newState, Just updatedAnnotation ) ->
+                    Ok ( newState, updatedAnnotation )
+
+                Ok ( newState, Nothing ) ->
+                    Ok ( newState, annotation )
+
+                Err err ->
+                    Err err
+
+        Selecting _ ->
+            Err (errorMessage editState)
+
+        Moving _ _ ->
+            finishMoving annotation editState
+
+        Resizing _ _ ->
+            finishResizing config annotation editState
+
+        EditingText _ ->
+            finishEditingText annotation editState
+
+
 selectAnnotation : Annotation -> EditState -> Result String EditState
 selectAnnotation annotation editState =
     case editState of
@@ -376,21 +408,25 @@ subscriptions config editState =
             Selecting _ ->
                 [ Sub.map config.changedKey Keyboard.subscriptions ]
 
-            Drawing _ ->
-                [ onMouseMove (Json.map (config.drew << toDrawingPosition) Position.decoder)
+            Drawing id ->
+                [ Events.onMouseMove (Json.map (config.drew << toDrawingPosition) Position.decoder)
                 , Sub.map config.changedKey Keyboard.subscriptions
+                , Events.onMouseUp (Json.succeed (config.finished id))
                 ]
 
-            Moving _ _ ->
-                [ onMouseMove (Json.map (config.moved << toDrawingPosition) Position.decoder) ]
+            Moving id _ ->
+                [ Events.onMouseMove (Json.map (config.moved << toDrawingPosition) Position.decoder)
+                , Events.onMouseUp (Json.succeed (config.finished id))
+                ]
 
-            Resizing _ _ ->
-                [ onMouseMove (Json.map (config.resized << toDrawingPosition) Position.decoder)
+            Resizing id _ ->
+                [ Events.onMouseMove (Json.map (config.resized << toDrawingPosition) Position.decoder)
                 , Sub.map config.changedKey Keyboard.subscriptions
+                , Events.onMouseUp (Json.succeed (config.finished id))
                 ]
 
             EditingText id ->
-                [ Browser.Events.onMouseDown (Json.succeed (config.clicked id)) ]
+                [ Events.onMouseDown (Json.succeed (config.clicked id)) ]
 
 
 annotationEvents : AnnotationConfig msg -> EditState -> List (Attribute msg)

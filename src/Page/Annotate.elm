@@ -95,6 +95,7 @@ type SelectedMsg
       -- Resize updates
     | StartResizingAnnotation Vertex StartPosition
     | FinishResizingAnnotation Position
+    | FinishedEdit
     | ToggleSelectedAnnotationMenu Position
     | BringAnnotationToFront
     | SendAnnotationToBack
@@ -200,6 +201,9 @@ updateSelected annotation msg model =
                 |> finishResizingAnnotation annotation
             , Cmd.none
             )
+
+        FinishedEdit ->
+            finishEdit annotation model
 
         BringAnnotationToFront ->
             ( bringAnnotationToFront annotation model
@@ -339,6 +343,21 @@ resetEditState model =
     { model | editState = EditState.initialState }
 
 
+finishEdit : Annotation -> Model -> ( Model, Cmd Msg )
+finishEdit annotation model =
+    case EditState.finish (annoConfig model annotation.id) annotation model.editState of
+        Ok ( newState, updatedAnnotation ) ->
+            ( { model
+                | editState = newState
+                , edits = UndoList.new (Array.set annotation.id updatedAnnotation model.edits.present) model.edits
+              }
+            , Cmd.none
+            )
+
+        Err _ ->
+            ( model, Cmd.none )
+
+
 
 -- DRAWING
 
@@ -450,6 +469,10 @@ finishDrawing annotation pos model =
 
         Err _ ->
             ( model, Cmd.none )
+
+
+
+-- MOVING
 
 
 finishMovingAnnotation : Annotation -> Model -> Model
@@ -1110,6 +1133,7 @@ editStateConfig =
     , moved = MoveAnnotation
     , changedKey = KeyboardMsg
     , clicked = \index -> GotSelectedMsg index FinishEditingText
+    , finished = \index -> GotSelectedMsg index FinishedEdit
     }
 
 
