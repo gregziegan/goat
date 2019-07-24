@@ -318,7 +318,7 @@ resetEditState model =
 
 finishEdit : Annotation -> Model -> ( Model, Cmd Msg )
 finishEdit annotation model =
-    case EditState.finish (annotationConfig (shouldSnap model) annotation.id (annoConfig annotation.id)) annotation model.editState of
+    case EditState.finish (annotationConfig model annotation.id) annotation model.editState of
         Successful newState updatedAnnotation ->
             finishValidDrawing updatedAnnotation { model | editState = newState }
 
@@ -349,19 +349,19 @@ startDrawing start model =
         styles =
             model.controls.annotationStyles
 
-        annotation =
-            Annotation.init
-                { id = numAnnotations
-                , choice = model.controls.annotation
-                , start = start
-                , end = start
-                , positions = []
-                , onInput = GotSelectedMsg numAnnotations << TextBoxInput
-                , styles = styles
-                }
+        id =
+            numAnnotations
+
+        drawing =
+            { id = id
+            , choice = model.controls.annotation
+            , start = start
+            , end = start
+            , styles = styles
+            }
     in
-    case EditState.startDrawing annotation model.editState of
-        Ok newEditState ->
+    case EditState.startDrawing (annotationConfig model id) drawing model.editState of
+        Ok ( newEditState, annotation ) ->
             { model
                 | editState = newEditState
             }
@@ -388,15 +388,6 @@ continueDrawing pos annotation model =
 textAreaDomId : Int -> String
 textAreaDomId id =
     "text-box-edit--" ++ String.fromInt id
-
-
-annoConfig : Int -> Annotation.Config Msg
-annoConfig index =
-    Annotation.configure
-        { onInput = GotSelectedMsg index << TextBoxInput
-        , onFocus = GotSelectedMsg index FocusTextArea
-        , eventsForVertex = Nothing
-        }
 
 
 selectText : Int -> Result Dom.Error () -> Msg
@@ -897,22 +888,23 @@ viewSvgArea model annotations image =
 
 viewDef : Model -> Int -> Annotation -> Annotation.Def Msg
 viewDef model index annotation =
-    EditState.viewDef (annotationConfig (shouldSnap model) index (annoConfig index)) annotation model.editState
+    EditState.viewDef (annotationConfig model index) annotation model.editState
 
 
 viewAnnotation : Model -> Int -> Annotation -> Svg Msg
 viewAnnotation model index annotation =
-    EditState.view (annotationConfig (shouldSnap model) index (annoConfig index)) annotation model.editState
+    EditState.view (annotationConfig model index) annotation model.editState
 
 
-annotationConfig : Bool -> Int -> Annotation.Config Msg -> AnnotationConfig Msg
-annotationConfig snap index config =
+annotationConfig : Model -> Int -> AnnotationConfig Msg
+annotationConfig model index =
     { selectAndMove = GotSelectedMsg index << SelectAndMoveAnnotation
     , contextMenu = GotSelectedMsg index << ToggleSelectedAnnotationMenu
     , startMoving = GotSelectedMsg index << StartMovingAnnotation
     , resize = \pos vertex -> GotSelectedMsg index (StartResizingAnnotation pos vertex)
-    , annotation = config
-    , snap = snap
+    , snap = shouldSnap model
+    , onInput = GotSelectedMsg index << TextBoxInput
+    , onFocus = GotSelectedMsg index FocusTextArea
     }
 
 

@@ -1,31 +1,62 @@
 module Annotation exposing
-    ( Annotation
-    , Attributes
-    , Choice(..)
+    ( view, viewDef
+    , configure, withVertices
+    , Annotation, Def(..), Id, Choice(..), Styles, init, defaultStyles
+    , hasNoText, isSpotlight, resizeFn, startAndEnd
+    , move, setStyles, updateTextArea
     , Config
-    , Def(..)
-    , Id
-    , Shape
-    , Styles
-    , calcLinePos
-    , calcShapePos
-    , configure
-    , defaultStyles
-    , hasNoText
-    , init
-    , isSpotlight
-    , lineAttributes
-    , move
-    , rectAttrs
-    , resizeFn
-    , setStyles
-    , startAndEnd
-    , trackPosition
-    , updateTextArea
-    , view
-    , viewDef
-    , withVertices
     )
+
+{-| An annotation is a two-dimensional graphic intended to be rendered above an image to add visual (and
+sometimes textual) information.
+
+Any event handlers you'd like to add to an annotation can be passed in via `configure`.
+
+By pattern matching on the `Choice` enumeration, you should be able to conditionally pass
+any events you need.
+
+    Annotation.configure <|
+        case choice of
+            Arrow ->
+                { defaultConfig | events = [ onDoubleClick ChangeStrokeStyle ] }
+
+            _ ->
+                { defaultConfig | events = [] }
+
+
+# View
+
+@docs view, viewDef
+
+
+# Configuration
+
+@docs configure, withVertices
+
+
+# State
+
+@docs Annotation, Def, Id, Choice, Styles, init, defaultStyles
+
+
+# Query
+
+@docs hasNoText, isSpotlight, resizeFn, startAndEnd
+
+
+# Update
+
+@docs move, setStyles, updateTextArea
+
+
+# Custom Annotations
+
+This is a placeholder for futher customization. More configuration functions will be added
+if `configure` function is not sufficient.
+
+@docs Config
+
+-}
 
 import Annotation.Options exposing (Fill, FontSize, StrokeColor, StrokeStyle(..))
 import Annotation.Vertices as Vertices exposing (Vertex)
@@ -43,10 +74,17 @@ import Svg.Attributes as Attr exposing (d, fill, filter, stroke, transform)
 import Utils exposing (toPx)
 
 
+
+-- STATE
+
+
 type alias Id =
     Int
 
 
+{-| Tracks co-ordinates used to position and size the annotation. An annotation may also be rotated. Its styles
+are also editable.
+-}
 type alias Annotation =
     { id : Id
     , start : Position
@@ -57,6 +95,33 @@ type alias Annotation =
     , autoExpand : AutoExpand.State
     , choice : Choice
     , styles : Styles
+    }
+
+
+{-| Choose what annotation you'd like to represent, and provide the minimal positioning and styling info to
+render it.
+-}
+init :
+    Config msg
+    ->
+        { id : Id
+        , choice : Choice
+        , start : StartPosition
+        , end : EndPosition
+        , styles : Styles
+        }
+    -> Annotation
+init { onInput } { id, start, end, choice, styles } =
+    { id = id
+    , start = start
+    , end = end
+    , positions = []
+    , choice = choice
+    , autoExpand =
+        AutoExpand.initState (autoExpandConfig id styles.fontSize onInput)
+    , angle = 0
+    , text = "Text"
+    , styles = styles
     }
 
 
@@ -76,19 +141,23 @@ type alias Styles =
     }
 
 
-type Config msg
-    = Config
-        { onInput : { state : AutoExpand.State, textValue : String } -> msg
-        , onFocus : msg
-        , eventsForVertex : Maybe (Vertex -> List (Svg.Attribute msg)) -- an annotation does not always show vertices
-        }
+
+-- CONFIG
 
 
-type alias Attributes msg =
+{-| Configuration for your annotation, describing any any event handlers and presentation modifications.
+
+**Note:** Your `Config` should _never_ be held in your model.
+It should only appear in `view` code.
+
+-}
+type alias Config msg =
     { events : List (Svg.Attribute msg)
     , translate : ( Int, Int )
-    , config : Config msg
     , snap : Bool
+    , onInput : { state : AutoExpand.State, textValue : String } -> msg
+    , onFocus : msg
+    , eventsForVertex : Maybe (Vertex -> List (Svg.Attribute msg)) -- an annotation does not always show vertices
     }
 
 
@@ -106,65 +175,28 @@ type Choice
     | TextBox
 
 
-init :
-    { id : Id
-    , choice : Choice
-    , start : StartPosition
-    , end : EndPosition
-    , positions : List Position
-    , styles : Styles
-    , onInput : { state : AutoExpand.State, textValue : String } -> msg
-    }
-    -> Annotation
-init { id, start, end, positions, onInput, choice, styles } =
-    { id = id
-    , start = start
-    , end = end
-    , positions = positions
-    , choice = choice
-    , autoExpand =
-        AutoExpand.initState (autoExpandConfig id styles.fontSize onInput)
-    , angle = 0
-    , text = "Text"
-    , styles = styles
-    }
-
-
 configure :
     { onInput : { state : AutoExpand.State, textValue : String } -> msg
     , onFocus : msg
+    , snap : Bool
+    , translate : ( Int, Int )
     , eventsForVertex : Maybe (Vertex -> List (Svg.Attribute msg))
+    , events : List (Svg.Attribute msg)
     }
     -> Config msg
-configure { onInput, onFocus, eventsForVertex } =
-    Config
-        { onInput = onInput
-        , onFocus = onFocus
-        , eventsForVertex = eventsForVertex
-        }
+configure { onInput, onFocus, eventsForVertex, snap, translate, events } =
+    { onInput = onInput
+    , onFocus = onFocus
+    , eventsForVertex = eventsForVertex
+    , events = events
+    , translate = translate
+    , snap = snap
+    }
 
 
 withVertices : (Vertex -> List (Svg.Attribute msg)) -> Config msg -> Config msg
-withVertices eventsForVertex (Config config) =
-    Config { config | eventsForVertex = Just eventsForVertex }
-
-
-trackPosition : Position -> Annotation -> Annotation
-trackPosition position drawing =
-    { drawing
-        | positions =
-            case drawing.positions of
-                [] ->
-                    [ position ]
-
-                lastPos :: _ ->
-                    if abs (lastPos.x - position.x) < 10 && abs (lastPos.y - position.y) < 10 then
-                        drawing.positions
-
-                    else
-                        position :: drawing.positions
-        , end = position
-    }
+withVertices eventsForVertex config =
+    { config | eventsForVertex = Just eventsForVertex }
 
 
 defaultStyles : Styles
@@ -584,10 +616,6 @@ viewArrowHead showDropShadow arrow =
         []
 
 
-
--- VIEW
-
-
 arrowHeadPath : Position -> String
 arrowHeadPath pos =
     "M"
@@ -595,6 +623,10 @@ arrowHeadPath pos =
         ++ ","
         ++ String.fromFloat (toFloat pos.y - 2.8)
         ++ "l-4.62033,-10.72559l 25.66667, 13.66667l -25.66667, 13.66667l4.62033, -10.33667z"
+
+
+
+-- HELPERS
 
 
 calcLinePos : Bool -> Position -> Position -> Position
@@ -624,12 +656,13 @@ equalXandY a b =
         Position b.x (a.y + Basics.max (b.x - a.x) (a.x - b.x))
 
 
-move : ( Int, Int ) -> Annotation -> Annotation
-move ( dx, dy ) annotation =
-    { annotation
-        | start = Position.shift dx dy annotation.start
-        , end = Position.shift dx dy annotation.end
-    }
+
+-- QUERY
+
+
+startAndEnd : Annotation -> ( StartPosition, EndPosition )
+startAndEnd { start, end } =
+    ( start, end )
 
 
 resizeFn : Bool -> Annotation -> (StartPosition -> EndPosition -> Position)
@@ -669,6 +702,18 @@ resizeFn snap annotation =
             calcShapePos snap
 
 
+
+-- UPDATE
+
+
+move : ( Int, Int ) -> Annotation -> Annotation
+move ( dx, dy ) annotation =
+    { annotation
+        | start = Position.shift dx dy annotation.start
+        , end = Position.shift dx dy annotation.end
+    }
+
+
 setStyles : Styles -> Annotation -> Annotation
 setStyles styles annotation =
     { annotation | styles = styles }
@@ -677,11 +722,6 @@ setStyles styles annotation =
 updateTextArea : AutoExpand.State -> String -> Annotation -> Annotation
 updateTextArea autoExpand textValue annotation =
     { annotation | autoExpand = autoExpand, text = textValue }
-
-
-startAndEnd : Annotation -> ( StartPosition, EndPosition )
-startAndEnd { start, end } =
-    ( start, end )
 
 
 autoExpandConfig :
@@ -737,12 +777,9 @@ spotlightFill =
     Just Palette.black
 
 
-view : Attributes msg -> Annotation -> Svg msg
-view { events, translate, config, snap } ({ start, end, positions, styles, choice } as annotation) =
+view : Config msg -> Annotation -> Svg msg
+view ({ events, translate, eventsForVertex, snap } as config) ({ start, end, positions, styles, choice } as annotation) =
     let
-        (Config { eventsForVertex }) =
-            config
-
         { strokeColor, strokeStyle, fill } =
             styles
 
@@ -832,7 +869,7 @@ type Def msg
     | Empty
 
 
-viewDef : Attributes msg -> Annotation -> Def msg
+viewDef : Config msg -> Annotation -> Def msg
 viewDef { events, snap } { start, end, styles, choice } =
     let
         shape =
@@ -940,7 +977,7 @@ viewText attrs annotation =
 
 
 viewTextBox : Config msg -> Annotation -> Html msg
-viewTextBox (Config { onInput }) { id, start, end, autoExpand, text, styles } =
+viewTextBox { onInput } { id, start, end, autoExpand, text, styles } =
     foreignObject
         [ Attr.y (toPx (-10 + Basics.min start.y end.y))
         , Attr.x (toPx (-20 + Basics.min start.x end.x))
@@ -981,7 +1018,7 @@ toTSpan { start, end, styles } spanText =
 
 
 viewTextBoxWithVertices : Config msg -> List (Svg.Attribute msg) -> Annotation -> Svg msg
-viewTextBoxWithVertices (Config config) attrs ({ start, end, text, styles } as annotation) =
+viewTextBoxWithVertices config attrs ({ start, end, text, styles } as annotation) =
     text
         |> String.split "\n"
         |> List.map (toTSpan annotation)

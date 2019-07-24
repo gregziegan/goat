@@ -36,6 +36,7 @@ functions, with the exception of `initialState`.
 
 import Annotation exposing (Annotation, Choice(..))
 import Annotation.Vertices exposing (Vertex(..))
+import AutoExpand
 import Browser.Events as Events
 import EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
 import Html.Events exposing (stopPropagationOn)
@@ -103,7 +104,8 @@ type alias AnnotationConfig msg =
     , contextMenu : Position -> msg
     , startMoving : StartPosition -> msg
     , resize : Vertex -> StartPosition -> msg
-    , annotation : Annotation.Config msg
+    , onInput : { state : AutoExpand.State, textValue : String } -> msg
+    , onFocus : msg
     , snap : Bool
     }
 
@@ -126,14 +128,28 @@ errorMessage editState =
     editStateToString editState ++ " is not a valid state to start this transition."
 
 
-startDrawing : Annotation -> EditState -> Result String EditState
-startDrawing annotation editState =
+startDrawing :
+    AnnotationConfig msg
+    ->
+        { id : Annotation.Id
+        , choice : Annotation.Choice
+        , start : StartPosition
+        , end : EndPosition
+        , styles : Annotation.Styles
+        }
+    -> EditState
+    -> Result String ( EditState, Annotation )
+startDrawing config drawing editState =
+    let
+        annotation =
+            Annotation.init (configForAnnotation config drawing.id editState) drawing
+    in
     case editState of
         NotSelecting ->
-            Ok (Drawing annotation.id)
+            Ok ( Drawing drawing.id, annotation )
 
         Selecting _ ->
-            Ok (Drawing annotation.id)
+            Ok ( Drawing drawing.id, annotation )
 
         _ ->
             Err (errorMessage editState)
@@ -248,7 +264,7 @@ finish config annotation editState =
             Successful (Selecting id) (Annotation.move translate annotation)
 
         Resizing id resizingInfo ->
-            Successful (Selecting id) (resize (attributes config annotation editState).snap resizingInfo annotation)
+            Successful (Selecting id) (resize (configForAnnotation config annotation.id editState).snap resizingInfo annotation)
 
         EditingText _ ->
             Successful NotSelecting annotation
@@ -489,11 +505,11 @@ resize snap { curPos, vertex, originalCoords } annotation =
             { annotation | start = constrain annotation.end curPos, end = Position end.x start.y }
 
 
-viewHelper : (Annotation.Attributes msg -> Annotation -> view) -> AnnotationConfig msg -> Annotation -> EditState -> view
+viewHelper : (Annotation.Config msg -> Annotation -> view) -> AnnotationConfig msg -> Annotation -> EditState -> view
 viewHelper render config annotation editState =
     let
         attrs =
-            attributes config annotation editState
+            configForAnnotation config annotation.id editState
     in
     case editState of
         NotSelecting ->
@@ -510,7 +526,7 @@ viewHelper render config annotation editState =
 
         Resizing id resizingInfo ->
             if id == annotation.id then
-                render attrs (resize (attributes config annotation editState).snap resizingInfo annotation)
+                render attrs (resize (configForAnnotation config annotation.id editState).snap resizingInfo annotation)
 
             else
                 render attrs annotation
@@ -519,59 +535,74 @@ viewHelper render config annotation editState =
             render attrs annotation
 
 
-attributes : AnnotationConfig msg -> Annotation -> EditState -> Annotation.Attributes msg
-attributes config annotation editState =
+configForAnnotation : AnnotationConfig msg -> Annotation.Id -> EditState -> Annotation.Config msg
+configForAnnotation config id editState =
     let
+        defaultConfig =
+            { onInput = config.onInput
+            , onFocus = config.onFocus
+            , eventsForVertex = Nothing
+            , translate = ( 0, 0 )
+            , snap = config.snap
+            , events = []
+            }
+
         eventsForVertex translate =
             vertexEvents config translate
 
         static =
-            { events = [], translate = ( 0, 0 ), config = config.annotation, snap = False }
+            { defaultConfig | snap = False }
 
         interactive =
-            { events = annotationEvents config editState, translate = ( 0, 0 ), config = config.annotation, snap = config.snap }
+            { defaultConfig | events = annotationEvents config editState }
 
-        moving translate configuredVertices =
-            { events = annotationEvents config editState, translate = translate, config = configuredVertices, snap = config.snap }
+        moving translate =
+            { defaultConfig | events = annotationEvents config editState, translate = translate }
     in
     case editState of
         NotSelecting ->
-            { interactive | snap = False }
+            Annotation.configure { interactive | snap = False }
 
-        Drawing id ->
-            if id == annotation.id then
+        Drawing selectedId ->
+            if id == selectedId then
+                Annotation.configure interactive
+
+            else
+                Annotation.configure static
+
+        Selecting selectedId ->
+            if id == selectedId then
                 interactive
+                    |> Annotation.configure
+                    |> Annotation.withVertices (eventsForVertex Nothing)
 
             else
-                static
+                Annotation.configure static
 
-        Selecting id ->
-            if id == annotation.id then
-                { interactive | config = Annotation.withVertices (eventsForVertex Nothing) config.annotation }
-
-            else
-                static
-
-        Moving id { translate } ->
-            if id == annotation.id then
-                moving translate (Annotation.withVertices (eventsForVertex (Just translate)) config.annotation)
+        Moving selectedId { translate } ->
+            if id == selectedId then
+                moving translate
+                    |> Annotation.configure
+                    |> Annotation.withVertices (eventsForVertex (Just translate))
 
             else
-                static
+                Annotation.configure static
 
-        Resizing id _ ->
-            if id == annotation.id then
-                { interactive | config = Annotation.withVertices (eventsForVertex Nothing) config.annotation }
-
-            else
-                static
-
-        EditingText id ->
-            if id == annotation.id then
+        Resizing selectedId _ ->
+            if id == selectedId then
                 interactive
+                    |> Annotation.configure
+                    |> Annotation.withVertices (eventsForVertex Nothing)
 
             else
-                static
+                Annotation.configure static
+
+        EditingText selectedId ->
+            if id == selectedId then
+                Annotation.configure interactive
+
+            else
+                Annotation.configure static
 
 
 viewDef : AnnotationConfig msg -> Annotation -> EditState -> Annotation.Def msg
