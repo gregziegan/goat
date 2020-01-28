@@ -3,17 +3,17 @@ module Update exposing (all)
 import Array exposing (Array)
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, autoExpand, drawingInfo, end, model, resizingInfo, start, testColor)
-import Goat.Annotation as Annotation exposing (Annotation(..), Drawing(..), LineType(..), ShapeType(..), shiftPosition)
-import Goat.Annotation.Shared exposing (Vertex(Start))
-import Goat.Model exposing (Model)
-import Goat.Update exposing (Msg(..), extractAnnotationAttributes, moveAnnotation, selectAnnotation)
+import Annotation as Annotation exposing (Annotation(..), Drawing(..), LineType(..), ShapeType(..), shiftPosition)
+import Annotation exposing (Vertex(Start))
+import Model exposing (Model)
+
 import Test exposing (..)
 import TestUtil exposing (getFirstAnnotation)
 
 
 update : Msg -> Model -> Model
 update msg model =
-    Tuple.first (Goat.Update.update msg model)
+    Tuple.first (Update.update msg model)
 
 
 initAnnotation : Model -> Maybe Annotation

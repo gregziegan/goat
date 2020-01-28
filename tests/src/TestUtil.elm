@@ -2,8 +2,8 @@ module TestUtil exposing (getFirstAnnotation, isAnnotationMovedByCorrectAmount, 
 
 import Array
 import Fuzz exposing (Fuzzer)
-import Goat.Annotation as Annotation exposing (Annotation, EndPosition, StartPosition, shiftPosition)
-import Goat.Model exposing (Model)
+import Annotation as Annotation exposing (Annotation, EndPosition, StartPosition, shiftPosition)
+import Model exposing (Model)
 import Mouse exposing (Position)
 import Random.Pcg as Random
 import Shrink

@@ -1,4 +1,4 @@
-module Goat.Utils exposing (mapAtIndex, removeItem, removeItemIf)
+module Array.Extra exposing (mapAtIndex, removeItem, removeItemIf)
 
 import Array exposing (Array)
 

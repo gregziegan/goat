@@ -1,4 +1,4 @@
-module Goat.Environment exposing (OperatingSystem(..), Platform(..))
+module Environment exposing (OperatingSystem(..), Platform(..))
 
 
 type OperatingSystem

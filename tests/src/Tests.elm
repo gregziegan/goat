@@ -1,19 +1,19 @@
 module Tests exposing (..)
 
-import Update
-import Update.Controls
+
+
 import Utils
 import Test exposing (..)
-import View.DrawingArea.Annotation
-import View.DrawingArea.Definitions
+import DrawingArea.Annotation
+import DrawingArea.Definitions
 
 
 all : Test
 all =
     describe "Annotation App Suite"
         [ Update.Controls.all
-        , View.DrawingArea.Annotation.all
-        , View.DrawingArea.Definitions.all
+        , DrawingArea.Annotation.all
+        , DrawingArea.Definitions.all
         , Update.all
         , Utils.all
         ]

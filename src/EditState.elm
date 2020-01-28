@@ -1,4 +1,4 @@
-module Goat.EditState exposing (AnnotationConfig, DrawingConfig, EditState, KeyboardConfig, SubscriptionConfig, annotationEvents, continueDrawing, continueMoving, continueResizing, currentAnnotationAttributes, drawingEvents, finishDrawing, finishEditingText, finishMoving, finishResizing, finishTextDrawing, ifMoving, initialState, keyboard, selectAnnotation, selectState, startDrawing, startEditingText, startMoving, startResizing, subscriptions, updateAnySelectedAnnotations, updateSelectedAttributes, vertexEvents, viewDrawing)
+module EditState exposing (AnnotationConfig, DrawingConfig, EditState, KeyboardConfig, SubscriptionConfig, annotationEvents, continueDrawing, continueMoving, continueResizing, currentAnnotationAttributes, drawingEvents, finishDrawing, finishEditingText, finishMoving, finishResizing, finishTextDrawing, ifMoving, initialState, keyboard, selectAnnotation, selectState, startDrawing, startEditingText, startMoving, startResizing, subscriptions, updateAnySelectedAnnotations, updateSelectedAttributes, vertexEvents, viewDrawing)
 
 {-| The finite state machine for annotating.
 See <https://github.com/thebritican/goat/wiki/The-Annotation-Editor's-Finite-State-Machine>
@@ -8,10 +8,10 @@ functions, with the exception of `initialState`.
 
 -}
 
+import Annotation exposing (Vertex)
+import Annotation.Attributes
 import Browser.Events exposing (onMouseMove)
-import Goat.Annotation exposing (SelectState(..))
-import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, MovingInfo, ResizingInfo, SelectingInfo, Vertex)
-import Goat.View.EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
+import EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
 import Html.Events exposing (custom, preventDefaultOn, stopPropagationOn)
 import Html.Events.Extra.Touch as T
 import Json.Decode as Json
@@ -19,6 +19,44 @@ import Keyboard exposing (KeyChange)
 import Mouse exposing (Position)
 import Svg exposing (Attribute)
 import Svg.Attributes as Attr
+
+
+type alias SelectingInfo =
+    { id : Int
+    , attributes : Annotation.Attributes
+    }
+
+
+type alias MovingInfo =
+    { id : Int
+    , start : Position
+    , translate : ( Int, Int )
+    , attributes : Annotation.Attributes
+    }
+
+
+type alias ResizingInfo =
+    { id : Int
+    , start : Position
+    , curPos : Position
+    , vertex : Vertex
+    , originalCoords : ( Position, Position )
+    , attributes : Annotation.Attributes
+    }
+
+
+type alias EditingTextInfo =
+    { id : Int
+    , attributes : Annotation.Attributes
+    }
+
+
+type alias DrawingInfo =
+    { start : StartPosition
+    , current : Position
+    , positions : List Position
+    , annotation : Annotation
+    }
 
 
 type EditState

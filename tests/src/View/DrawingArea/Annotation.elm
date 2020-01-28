@@ -1,18 +1,18 @@
-module View.DrawingArea.Annotation exposing (all)
+module DrawingArea.Annotation exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aShape, aTextArea, end, goat, model, start, testColor)
-import Goat.Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, fontSizeToLineHeight, textareaPadding, toLineStyle)
-import Goat.EditState as EditState
-import Goat.Model exposing (Image)
-import Goat.Update exposing (Msg)
-import Goat.View.DrawingArea exposing (viewImage, viewPixelatedImage)
-import Goat.View.DrawingArea.Annotation exposing (arrowHeadPath, arrowPath, linePath, viewAnnotation)
+import Annotation exposing (Annotation(..), LineType(..), Shape, ShapeType(..), TextArea, arrowAngle, fontSizeToLineHeight, textareaPadding, toLineStyle)
+import EditState as EditState
+import Model exposing (Image)
+
+import DrawingArea exposing (viewImage, viewPixelatedImage)
+import DrawingArea.Annotation exposing (arrowHeadPath, arrowPath, linePath, viewAnnotation)
 import Html exposing (Html)
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
-import View.TestUtil exposing (svgDrawspace)
+import TestUtil exposing (svgDrawspace)
 
 
 lineSelector : Shape -> List Selector

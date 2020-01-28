@@ -1,11 +1,10 @@
-module Goat.Subscriptions exposing (subscriptions)
+module Subscriptions exposing (subscriptions)
 
-import Goat.EditState as EditState exposing (SubscriptionConfig)
-import Goat.Model exposing (Image, Model)
-import Goat.Ports as Ports
-import Goat.Update exposing (Msg(..))
+import EditState as EditState exposing (SubscriptionConfig)
 import Json.Decode as Json exposing (Value, field)
 import List.Selection as Selection
+import Model exposing (Image, Model)
+import Ports as Ports
 import Time
 
 

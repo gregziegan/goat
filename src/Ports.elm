@@ -1,4 +1,4 @@
-port module Goat.Ports exposing (exportToImage, listenForUpload, newImage, requestImages, reset, selectText, setImages)
+port module Ports exposing (exportToImage, listenForUpload, newImage, requestImages, reset, selectText, setImages)
 
 import Json.Decode exposing (Value)
 

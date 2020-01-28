@@ -1,4 +1,4 @@
-module Goat.View.Utils exposing (toPx)
+module Utils exposing (toPx)
 
 
 toPx : Int -> String

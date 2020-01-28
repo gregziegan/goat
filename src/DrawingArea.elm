@@ -1,14 +1,14 @@
-module Goat.View.DrawingArea exposing (view, viewAnnotationMenu, viewImage, viewPixelatedImage)
+module DrawingArea exposing (view, viewAnnotationMenu, viewImage, viewPixelatedImage)
 
 import Array exposing (Array)
-import Goat.Annotation exposing (Annotation(..), Drawing(..), TextArea)
-import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo)
-import Goat.EditState as EditState exposing (DrawingConfig, EditState)
-import Goat.Model exposing (Image)
-import Goat.Update exposing (Msg(..), getFirstSpotlightIndex, isSpotlightDrawing)
-import Goat.View.DrawingArea.Annotation as Annotation exposing (DrawingModifiers, viewAnnotation)
-import Goat.View.DrawingArea.Definitions as Definitions
-import Goat.View.Utils exposing (toPx)
+import Annotation exposing (Annotation(..), Drawing(..), TextArea)
+import Annotation exposing (AnnotationAttributes, DrawingInfo)
+import EditState as EditState exposing (DrawingConfig, EditState)
+import Model exposing (Image)
+
+import DrawingArea.Annotation as Annotation exposing (DrawingModifiers, viewAnnotation)
+import DrawingArea.Definitions as Definitions
+import Utils exposing (toPx)
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Html.Events exposing (onClick, onMouseEnter)

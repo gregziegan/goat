@@ -2,12 +2,12 @@ module Fixtures exposing (aShape, aTextArea, attributes, autoExpand, drawingInfo
 
 import Array exposing (Array)
 import AutoExpand
-import Goat.Annotation as Annotation exposing (EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, autoExpandConfig, shiftPosition)
-import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle, Vertex(..))
-import Goat.EditState as EditState
-import Goat.Environment exposing (OperatingSystem(MacOS), Platform(Web))
-import Goat.Model exposing (Image, Model)
-import Goat.Update exposing (Msg(..), extractAnnotationAttributes)
+import Annotation as Annotation exposing (EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, autoExpandConfig, shiftPosition)
+import Annotation exposing (AnnotationAttributes, DrawingInfo, ResizingInfo, StrokeStyle, Vertex(..))
+import EditState as EditState
+import Environment exposing (OperatingSystem(MacOS), Platform(Web))
+import Model exposing (Image, Model)
+
 import Mouse exposing (Position)
 import UndoList
 import ZipList

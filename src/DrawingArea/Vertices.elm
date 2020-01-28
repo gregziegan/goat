@@ -1,8 +1,8 @@
-module Goat.View.DrawingArea.Vertices exposing (ResizeDirection, viewVertices)
+module DrawingArea.Vertices exposing (ResizeDirection, viewVertices)
 
 import Color
-import Goat.Annotation exposing (EndPosition, SelectState(..), StartPosition)
-import Goat.Annotation.Shared exposing (Vertex(..), Vertices(..))
+import Annotation exposing (EndPosition, SelectState(..), StartPosition)
+import Annotation exposing (Vertex(..), Vertices(..))
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)
 import Svg.Attributes as Attr
 

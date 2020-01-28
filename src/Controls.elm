@@ -1,14 +1,14 @@
-module Goat.View.Controls exposing (view, viewDropdownMenu)
+module Controls exposing (view, viewDropdownMenu)
 
 import Array exposing (Array)
 import Color exposing (Color)
-import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), LineType(..), ShapeType(..), shapes, spotlights)
-import Goat.Annotation.Shared exposing (AnnotationAttributes, StrokeStyle(..))
-import Goat.Environment exposing (OperatingSystem(..))
-import Goat.Model exposing (AttributeDropdown(..), Model)
-import Goat.Update exposing (Msg(..), drawingsAreEqual, isCtrlPressed, isSpotlightDrawing)
-import Goat.View.EventUtils exposing (stopPropagationAndDefault)
-import Goat.View.Icons as Icons
+import Annotation as Annotation exposing (Annotation, Drawing(..), LineType(..), ShapeType(..), shapes, spotlights)
+import Annotation exposing (AnnotationAttributes, StrokeStyle(..))
+import Environment exposing (OperatingSystem(..))
+import Model exposing (AttributeDropdown(..), Model)
+
+import EventUtils exposing (stopPropagationAndDefault)
+import Icons as Icons
 import Html exposing (Attribute, Html, button, div, h2, h3, img, li, p, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style, title)
 import Html.Events exposing (onClick, onMouseDown, onMouseUp)

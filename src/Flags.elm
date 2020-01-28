@@ -1,6 +1,6 @@
-module Goat.Flags exposing (Flags, decodeFlags)
+module Flags exposing (Flags, decodeFlags)
 
-import Goat.Environment exposing (OperatingSystem(..), Platform(..))
+import Environment exposing (OperatingSystem(..), Platform(..))
 import Json.Decode as Json
 
 

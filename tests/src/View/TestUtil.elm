@@ -1,4 +1,4 @@
-module View.TestUtil exposing (..)
+module TestUtil exposing (..)
 
 import Fixtures exposing (goat)
 import Html

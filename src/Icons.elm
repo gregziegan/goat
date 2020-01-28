@@ -1,7 +1,7 @@
-module Goat.View.Icons exposing (freeHand, viewArrow, viewCornerArrow, viewDownArrow, viewEllipse, viewFill, viewFontSize, viewLine, viewNormalLine, viewPencil, viewPixelate, viewRectangle, viewRoundedRectangle, viewSpotlightEllipse, viewSpotlightRect, viewSpotlightRoundedRect, viewStrokeColor, viewStrokeStyle, viewText, viewUndoArrow)
+module Icons exposing (freeHand, viewArrow, viewCornerArrow, viewDownArrow, viewEllipse, viewFill, viewFontSize, viewLine, viewNormalLine, viewPencil, viewPixelate, viewRectangle, viewRoundedRectangle, viewSpotlightEllipse, viewSpotlightRect, viewSpotlightRoundedRect, viewStrokeColor, viewStrokeStyle, viewText, viewUndoArrow)
 
 import Color exposing (Color)
-import Goat.Annotation.Shared exposing (StrokeStyle(..))
+import Annotation exposing (StrokeStyle(..))
 import Html exposing (Html)
 import Html.Attributes
 import Svg exposing (circle, ellipse, g, linearGradient, mask, path, polygon, rect, stop, svg, use)

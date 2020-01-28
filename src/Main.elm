@@ -1,12 +1,9 @@
 module Main exposing (main)
 
 import Browser
-import Goat.Flags exposing (Flags, decodeFlags)
-import Goat.Model as Model exposing (Model, init)
-import Goat.Subscriptions exposing (subscriptions)
-import Goat.Update exposing (Msg, update)
-import Goat.View exposing (view)
+import Flags exposing (Flags, decodeFlags)
 import Json.Decode exposing (Value)
+import Subscriptions exposing (subscriptions)
 
 
 batchCommands : ( model, List (Cmd msg) ) -> ( model, Cmd msg )
@@ -26,9 +23,11 @@ batchUpdate fn =
 
 main : Program Value Model Msg
 main =
-    Browser.element
+    Browser.application
         { init = decodeFlags >> init >> batchInit
         , update = update >> batchUpdate
         , view = view
         , subscriptions = subscriptions
+        , onUrlRequest = onUrlRequest
+        , onUrlUpdate = onUrlUpdate
         }

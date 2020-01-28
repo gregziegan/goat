@@ -2,9 +2,9 @@ module Update.Controls exposing (all)
 
 import Expect exposing (Expectation)
 import Fixtures exposing (aTextArea, end, model, start)
-import Goat.Annotation exposing (Drawing(..))
-import Goat.Model exposing (AttributeDropdown(..))
-import Goat.Update exposing (Msg(ChangeDrawing, CloseDropdown, ToggleDropdown), changeDrawing, toggleDropdown, update)
+import Annotation exposing (Drawing(..))
+import Model exposing (AttributeDropdown(..))
+
 import Test exposing (..)
 
 

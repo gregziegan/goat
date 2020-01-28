@@ -1,4 +1,4 @@
-module Goat.View.EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
+module EventUtils exposing (alwaysPreventDefault, onMouseDown, onMouseUp, stopPropagationAndDefault)
 
 import Html exposing (Attribute)
 import Html.Events exposing (custom, on)
@@ -20,5 +20,6 @@ alwaysPreventDefault msg =
     ( msg, True )
 
 
+stopPropagationAndDefault : String -> Json.Decoder msg -> Attribute msg
 stopPropagationAndDefault event decoder =
     custom event (Json.map (\msg -> { message = msg, stopPropagation = True, preventDefault = True }) decoder)

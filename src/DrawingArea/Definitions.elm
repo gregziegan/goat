@@ -1,4 +1,4 @@
-module Goat.View.DrawingArea.Definitions exposing (view)
+module DrawingArea.Definitions exposing (view)
 
 import Html.Attributes exposing (attribute, class, classList, disabled, id, src, style)
 import Svg exposing (Svg, circle, defs, foreignObject, marker, rect, svg)

@@ -1,16 +1,16 @@
-module View.DrawingArea.Definitions exposing (all)
+module DrawingArea.Definitions exposing (all)
 
 import Fixtures exposing (attributes, drawingInfo)
-import Goat.Annotation as Annotation exposing (Drawing(DrawPixelate, DrawSpotlight), ShapeType(Rect))
-import Goat.EditState as EditState
-import Goat.Update exposing (Msg)
-import Goat.View.DrawingArea.Annotation exposing (viewPixelate, viewSpotlightInMask)
-import Goat.View.DrawingArea.Definitions as Definitions
+import Annotation as Annotation exposing (Drawing(DrawPixelate, DrawSpotlight), ShapeType(Rect))
+import EditState as EditState
+
+import DrawingArea.Annotation exposing (viewPixelate, viewSpotlightInMask)
+import DrawingArea.Definitions as Definitions
 import Svg exposing (Svg)
 import Test exposing (..)
 import Test.Html.Query as Query
 import Test.Html.Selector as HtmlSelector exposing (Selector, all, attribute, class, tag, text)
-import View.TestUtil exposing (svgDrawspace)
+import TestUtil exposing (svgDrawspace)
 
 
 spotlightMaskSelector =

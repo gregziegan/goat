@@ -1,23 +1,114 @@
-module Goat.Update exposing (Msg(..), addAnnotation, alterDrawing, alterTextBoxDrawing, alterToolbarWithKeyboard, annotationAttributesInModel, bringAnnotationToFront, bringToFront, cancelWaitForDropdownToggle, changeDrawing, changeShapeAndSpotlightDropdowns, closeAllMenus, closeDropdown, closeOpenDrawingDropdowns, continueDrawing, controlKeys, copySelectedAnnotation, cutSelectedAnnotation, deleteSelectedDrawing, drawingsAreEqual, editTextBoxAnnotation, extractAnnotationAttributes, finishDrawing, finishEditingText, finishFreeHandDrawing, finishMovingAnnotation, finishNonTextDrawing, finishResizingAnnotation, finishTextDrawing, finishValidDrawing, foldDistance, getFirstSpotlightIndex, handleCopyKey, handleKeyboardInteractions, handlePaste, handleSelectedAnnotationKeyboard, isCtrlPressed, isDrawingTooSmall, isSpotlightDrawing, keyboardConfig, minDrawingDistance, minSpotlightDrawingDistance, moveAnnotation, pasteAnnotation, redoEdit, releaseKey, resetEditState, resizeAnnotation, returnToImageSelection, selectAnnotation, selectImage, selectText, sendAnnotationToBack, sendToBack, setFill, setFontSize, setStrokeColor, setStrokeStyle, skipChange, startDrawing, startEditingText, startMovingAnnotation, startResizingAnnotation, toggleAnnotationMenu, toggleDropdown, tryToBlur, tryToEdit, undoEdit, update, updateAnySelectedAnnotationsHelper, waitForDropdownToggle, whenDrawingKeyboard, whenEditingTextKeyboard, whenMovingKeyboard, whenNotSelectingKeyboard, whenResizingKeyboard, whenSelectingKeyboard)
+module Model exposing (AnnotationMenu, AttributeDropdown(..), Model, init)
 
+import Annotation as Annotation exposing (Annotation, AnnotationAttributes, Drawing(..), DrawingInfo, EditingTextInfo, EndPosition, LineType(..), ResizingInfo, SelectingInfo, Shape, ShapeType(..), StartPosition, StrokeStyle, TextArea, Vertex, calcDistance, defaultDrawing, defaultShape, defaultSpotlight, defaultStroke)
 import Array exposing (Array)
 import AutoExpand
 import Browser.Dom as Dom
 import Color exposing (Color)
-import Goat.Annotation as Annotation exposing (Annotation, Drawing(..), EndPosition, LineType(..), Shape, ShapeType(..), StartPosition, TextArea, calcDistance)
-import Goat.Annotation.Shared exposing (AnnotationAttributes, DrawingInfo, EditingTextInfo, ResizingInfo, SelectingInfo, StrokeStyle, Vertex)
-import Goat.EditState as EditState exposing (EditState, KeyboardConfig)
-import Goat.Environment exposing (OperatingSystem(..))
-import Goat.Model exposing (AttributeDropdown(..), Image, Model)
-import Goat.Ports as Ports
-import Goat.Utils exposing (mapAtIndex, removeItem, removeItemIf)
+import EditState as EditState exposing (EditState, KeyboardConfig)
+import Environment exposing (OperatingSystem(..), Platform(..))
+import Image exposing (Image)
 import Json.Decode as Json
 import Keyboard exposing (Key(..), KeyChange(..), anyKey)
 import List.Extra
 import List.Selection as Selection exposing (Selection)
 import Mouse exposing (Position, position)
+import Ports as Ports
 import Task exposing (succeed)
 import UndoList exposing (UndoList)
+import Utils exposing (mapAtIndex, removeItem, removeItemIf)
+
+
+type AttributeDropdown
+    = ShapesDropdown
+    | SpotlightsDropdown
+    | Fonts
+    | Fills
+    | StrokeColors
+    | Strokes
+
+
+type alias AnnotationMenu =
+    { index : Maybe Int
+    , position : Position
+    }
+
+
+type alias Model =
+    { -- Annotation Editing State
+      edits : UndoList (Array Annotation)
+    , editState : EditState
+    , clipboard : Maybe Annotation
+
+    -- Control UI State
+    , drawing : Drawing
+    , shape : Drawing
+    , spotlight : Drawing
+    , waitingForDropdownToggle : Maybe AttributeDropdown
+    , fill : Maybe Color
+    , strokeColor : Color
+    , strokeStyle : StrokeStyle
+    , fontSize : Int
+    , currentDropdown : Maybe AttributeDropdown
+
+    -- Image Annotator Modals
+    , annotationMenu : Maybe AnnotationMenu
+    , showingAnyMenu : Bool
+
+    -- Image Selection State
+    , images : Maybe (Selection Image)
+
+    -- Keys pressed
+    , pressedKeys : List Key
+
+    -- System/Environment State
+    , operatingSystem : OperatingSystem
+    , platform : Platform
+    }
+
+
+init :
+    Result Json.Error { os : OperatingSystem, platform : Platform }
+    -> ( Model, List (Cmd msg) )
+init decodeResult =
+    case decodeResult of
+        Ok { os, platform } ->
+            ( initialModel os platform
+            , case platform of
+                Zendesk ->
+                    []
+
+                Web ->
+                    [ Ports.listenForUpload () ]
+            )
+
+        Err _ ->
+            ( initialModel Windows Web
+            , [ Ports.listenForUpload () ]
+            )
+
+
+initialModel : OperatingSystem -> Platform -> Model
+initialModel os platform =
+    { edits = UndoList.fresh Array.empty
+    , editState = EditState.initialState
+    , clipboard = Nothing
+    , drawing = defaultDrawing
+    , shape = defaultShape
+    , spotlight = defaultSpotlight
+    , waitingForDropdownToggle = Nothing
+    , fill = Nothing
+    , strokeColor = Color.magenta
+    , strokeStyle = defaultStroke
+    , fontSize = 20
+    , currentDropdown = Nothing
+    , annotationMenu = Nothing
+    , showingAnyMenu = False
+    , images = Nothing
+    , pressedKeys = []
+    , operatingSystem = os
+    , platform = platform
+    }
 
 
 type Msg
@@ -1367,3 +1458,42 @@ isDrawingTooSmall isSpotlight start end =
 isCtrlPressed : List Key -> OperatingSystem -> Bool
 isCtrlPressed pressedKeys os =
     List.any (\key -> List.member key pressedKeys) (controlKeys os)
+
+
+viewModals : Model -> Html Msg
+viewModals model =
+    case model.annotationMenu of
+        Just { index, position } ->
+            DrawingArea.viewAnnotationMenu position index
+
+        Nothing ->
+            text ""
+
+
+viewModalMask : Bool -> Html Msg
+viewModalMask showingAnyMenu =
+    div
+        [ classList [ ( "modal-mask", True ), ( "hidden", not showingAnyMenu ) ]
+        , onClick CloseAllMenus
+        ]
+        []
+
+
+viewImageAnnotator : Model -> Image -> Html Msg
+viewImageAnnotator model selectedImage =
+    let
+        annotationAttrs =
+            currentAnnotationAttributes model.editState (extractAnnotationAttributes model)
+    in
+    div
+        [ class "annotation-app" ]
+        [ viewModals model
+        , viewModalMask model.showingAnyMenu
+        , Controls.view model annotationAttrs (Controls.viewDropdownMenu model.currentDropdown model.drawing annotationAttrs)
+        , DrawingArea.view (toDrawingModifiers model) model.edits.present annotationAttrs selectedImage
+        ]
+
+
+toDrawingModifiers : Model -> DrawingModifiers
+toDrawingModifiers model =
+    DrawingModifiers model.drawing (List.member Shift model.pressedKeys) model.editState
